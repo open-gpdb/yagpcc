@@ -1,0 +1,45 @@
+syntax = "proto3";
+
+import "google/protobuf/timestamp.proto";
+
+package yagpcc;
+option java_outer_classname = "SegmentYAGPCCAC";
+option go_package = "github.com/open-gpdb/yagpcc/api/proto/agent_segment;greenplum";
+
+service AgentControl {
+    rpc ResetStat (ResetStatReq) returns (ControlResponse) {}
+
+    rpc GetAgentInfo (GetInfoReq) returns (InfoRepsonse) {}
+}
+
+message ResetStatReq {    
+}
+
+message GetInfoReq {
+}
+
+message InfoRepsonse {
+    string version = 1;
+
+    google.protobuf.Timestamp reset_time = 2;
+    uint64 queries_count = 3;
+    uint64 plannodes_count = 4;
+    uint64 queries_wiped_out = 5;
+    uint64 plans_wiped_out = 6;
+    uint64 num_gc = 7;
+    uint64 heap_inuse = 8;
+    uint64 heap_alloc = 9;
+    uint32 num_sys_gc = 10;
+}
+
+message ControlResponse {
+    ControlResponseStatusCode error_code = 1;
+    string error_text = 2;
+}
+
+enum ControlResponseStatusCode {
+    CONTROL_RESPONSE_STATUS_CODE_UNSPECIFIED = 0;
+    CONTROL_RESPONSE_STATUS_CODE_SUCCESS = 1;
+    CONTROL_RESPONSE_STATUS_CODE_ERROR = 2;
+}
+

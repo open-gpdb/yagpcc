@@ -1,0 +1,12 @@
+{"level":"debug","ts":1772917290.008669,"msg":"got reset message"}
+{"level":"debug","ts":1772917290.009046,"msg":"got set metric query message query_status:QUERY_STATUS_START  query_key:{}  segment_key:{segindex:1}  query_info:{query_text:\"Hello1\"}  start_time:{seconds:1740125419  nanos:123}  add_info:{}"}
+{"level":"debug","ts":1772917290.009102,"msg":"set metric query message  took 17.541µs"}
+{"level":"debug","ts":1772917290.0094342,"msg":"got set metric query message query_status:QUERY_STATUS_START  query_key:{ssid:1}  segment_key:{segindex:1}  query_info:{query_text:\"Hello2\"}  start_time:{seconds:1740125419  nanos:123}  add_info:{}"}
+{"level":"debug","ts":1772917290.009496,"msg":"set metric query message ssid:1 took 19.666µs"}
+{"level":"debug","ts":1772917290.009878,"msg":"got set metric query message query_status:QUERY_STATUS_DONE  query_key:{}  segment_key:{segindex:1}  query_metrics:{instrumentation:{inherited_calls:10000}}  start_time:{seconds:1740125419  nanos:123}  end_time:{seconds:1740125419  nanos:789}  add_info:{slice_id:1}"}
+{"level":"debug","ts":1772917290.009949,"msg":"set metric query message  took 15.833µs"}
+{"level":"debug","ts":1772917290.010318,"msg":"got set metric query message query_status:QUERY_STATUS_DONE  query_key:{}  segment_key:{segindex:1}  query_metrics:{instrumentation:{inherited_calls:10002}}  start_time:{seconds:1740125419  nanos:123}  end_time:{seconds:1740125419  nanos:789}  add_info:{slice_id:2}"}
+{"level":"debug","ts":1772917290.01039,"msg":"set metric query message  took 16.25µs"}
+{"level":"debug","ts":1772917290.010762,"msg":"got set metric query message query_status:QUERY_STATUS_DONE  query_key:{ssid:1}  segment_key:{segindex:1}  query_metrics:{instrumentation:{inherited_calls:10001}}  start_time:{seconds:1740125419  nanos:123}  end_time:{seconds:1740125419  nanos:789}  add_info:{slice_id:1}"}
+{"level":"debug","ts":1772917290.010817,"msg":"set metric query message ssid:1 took 14.958µs"}
+{"level":"debug","ts":1772917290.011117,"msg":"got get data request clear_sent:true"}

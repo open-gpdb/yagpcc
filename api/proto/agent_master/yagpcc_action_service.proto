@@ -1,0 +1,44 @@
+syntax = "proto3";
+
+import "google/protobuf/empty.proto";
+import "api/proto/common/yagpcc_metrics.proto";
+import "api/proto/common/yagpcc_session.proto";
+
+package yagpcc;
+option java_outer_classname = "MasterYAGPCCAA";
+option go_package = "github.com/open-gpdb/yagpcc/api/proto/agent_master;greenplum";
+
+service ActionService {
+    rpc MoveQueryToResourceGroup (MoveQueryToResourceGroupRequest) returns (google.protobuf.Empty);
+
+    rpc TerminateQuery (TerminateQueryRequest) returns (TerminateResponse);
+    rpc TerminateSession (TerminateSessionRequest) returns (TerminateResponse);
+}
+
+message MoveQueryToResourceGroupRequest {
+    QueryKey query_key           = 1;
+    string   resource_group_name = 2;
+}
+
+message TerminateQueryRequest {
+
+    QueryKey query_key   =  1;
+}
+
+message TerminateResponse {
+
+    TerminateResponseStatusCode status_code   =  1;
+    string status_text                        =  2;
+}
+
+enum TerminateResponseStatusCode {
+
+    TERMINATE_RESPONSE_STATUS_CODE_UNSPECIFIED  =  0;
+    TERMINATE_RESPONSE_STATUS_CODE_SUCCESS      =  1;
+    TERMINATE_RESPONSE_STATUS_CODE_ERROR        =  2;
+}
+
+message TerminateSessionRequest {
+
+    SessionKey session_key   =  1;
+}
