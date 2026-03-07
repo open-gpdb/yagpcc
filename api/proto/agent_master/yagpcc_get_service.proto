@@ -1,0 +1,424 @@
+syntax = "proto3";
+
+import "google/protobuf/timestamp.proto";
+
+import "api/proto/common/yagpcc_metrics.proto";
+import "api/proto/common/yagpcc_session.proto";
+
+package yagpcc;
+option java_outer_classname = "MasterYAGPCCAG";
+option go_package = "github.com/open-gpdb/yagpcc/api/proto/agent_master;greenplum";
+
+service GetGPInfo {
+    rpc GetGPSessions (GetGPSessionsReq) returns (GetGPSessionsResponse) {}
+    rpc GetGPQuery    (GetGPQueryReq) returns (GetGPQueryResponse) {}
+    rpc GetGPQueries (GetGPQueriesReq) returns (GetGPSessionsResponse) {}
+    rpc GetGPSession  (GetGPSessionReq) returns (GetGPSessionResponse) {}
+    rpc GetTotalSessionsStat (GetTotalSessionsReq) returns (GetTotalSessionsResponse) {}
+}
+
+message GetTotalSessionsReq {
+}
+
+message GetGPQueriesReq {
+    repeated SessionFieldWrapper field              =  1;
+    repeated SessionFilter filter                   =  2;
+    int64 page_size                                 =  3;
+    string page_token                               =  4;
+}
+
+message SessionStat {
+    string state   =  1;
+    double count   =  2;
+}
+
+message GetTotalSessionsResponse {
+    repeated SessionStat sessions_stat = 1;
+}
+
+enum RunningQueryType
+{
+    RQT_UNSPECIFIED = 0;
+    RQT_TOP         = 1;           /* show top query */
+    RQT_LAST        = 2;           /* show last executed query */
+}
+
+
+message GetGPSessionsReq {
+    bool show_system                                =  1;
+    repeated SessionFieldWrapper field              =  2;
+    repeated SessionFilter filter                   =  3;
+    int64 page_size                                 =  4;
+    string page_token                               =  5;
+    bool hide_empty_queries                         =  6;
+    RunningQueryType show_query_type                =  7;
+}
+
+message GetGPSessionsResponse {
+    repeated SessionState sessions_state = 1;
+    string next_page_token               = 2;
+}
+
+message GetGPQueryReq {
+    QueryKey query_key  = 1;
+}
+
+message GetGPQueryResponse {
+    TotalQueryData queries_data = 1;
+}
+
+message GetGPSessionReq {
+    SessionKey session_key  = 1;
+}
+
+message GetGPSessionResponse {
+    SessionState sessions_state = 1;
+}
+
+enum StatKind
+{
+    SK_UNSPECIFIED = 0;
+    SK_PRECISE     = 1;           /* Each query has their own metrics */
+    SK_AGGREGATED  = 2;           /* All metrics was agregated in interval-based fashion, start interval and end interval see in start_time and end_time  */
+}
+
+message TotalQueryData {
+   reserved 3;
+   QueryStat query_stat = 1;
+   repeated SegmentMetrics segment_query_metrics = 2;
+}
+
+
+message QueryStat {
+    string cluster_id                               = 1;
+    string hostname                                 = 2;
+    google.protobuf.Timestamp collect_time          = 3;
+    QueryKey query_key                              = 4;
+    QueryInfo query_info                            = 5;
+    StatKind stat_kind                              = 6;
+    QueryStatus query_status                        = 7;
+    google.protobuf.Timestamp start_time            = 8;
+    google.protobuf.Timestamp end_time              = 9;
+    bool completed                                  = 10; // query completed or not
+    GPMetrics total_query_metrics                   = 11; // query metrics calculated as sum from segments
+    AggregatedMetrics aggregated_metrics            = 12; // set if stat_kind == SK_AGGREGATED - for short queries
+    int64 blocked_by_sess_id                        = 13;
+    string wait_mode                                = 14;
+    string locked_item                              = 15;
+    string locked_mode                              = 16;
+    string session_state                            = 17;
+    string message                                  = 18;
+    int64 slices                                    = 19; // the number of registered slices for a query
+}
+
+message QueryStatWrite {
+    string cluster_id                               = 1;
+    string hostname                                 = 2;
+    string collect_time                             = 3;
+    QueryKey query_key                              = 4;
+    QueryInfo query_info                            = 5;
+    StatKind stat_kind                              = 6;
+    QueryStatus query_status                        = 7;
+    string start_time                               = 8;
+    string end_time                                 = 9;
+    bool completed                                  = 10; // query completed or not
+    GPMetrics total_query_metrics                   = 11; // query metrics calculated as sum from segments
+    AggregatedMetrics aggregated_metrics            = 12; // set if stat_kind == SK_AGGREGATED - for short queries
+    int64 blocked_by_sess_id                        = 13;
+    string wait_mode                                = 14;
+    string locked_item                              = 15;
+    string locked_mode                              = 16;
+    string session_state                            = 17;
+    string message                                  = 18;
+    int64 slices                                    = 19; // the number of registered slices for a query
+}
+
+message AggregatedMetrics {
+    int64 calls         = 1;
+    double min_time     = 2;  // min_exec_time
+    double max_time     = 3;  // max_exec_time
+    double mean_time    = 4;  // mean_exec_time
+    double stddev_time  = 5;  // stddev_exec_time
+    double total_time   = 6;  // total_exec_time
+}
+
+message SegmentMetrics {
+    reserved 5, 10;
+    string cluster_id                              = 1;
+    string hostname                                = 2;
+    google.protobuf.Timestamp collect_time         = 3;
+    SegmentKey segment_key                         = 4;
+    QueryStatus query_status                       = 6;
+    google.protobuf.Timestamp start_time           = 7;
+    google.protobuf.Timestamp end_time             = 8;
+    GPMetrics segment_metrics                      = 9;
+    QueryKey query_key                             = 11; // set is used outside of TotalQueryData
+    QueryInfo query_info                           = 12; // set is used outside of TotalQueryData
+}
+
+message SegmentMetricsWrite {
+    reserved 5, 10;
+    string cluster_id                              = 1;
+    string hostname                                = 2;
+    string collect_time                            = 3;
+    SegmentKey segment_key                         = 4;
+    QueryStatus query_status                       = 6;
+    string start_time                              = 7;
+    string end_time                                = 8;
+    GPMetrics segment_metrics                      = 9;
+    QueryKey query_key                             = 11; // set is used outside of TotalQueryData
+    QueryInfo query_info                           = 12; // set is used outside of TotalQueryData
+}
+
+enum SortOrder {
+    SORT_ORDER_UNSPECIFIED            	   =  0;
+    SORT_ASC                               =  1;
+    SORT_DESC                              =  2;
+}
+
+enum SessionField {
+    SESSION_FIELD_UNSPECIFIED              	=  0;
+    SESSION_FIELD_KEY                           =  1;
+    SESSION_FIELD_HOST                          =  2;
+    SESSION_FIELD_PID                           =  3;
+    SESSION_FIELD_DATABASE                      =  4;
+    SESSION_FIELD_USER                          =  5;
+    SESSION_FIELD_APPLICATION_NAME              =  6;
+    SESSION_FIELD_CLIENT_ADDR                   =  7;
+    SESSION_FIELD_CLIENT_HOSTNAME               =  8;
+    SESSION_FIELD_CLIENT_PORT                   =  9;
+    SESSION_FIELD_BACKEND_START                 = 10;
+    SESSION_FIELD_XACT_START                    = 11;
+    SESSION_FIELD_QUERY_START                   = 12;
+    SESSION_FIELD_STATE_CHANGE                  = 13;
+    SESSION_FIELD_WAITING_REASON                = 14;
+    SESSION_FIELD_WAITING                       = 15;
+    SESSION_FIELD_STATE                         = 16;
+    SESSION_FIELD_BACKEND_XID                   = 17;
+    SESSION_FIELD_BACKEND_XMIN                  = 18;
+    SESSION_FIELD_RSGID                         = 19;
+    SESSION_FIELD_RSGNAME                       = 20;
+    SESSION_FIELD_RSGQUEUEDURATION              = 21;
+    SESSION_FIELD_BLOCKED_BY                    = 22;
+    SESSION_FIELD_BLOCKED_REASON                = 23;
+    SESSION_FIELD_RUNNING_QUERY                 = 24;
+    SESSION_FIELD_RUNNING_QUERY_STATUS          = 25;
+    QUERY_GENERATOR                       = 26;
+    QUERY_QUERY_ID                        = 27;
+    QUERY_PLAN_ID                         = 28;
+    QUERY_QUERY_TEXT                      = 29;
+    QUERY_PLAN_TEXT                       = 30;
+    QUERY_TEMPLATE_QUERY_TEXT             = 31;
+    QUERY_TEMPLATE_PLAN_TEXT              = 32;
+    QUERY_USERNAME                        = 33;
+    QUERY_DATABASENAME                    = 34;
+    QUERY_RSGNAME                         = 35;
+
+    TOTAL_RUNNINGTIMESECONDS              = 36;
+    TOTAL_USERTIMESECONDS                 = 37;
+    TOTAL_KERNELTIMESECONDS               = 38;
+    TOTAL_VSIZE                           = 39;
+    TOTAL_RSS                             = 40;
+    TOTAL_VMPEAKKB                        = 42;
+    TOTAL_RCHAR                           = 43;
+    TOTAL_WCHAR                           = 44;
+    TOTAL_SYSCR                           = 45;
+    TOTAL_SYSCW                           = 46;
+    TOTAL_READ_BYTES                      = 47;
+    TOTAL_WRITE_BYTES                     = 48;
+    TOTAL_CANCELLED_WRITE_BYTES           = 49;
+    TOTAL_NTUPLES                         = 50;
+    TOTAL_NLOOPS                          = 51;
+    TOTAL_TUPLECOUNT                      = 52;
+    TOTAL_FIRSTTUPLE                      = 53;
+    TOTAL_STARTUP                         = 54;
+    TOTAL_TOTAL                           = 55;
+    TOTAL_SHARED_BLKS_HIT                 = 56;
+    TOTAL_SHARED_BLKS_READ                = 57;
+    TOTAL_SHARED_BLKS_DIRTIED             = 58;
+    TOTAL_SHARED_BLKS_WRITTEN             = 60;
+    TOTAL_LOCAL_BLKS_HIT                  = 61;
+    TOTAL_LOCAL_BLKS_READ                 = 62;
+    TOTAL_LOCAL_BLKS_DIRTIED              = 63;
+    TOTAL_LOCAL_BLKS_WRITTEN              = 64;
+    TOTAL_TEMP_BLKS_READ                  = 65;
+    TOTAL_TEMP_BLKS_WRITTEN               = 66;
+    TOTAL_BLK_READ_TIME                   = 67;
+    TOTAL_BLK_WRITE_TIME                  = 68;
+    TOTAL_SPILL_FILECOUNT                 = 69;
+    TOTAL_SPILL_TOTALBYTES                = 70;
+
+    LAST_RUNNINGTIMESECONDS               = 71;
+    LAST_USERTIMESECONDS                  = 72;
+    LAST_KERNELTIMESECONDS                = 73;
+    LAST_VSIZE                            = 74;
+    LAST_RSS                              = 75;
+    LAST_VMPEAKKB                         = 77;
+    LAST_RCHAR                            = 78;
+    LAST_WCHAR                            = 79;
+    LAST_SYSCR                            = 80;
+    LAST_SYSCW                            = 81;
+    LAST_READ_BYTES                       = 82;
+    LAST_WRITE_BYTES                      = 83;
+    LAST_CANCELLED_WRITE_BYTES            = 84;
+    LAST_NTUPLES                          = 85;
+    LAST_NLOOPS                           = 86;
+    LAST_TUPLECOUNT                       = 87;
+    LAST_FIRSTTUPLE                       = 88;
+    LAST_STARTUP                          = 89;
+    LAST_TOTAL                            = 90;
+    LAST_SHARED_BLKS_HIT                  = 91;
+    LAST_SHARED_BLKS_READ                 = 92;
+    LAST_SHARED_BLKS_DIRTIED              = 93;
+    LAST_SHARED_BLKS_WRITTEN              = 94;
+    LAST_LOCAL_BLKS_HIT                   = 95;
+    LAST_LOCAL_BLKS_READ                  = 96;
+    LAST_LOCAL_BLKS_DIRTIED               = 97;
+    LAST_LOCAL_BLKS_WRITTEN               = 98;
+    LAST_TEMP_BLKS_READ                   = 100;
+    LAST_TEMP_BLKS_WRITTEN                = 101;
+    LAST_BLK_READ_TIME                    = 102;
+    LAST_BLK_WRITE_TIME                   = 103;
+    LAST_SPILL_FILECOUNT                  = 104;
+    LAST_SPILL_TOTALBYTES                 = 105;
+
+    QUERY_RUNNINGTIMESECONDS              = 106;
+    QUERY_USERTIMESECONDS                 = 107;
+    QUERY_KERNELTIMESECONDS               = 108;
+    QUERY_VSIZE                           = 109;
+    QUERY_RSS                             = 110;
+    QUERY_VMPEAKKB                        = 112;
+    QUERY_RCHAR                           = 113;
+    QUERY_WCHAR                           = 114;
+    QUERY_SYSCR                           = 115;
+    QUERY_SYSCW                           = 116;
+    QUERY_READ_BYTES                      = 117;
+    QUERY_WRITE_BYTES                     = 118;
+    QUERY_CANCELLED_WRITE_BYTES           = 119;
+    QUERY_NTUPLES                         = 120;
+    QUERY_NLOOPS                          = 121;
+    QUERY_TUPLECOUNT                      = 122;
+    QUERY_FIRSTTUPLE                      = 123;
+    QUERY_STARTUP                         = 124;
+    QUERY_TOTAL                           = 125;
+    QUERY_SHARED_BLKS_HIT                 = 126;
+    QUERY_SHARED_BLKS_READ                = 127;
+    QUERY_SHARED_BLKS_DIRTIED             = 128;
+    QUERY_SHARED_BLKS_WRITTEN             = 129;
+    QUERY_LOCAL_BLKS_HIT                  = 130;
+    QUERY_LOCAL_BLKS_READ                 = 131;
+    QUERY_LOCAL_BLKS_DIRTIED              = 132;
+    QUERY_LOCAL_BLKS_WRITTEN              = 133;
+    QUERY_TEMP_BLKS_READ                  = 134;
+    QUERY_TEMP_BLKS_WRITTEN               = 135;
+    QUERY_BLK_READ_TIME                   = 136;
+    QUERY_BLK_WRITE_TIME                  = 137;
+    QUERY_SPILL_FILECOUNT                 = 138;
+    QUERY_SPILL_TOTALBYTES                = 139;
+
+    TOTAL_NET_SENT_TOTAL_BYTES            = 140;
+    TOTAL_NET_SENT_TUPLE_BYTES            = 141;
+    TOTAL_NET_SENT_CHUNKS                 = 142;
+    TOTAL_NET_RECV_TOTAL_BYTES            = 143;
+    TOTAL_NET_RECV_TUPLE_BYTES            = 144;
+    TOTAL_NET_RECV_CHUNKS                 = 145;
+    LAST_NET_SENT_TOTAL_BYTES             = 146;
+    LAST_NET_SENT_TUPLE_BYTES             = 147;
+    LAST_NET_SENT_CHUNKS                  = 148;
+    LAST_NET_RECV_TOTAL_BYTES             = 149;
+    LAST_NET_RECV_TUPLE_BYTES             = 150;
+    LAST_NET_RECV_CHUNKS                  = 151;
+    QUERY_NET_SENT_TOTAL_BYTES            = 152;
+    QUERY_NET_SENT_TUPLE_BYTES            = 153;
+    QUERY_NET_SENT_CHUNKS                 = 154;
+    QUERY_NET_RECV_TOTAL_BYTES            = 155;
+    QUERY_NET_RECV_TUPLE_BYTES            = 156;
+    QUERY_NET_RECV_CHUNKS                 = 157;
+
+    TOTAL_STARTUP_TIME                    = 158;
+    LAST_STARTUP_TIME                     = 159;
+    QUERY_STARTUP_TIME                    = 160;
+    RUNNING_QUERY_LEVEL                   = 161;
+    RUNNING_QUERY_SLICES                  = 162;
+
+    LAST_INHERITED_TIME                              = 163;
+    LAST_INHERITED_CALLS                             = 164;
+    LAST_INTERCONNECT_ACTIVE_CONNECTIONS_NUM         = 165;
+    LAST_INTERCONNECT_BUFFER_COUNTING_TIME           = 166;
+    LAST_INTERCONNECT_CAPACITY_COUNTING_TIME         = 167;
+    LAST_INTERCONNECT_CRC_ERRORS                     = 168;
+    LAST_INTERCONNECT_DISORDERED_PKT_NUM             = 169;
+    LAST_INTERCONNECT_DUPLICATED_PKT_NUM             = 170;
+    LAST_INTERCONNECT_MISMATCH_NUM                   = 171;
+    LAST_INTERCONNECT_RECV_ACK_NUM                   = 172;
+    LAST_INTERCONNECT_RECV_PKT_NUM                   = 173;
+    LAST_INTERCONNECT_RECV_QUEUE_SIZE_COUNTING_TIME  = 174;
+    LAST_INTERCONNECT_RETRANSMITS                    = 175;
+    LAST_INTERCONNECT_SND_PKT_NUM                    = 176;
+    LAST_INTERCONNECT_STARTUP_CACHED_PKT_NUM         = 177;
+    LAST_INTERCONNECT_STATUS_QUERY_MSG_NUM           = 178;
+    LAST_INTERCONNECT_TOTAL_BUFFERS                  = 179;
+    LAST_INTERCONNECT_TOTAL_CAPACITY                 = 180;
+    LAST_INTERCONNECT_TOTAL_RECV_QUEUE_SIZE          = 181;
+    QUERY_INHERITED_TIME                             = 182;
+    QUERY_INHERITED_CALLS                            = 183;
+    QUERY_INTERCONNECT_ACTIVE_CONNECTIONS_NUM        = 184;
+    QUERY_INTERCONNECT_BUFFER_COUNTING_TIME          = 185;
+    QUERY_INTERCONNECT_CAPACITY_COUNTING_TIME        = 186;
+    QUERY_INTERCONNECT_CRC_ERRORS                    = 187;
+    QUERY_INTERCONNECT_DISORDERED_PKT_NUM            = 188;
+    QUERY_INTERCONNECT_DUPLICATED_PKT_NUM            = 189;
+    QUERY_INTERCONNECT_MISMATCH_NUM                  = 190;
+    QUERY_INTERCONNECT_RECV_ACK_NUM                  = 191;
+    QUERY_INTERCONNECT_RECV_PKT_NUM                  = 192;
+    QUERY_INTERCONNECT_RECV_QUEUE_SIZE_COUNTING_TIME = 193;
+    QUERY_INTERCONNECT_RETRANSMITS                   = 194;
+    QUERY_INTERCONNECT_SND_PKT_NUM                   = 195;
+    QUERY_INTERCONNECT_STARTUP_CACHED_PKT_NUM        = 196;
+    QUERY_INTERCONNECT_STATUS_QUERY_MSG_NUM          = 197;
+    QUERY_INTERCONNECT_TOTAL_BUFFERS                 = 198;
+    QUERY_INTERCONNECT_TOTAL_CAPACITY                = 199;
+    QUERY_INTERCONNECT_TOTAL_RECV_QUEUE_SIZE         = 200;
+    TOTAL_INHERITED_TIME                             = 201;
+    TOTAL_INHERITED_CALLS                            = 202;
+    TOTAL_INTERCONNECT_ACTIVE_CONNECTIONS_NUM        = 203;
+    TOTAL_INTERCONNECT_BUFFER_COUNTING_TIME          = 204;
+    TOTAL_INTERCONNECT_CAPACITY_COUNTING_TIME        = 205;
+    TOTAL_INTERCONNECT_CRC_ERRORS                    = 206;
+    TOTAL_INTERCONNECT_DISORDERED_PKT_NUM            = 207;
+    TOTAL_INTERCONNECT_DUPLICATED_PKT_NUM            = 208;
+    TOTAL_INTERCONNECT_MISMATCH_NUM                  = 209;
+    TOTAL_INTERCONNECT_RECV_ACK_NUM                  = 210;
+    TOTAL_INTERCONNECT_RECV_PKT_NUM                  = 211;
+    TOTAL_INTERCONNECT_RECV_QUEUE_SIZE_COUNTING_TIME = 212;
+    TOTAL_INTERCONNECT_RETRANSMITS                   = 213;
+    TOTAL_INTERCONNECT_SND_PKT_NUM                   = 214;
+    TOTAL_INTERCONNECT_STARTUP_CACHED_PKT_NUM        = 215;
+    TOTAL_INTERCONNECT_STATUS_QUERY_MSG_NUM          = 216;
+    TOTAL_INTERCONNECT_TOTAL_BUFFERS                 = 217;
+    TOTAL_INTERCONNECT_TOTAL_CAPACITY                = 218;
+    TOTAL_INTERCONNECT_TOTAL_RECV_QUEUE_SIZE         = 219;
+}
+
+message SessionFieldWrapper {
+    SessionField field_name                =  1;
+    SortOrder order                        =  2;
+}
+
+enum SessionFilterEnum {
+    SESSION_FILTER_ENUM_UNSPECIFIED                               =  0;
+    SESSION_FILTER_HOST                                           =  1;
+    SESSION_FILTER_USER                                           =  2;
+    SESSION_FILTER_DATABASE                                       =  3;
+    SESSION_FILTER_APPLICATION_NAME                               =  4;
+    SESSION_FILTER_CLIENT_HOSTNAME                                =  5;
+    SESSION_FILTER_STATE                                          =  6;
+    SESSION_FILTER_RSGNAME                                        =  7;
+    SESSION_FILTER_SESS_ID                                        =  8;
+    SESSION_FILTER_TM_ID                                          =  9;
+}
+
+message SessionFilter {
+    SessionFilterEnum field_name                   =  1;
+    string value                                   =  2;
+}

@@ -1,0 +1,193 @@
+syntax = "proto3";
+
+import "google/protobuf/timestamp.proto";
+import "api/proto/common/yagpcc_metrics.proto";
+
+package yagpcc;
+option java_outer_classname = "MasterYAGPCCM";
+option go_package = "github.com/open-gpdb/yagpcc/api/proto/common;greenplum";
+
+// SessionKey: represents compound cluster wide unique session identifier.
+message SessionKey {
+    // sess_id: session identifier from pg_stat_activity system view.
+    int64 sess_id = 1;
+
+    // tm_id: made up identifier to ensure SessionKey uniqueness through all cluster lifetime.
+    // It is calculated based on the epoch time of the postmaster start time as following:
+    //     cast(extract(epoch from pg_postmaster_start_time())
+    int64 tm_id   = 2;
+}
+
+// SessionInfo: various session statistics collected mostly from pg_stat_activity on primary master.
+message SessionInfo {
+    // pid: process ID for the session backend on primary master.
+    // Same as pg_stat_activity.pid.
+    int64 pid                               =  1;
+
+    // database: name of the database used by session.
+    // Same as pg_stat_activity.datname.
+    string database                         =  2;
+
+    // user: name of the user logged into this backend.
+    // Same as pg_stat_activity.usename.
+    string user                             =  3;
+
+    // application_name: name of the application that is connected to this backend.
+    // Same as pg_stat_activity.application_name.
+    string application_name                 =  4;
+
+    // client_addr: IP address of the client connected to this backend.
+    // If this field is null, it indicates either that the client is connected via a Unix socket on the server machine
+    // or that this is an internal process such as autovacuum.
+    // A value of 'localhost' or '127.0.0.1' indicates that the connection is local or goes through a connection pooler.
+    // Same as pg_stat_activity.client_addr.
+    string client_addr                      =  5;
+
+    // client_hostname: host name of the connected client, as reported by a reverse DNS lookup of client_addr.
+    // This field will only be non-null for IP connections, and only when log_hostname is enabled.
+    // Same as pg_stat_activity.client_hostname.
+    string client_hostname                  =  6;
+
+    // client_port: TCP port number that the client is using for communication with this backend,
+    // or -1 if a Unix socket is used
+    // Same as pg_stat_activity.client_port.
+    int64 client_port                       =  7;
+
+    // backend_start: time backend process was started.
+    // Same as pg_stat_activity.backend_start.
+    google.protobuf.Timestamp backend_start =  8;
+
+    // xact_start: transaction start time.
+    // If this field is null, it indicates that there is no transaction in progress in the session.
+    // Same as pg_stat_activity.xact_start.
+    google.protobuf.Timestamp xact_start    =  9;
+
+    // query_start: time query began execution.
+    // If this field is null, it indicates that no query was executed in the session.
+    // Same as pg_stat_activity.query_start.
+    google.protobuf.Timestamp query_start   = 10;
+
+    // state_change: time when the `state` was last changed.
+    // Same as pg_stat_activity.state_change.
+    google.protobuf.Timestamp state_change  = 11;
+
+    // waiting_reason: reason the session is waiting.
+    // The value can be: lock, replication, or resgroup.
+    // Same as pg_stat_activity.waiting_reason.
+    string waiting_reason                   = 12;
+
+    // waiting: true if waiting on a lock, false if not waiting.
+    // Same as pg_stat_activity.waiting.
+    bool waiting                            = 13;
+
+    // state: current overall state of the session.
+    // Same as pg_stat_activity.state.
+    string state                            = 14;
+
+    // backend_xid: top-level transaction identifier of this session, if any.
+    // Same as pg_stat_activity.backend_xid.
+    string backend_xid                      = 15;
+
+    // backend_xmin: the session's xmin horizon.
+    // Same as pg_stat_activity.backend_xmin.
+    string backend_xmin                     = 16;
+
+    // rsgid: resource group OID or `0`.
+    // Same as pg_stat_activity.rsgid and pg_resgroup.oid.
+    int64 rsgid                             = 17;
+
+    // rsgname: resource group name or `unknown`.
+    // Same as pg_stat_activity.rsgname and pg_resgroup.rsgname.
+    string rsgname                          = 18;
+
+    // rsgqueueduration: for a queued query, the total time the query has been queued.
+    // Same as pg_stat_activity.rsgqueueduration.
+    string rsgqueueduration                 = 19;
+
+    // blocked_by_sess_id: identifier of a session that blocks the current session.
+    // Same as pg_stat_activity.sess_id and pg_locks.mppsessionid.
+    int64 blocked_by_sess_id                = 20;
+
+    // wait_mode: name of the lock mode desired by the current session.
+    // Same as pg_lock.mode.
+    string wait_mode                        = 21;
+
+    // locked_item: name of the relation targeted by the lock or type of the lockable object.
+    // Calculated as following:
+    //    coalesce(cast(cast(pg_lock.relation AS regclass) AS text), pg_lock.locktype).
+    string locked_item                      = 22;
+
+    // locked_mode: name of the lock mode held by `blocked_by_sess_id` session.
+    // Same as pg_lock.mode.
+    string locked_mode                      = 23;
+}
+
+// QueryDesc: contains detailed information about a query,
+// including its unique identifier, status, and execution details.
+message QueryDesc {
+    // query_key: compound cluster wide unique query identifier.
+    QueryKey query_key                    =  1;
+
+    // query_info: various attributes of the query.
+    QueryInfo query_info                  =  2;
+
+    // query_status: the query status.
+    QueryStatus query_status              =  3;
+
+    // query_level: level of the query nesting.
+    int64 query_level                     =  4;
+
+    // query_start: query start timestamp.
+    google.protobuf.Timestamp query_start =  5;
+}
+
+// SessionState: represents various session related statistics.
+message SessionState {
+    // time: timestamp when statistics was collected.
+    google.protobuf.Timestamp time           =  1;
+
+    // cluster_id: unique identifier of the cluster.
+    string cluster_id                        =  2;
+
+    // hostname: host name of the master primary host.
+    string hostname                          =  3;
+
+    // session_key: cluster wide unique session identifier.
+    SessionKey session_key                   =  4;
+
+    // session_info: various session statistics collected mostly from pg_stat_activity on primary master.
+    SessionInfo session_info                 =  5;
+
+    // running_query: cluster wide unique query identifier of the currently executing query.
+    QueryKey running_query                   =  6;
+
+    // running_query_info: various attributes of the currently executing query.
+    QueryInfo running_query_info             =  7;
+
+    // running_query_status: status of the currently executing query.
+    QueryStatus running_query_status         =  8;
+
+    // total_metrics: various aggregated statistics for the whole session.
+    GPMetrics total_metrics                  =  9;
+
+    // last_metrics: various aggregated statistics for the whole session within 1h time window (now() - 1h).
+    GPMetrics last_metrics                   = 10;
+
+    // query_metrics: various aggregated statistics for the currently executing query.
+    GPMetrics query_metrics                  = 11;
+
+    // running_query_level: nesting level for the currently executing query.
+    int64 running_query_level                = 12;
+
+    // running_queries_stack: a stack of nested queries related to the currently executing query.
+    repeated QueryDesc running_queries_stack = 13;
+
+    // blocked_session_level: level of blocked session if session is blocked.
+    int64 blocked_session_level              = 14;
+
+    // running_query_error: error message for the currently executing query.
+    string running_query_error               = 15;
+
+    // running_query_slices: total number of slices used for the currently executing query.
+    int64 running_query_slices               = 16;
+}

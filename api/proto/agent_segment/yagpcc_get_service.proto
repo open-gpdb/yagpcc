@@ -1,0 +1,37 @@
+syntax = "proto3";
+
+import "google/protobuf/timestamp.proto";
+
+import "api/proto/common/yagpcc_metrics.proto";
+
+package yagpcc;
+option java_outer_classname = "SegmentYAGPCCAG";
+option go_package = "github.com/open-gpdb/yagpcc/api/proto/agent_segment;greenplum";
+
+service GetQueryInfo {
+    rpc GetMetricQueries (GetQueriesInfoReq) returns (GetQueriesInfoResponse) {}
+}
+
+message QueryData {
+    QueryStatus query_status              = 1;
+    google.protobuf.Timestamp query_start = 2;
+    google.protobuf.Timestamp query_end   = 3;
+    QueryKey query_key                    = 4;
+    SegmentKey segment_key                = 5;
+    QueryInfo query_info                  = 6;
+    GPMetrics query_metrics               = 7;
+    AdditionalQueryStat additional_stat   = 9;
+    int64 slice_id                        = 10;
+}
+
+message GetQueriesInfoResponse {
+    repeated QueryData queries_data = 1; 
+}
+
+message GetQueriesInfoReq {
+    repeated QueryKey filter_queries        = 1; // if set show queries with specific QueryKey's
+    google.protobuf.Timestamp from_time     = 2; // if set filter out entries with query start before from_time
+    google.protobuf.Timestamp to_time       = 3; // if set filter out entries with query end after to_time
+    bool clear_sent                         = 4; // clear info after sent query data
+}
+
