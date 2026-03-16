@@ -1,0 +1,13 @@
+role: segment
+listen_port: 1432
+app:
+  logging:
+    level: debug
+  instrumentation:
+    addr: "[::1]:{{ salt['pillar.get']('data:mdb-maintenance:instrumentation:port') }}"
+  sentry:
+    dsn: "{{ salt.pillar.get('data:mdb-maintenance:sentry:dsn') }}"
+    environment: "{{ salt.pillar.get('data:sentry:environment') }}"
+  prometheus:
+    url: "{{ salt['pillar.get']('data:mdb-maintenance:prometheus:url', '') | yaml }}"
+  app_name: yagpcc

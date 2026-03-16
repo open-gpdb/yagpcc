@@ -1,0 +1,23 @@
+role: master
+listen_port: 1432
+segment_pull_rate_sec: 3
+segment_pull_threads: 2
+master_connection:
+  addrs:
+    - iva-imbdpsgenmk30i4g.db.yandex.net:6432
+    - iva-7jmm4pfpu4grrbrk.db.yandex.net:6432
+  sslmode: allow
+  sslrootcert: allCAs.pem
+  password: place_here
+app:
+  logging:
+    level: debug
+    file: server.log
+  instrumentation:
+    addr: "[::1]:{{ salt['pillar.get']('data:mdb-maintenance:instrumentation:port') }}"
+  sentry:
+    dsn: "{{ salt.pillar.get('data:mdb-maintenance:sentry:dsn') }}"
+    environment: "{{ salt.pillar.get('data:sentry:environment') }}"
+  prometheus:
+    url: "{{ salt['pillar.get']('data:mdb-maintenance:prometheus:url', '') | yaml }}"
+  app_name: yagpcc
