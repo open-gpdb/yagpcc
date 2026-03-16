@@ -48,7 +48,7 @@ jobs:
         with:
           go-version: ${{ matrix.go-version }}
       - name: Install dependencies
-        run: go get .
+        run: go get
       - name: Check if builds successfully
         run: go build
       - name: Linter checks
