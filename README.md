@@ -1,6 +1,20 @@
 # yagpcc
 
-Diagnostic tool for Greenplum (Yet Another Greenplum Command Center).
+**yagpcc** (Yet Another Greenplum Command Center) is a diagnostic and monitoring agent for [Greenplum](https://greenplum.org/) clusters. It collects query and session telemetry from the database (via the **yagp-hooks-collector** extension), aggregates it across Master and Segment hosts, and exposes it over gRPC for real-time and historical use.
+
+## Features
+
+- Collects query and session telemetry from the database (via the **yagp-hooks-collector** extension).
+- Aggregates it across Master and Segment hosts.
+- Exposes it over gRPC for real-time and historical use.
+
+## Documentation
+
+| Document | Description |
+|----------|-------------|
+| [**Service architecture**](docs/service-architecture.md) | Services, roles, interfaces (UDS, TCP, libpq), and data flow. |
+| [Architecture overview](docs/architecture.md) | High-level design and system diagram (with Mermaid). |
+| [API description](docs/API.md) | gRPC API reference (GetGPInfo, ActionService, messages, metrics). |
 
 ## Building
 
