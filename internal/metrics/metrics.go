@@ -16,12 +16,13 @@ type YagpccMetricsType struct {
 	TotalQueries      prometheus.Gauge
 	AggregatedQueries prometheus.Gauge
 
-	HandleLatencies *prometheus.HistogramVec
-	QueryLatencies  *prometheus.HistogramVec
-	SliceLatencies  *prometheus.HistogramVec
-	FailedQueries   prometheus.Counter
-	QueryStatuses   *prometheus.CounterVec
-	QueriesInFlight prometheus.Gauge
+	HandleLatencies         *prometheus.HistogramVec
+	QueryLatencies          *prometheus.HistogramVec
+	SliceLatencies          *prometheus.HistogramVec
+	FailedQueries           prometheus.Counter
+	QueryStatuses           *prometheus.CounterVec
+	QueriesInFlight         prometheus.Gauge
+	ExecutingQueryLatencies *TimeGaugeHistogram
 }
 
 var YagpccMetrics *YagpccMetricsType

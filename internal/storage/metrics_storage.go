@@ -227,7 +227,13 @@ func (s *RunningQueriesStorage) garbageCollect() {
 	}
 
 	sort.Slice(ss, func(i, j int) bool {
-		return ss[i].Value.QueryStart.Before(ss[j].Value.QueryStart)
+		endedI := CheckQueryEnded(ss[i].Value.QueryStatus)
+		endedJ := CheckQueryEnded(ss[j].Value.QueryStatus)
+		if endedI == endedJ { // if both finished or unfinished sort by start time
+			return ss[i].Value.QueryStart.Before(ss[j].Value.QueryStart)
+		}
+		// True should be if we have finished effect in J and unfinished in I
+		return endedJ
 	})
 
 	for i := 0; i < (s.maximumStoredQueries/100*s.freePercent) && i < len(ss); i++ {
@@ -442,4 +448,18 @@ func (s *RunningQueriesStorage) StoreInfoInStorage(
 		setMetricsForEndedQuery(nKey, rQ, status, startTime, endTime, submitTime)
 	}
 	return newQuery, nil
+}
+
+func (s *RunningQueriesStorage) GetQueriesStartTime() []time.Time {
+	s.mx.RLock()
+	defer s.mx.RUnlock()
+
+	times := make([]time.Time, 0, len(s.runningQueries))
+	for _, q := range s.runningQueries {
+		if q.QueryStart.IsZero() || CheckQueryEnded(q.QueryStatus) {
+			continue
+		}
+		times = append(times, q.QueryStart)
+	}
+	return times
 }

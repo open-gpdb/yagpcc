@@ -143,3 +143,71 @@ func TestMultipleSlices(t *testing.T) {
 	assert.Equal(t, sliceOne.QueryMetrics.Instrumentation.Nloops, uint64(2))
 
 }
+
+func TestGetQueriesStartTime_Empty(t *testing.T) {
+	s := NewRunningQueriesStorage()
+	assert.Empty(t, s.GetQueriesStartTime())
+}
+
+func TestGetQueriesStartTime_IncludesRunningQueries(t *testing.T) {
+	s := NewRunningQueriesStorage()
+	tA := time.Now().Add(-30 * time.Second)
+	tB := time.Now().Add(-2 * time.Minute)
+	s.newQuery(&QueryKey{Ssid: 1}, int32(pbc.QueryStatus_QUERY_STATUS_START), MeasuredQueryTimes{
+		QueryStart: timestamppb.New(tA),
+	})
+	s.newQuery(&QueryKey{Ssid: 2}, int32(pbc.QueryStatus_QUERY_STATUS_SUBMIT), MeasuredQueryTimes{
+		QueryStart: timestamppb.New(tB),
+	})
+
+	got := s.GetQueriesStartTime()
+	assert.Len(t, got, 2)
+	assert.ElementsMatch(t, []int64{tA.Unix(), tB.Unix()}, []int64{got[0].Unix(), got[1].Unix()})
+}
+
+func TestGetQueriesStartTime_ExcludesEndedQueries(t *testing.T) {
+	s := NewRunningQueriesStorage()
+	tRun := time.Now().Add(-10 * time.Second)
+	s.newQuery(&QueryKey{Ssid: 1}, int32(pbc.QueryStatus_QUERY_STATUS_START), MeasuredQueryTimes{
+		QueryStart: timestamppb.New(tRun),
+	})
+	s.newQuery(&QueryKey{Ssid: 2}, int32(pbc.QueryStatus_QUERY_STATUS_START), MeasuredQueryTimes{
+		QueryStart: timestamppb.New(time.Now().Add(-time.Minute)),
+	})
+
+	s.mx.Lock()
+	s.runningQueries[QueryKey{Ssid: 2}].QueryStatus = int32(pbc.QueryStatus_QUERY_STATUS_DONE)
+	s.mx.Unlock()
+
+	got := s.GetQueriesStartTime()
+	assert.Len(t, got, 1)
+	assert.Equal(t, tRun.Unix(), got[0].Unix())
+}
+
+func TestGetQueriesStartTime_ExcludesCanceledAndError(t *testing.T) {
+	s := NewRunningQueriesStorage()
+	s.newQuery(&QueryKey{Ssid: 1}, int32(pbc.QueryStatus_QUERY_STATUS_START), MeasuredQueryTimes{
+		QueryStart: timestamppb.New(time.Now()),
+	})
+	s.newQuery(&QueryKey{Ssid: 2}, int32(pbc.QueryStatus_QUERY_STATUS_CANCELED), MeasuredQueryTimes{
+		QueryStart: timestamppb.New(time.Now()),
+	})
+	s.newQuery(&QueryKey{Ssid: 3}, int32(pbc.QueryStatus_QUERY_STATUS_ERROR), MeasuredQueryTimes{
+		QueryStart: timestamppb.New(time.Now()),
+	})
+
+	assert.Len(t, s.GetQueriesStartTime(), 1)
+}
+
+func TestGetQueriesStartTime_ExcludesZeroQueryStart(t *testing.T) {
+	s := NewRunningQueriesStorage()
+	s.newQuery(&QueryKey{Ssid: 1}, int32(pbc.QueryStatus_QUERY_STATUS_START), MeasuredQueryTimes{
+		QueryStart: timestamppb.New(time.Now()),
+	})
+
+	s.mx.Lock()
+	s.runningQueries[QueryKey{Ssid: 1}].QueryStart = time.Time{}
+	s.mx.Unlock()
+
+	assert.Empty(t, s.GetQueriesStartTime())
+}

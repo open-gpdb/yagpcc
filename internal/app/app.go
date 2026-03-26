@@ -230,9 +230,10 @@ func InitMetrics() {
 				Name:    "slice",
 				Buckets: requestQueryBuckets(),
 			}, requestQueryLabels()),
-		FailedQueries:   promauto.NewCounter(prometheus.CounterOpts{Name: "failed_queries"}),
-		QueryStatuses:   promauto.NewCounterVec(prometheus.CounterOpts{Name: "query_statuses"}, requestQueryStatuses()),
-		QueriesInFlight: promauto.NewGauge(prometheus.GaugeOpts{Name: "queries_in_flight"}),
+		FailedQueries:           promauto.NewCounter(prometheus.CounterOpts{Name: "failed_queries"}),
+		QueryStatuses:           promauto.NewCounterVec(prometheus.CounterOpts{Name: "query_statuses"}, requestQueryStatuses()),
+		QueriesInFlight:         promauto.NewGauge(prometheus.GaugeOpts{Name: "queries_in_flight"}),
+		ExecutingQueryLatencies: metrics.NewTimeGaugeHistogram("executing_query", "executing queries latencies", prometheus.DefaultRegisterer, requestQueryBuckets()),
 	}
 
 }
@@ -378,6 +379,7 @@ func Run(ctx context.Context, configFile string) error {
 	logger.Debug("Inited metrics")
 
 	rqStorage := storage.NewConfiguredRunningQueriesStorage(cfg)
+	metrics.YagpccMetrics.ExecutingQueryLatencies.AssignQueryGetter(rqStorage.GetQueriesStartTime)
 	aggStorage := storage.NewConfiguredAggregatedStorage(logger, cfg)
 	sessionsStorage := gp.NewSessionsStorage(rqStorage)
 	backgroundStorage := master.NewBackgroundStorage(logger, sessionsStorage, rqStorage, aggStorage)
