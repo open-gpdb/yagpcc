@@ -56,11 +56,55 @@ jobs:
         with:
           version: v2.6
       - name: Test with Go
+        continue-on-error: true
         run: |
-          {
-            go test -json ./... 
-          } | tee -a TestResults-${{ matrix.go-version }}.json
+          set -o pipefail
+          go test -json ./... | tee TestResults-${{ matrix.go-version }}.json
+      - name: Check test results
+        run: |
+          python3 - <<'PY'
+          import json
+          import sys
+          from pathlib import Path
+
+          path = Path("TestResults-${{ matrix.go-version }}.json")
+          if not path.exists():
+              print("Test results file is missing.")
+              sys.exit(1)
+
+          passed = 0
+          failed = 0
+          package_failures = 0
+
+          with path.open("r", encoding="utf-8") as f:
+              for line in f:
+                  line = line.strip()
+                  if not line:
+                      continue
+                  try:
+                      event = json.loads(line)
+                  except json.JSONDecodeError:
+                      continue
+
+                  action = event.get("Action")
+                  test_name = event.get("Test")
+
+                  if action == "pass" and test_name:
+                      passed += 1
+                  elif action == "fail" and test_name:
+                      failed += 1
+                  elif action == "fail" and not test_name:
+                      package_failures += 1
+
+          print(f"Passed tests: {passed}")
+          print(f"Failed tests: {failed}")
+          print(f"Failed packages/builds: {package_failures}")
+
+          if failed > 0 or package_failures > 0:
+              sys.exit(1)
+          PY
       - name: Upload Go test results
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: Go-results-${{ matrix.go-version }}
