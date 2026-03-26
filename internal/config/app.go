@@ -21,7 +21,7 @@ type InstrumentationConfig struct {
 
 func DefaultInstrumentationConfig() InstrumentationConfig {
 	return InstrumentationConfig{
-		Addr:            ":http",
+		Addr:            ":1433",
 		ShutdownTimeout: 10 * time.Second,
 	}
 }
