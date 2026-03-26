@@ -47,16 +47,16 @@ jobs:
         uses: actions/setup-go@v6
         with:
           go-version: ${{ matrix.go-version }}
-      - name: Install dependencies
-        run: go get
+      - name: Download modules
+        run: go mod download
       - name: Check if builds successfully
-        run: go build
+        run: go build ./...
       - name: Linter checks
         uses: golangci/golangci-lint-action@v9
         with:
           version: v2.6
       - name: Test with Go
-        run: go test -json > TestResults-${{ matrix.go-version }}.json
+        run: go test -json ./... > TestResults-${{ matrix.go-version }}.json
       - name: Upload Go test results
         uses: actions/upload-artifact@v4
         with:
