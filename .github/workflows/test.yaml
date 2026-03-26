@@ -56,7 +56,10 @@ jobs:
         with:
           version: v2.6
       - name: Test with Go
-        run: go test -json ./... > TestResults-${{ matrix.go-version }}.json
+        run: |
+        {
+          go test -json ./... 
+        } | tee -a TestResults-${{ matrix.go-version }}.json
       - name: Upload Go test results
         uses: actions/upload-artifact@v4
         with:
