@@ -127,12 +127,12 @@ func setupGRPCClientSet(t *testing.T, sessionMocker *MockStatActivityLister) (*g
 	aggStorage := storage.NewAggregatedStorage(zLogger)
 	backgroundStorage := master.NewBackgroundStorage(zLogger, sessStorage, rqStorage, aggStorage)
 
-	conn, err := gogrpc.DialContext(
-		ctx,
-		"",
-		gogrpc.WithTransportCredentials(insecure.NewCredentials()),
+	conn, err := gogrpc.NewClient(
+		"localhost",
 		gogrpc.WithContextDialer(setupGRPCDialer(t, sessionMocker, backgroundStorage)),
+		gogrpc.WithTransportCredentials(insecure.NewCredentials()),
 	)
+
 	require.NoError(t, err)
 
 	controlClient := pb.NewAgentControlClient(conn)

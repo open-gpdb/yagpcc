@@ -6,10 +6,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/stretchr/testify/require"
-
-	"github.com/golang/protobuf/proto"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/timestamppb"
 
 	pbm "github.com/open-gpdb/yagpcc/api/proto/agent_master"
@@ -107,7 +106,7 @@ func TestAggregate(t *testing.T) {
 	valA, okA := aggStorage.aggQueries[AggKey{QueryID: 123, StartTime: startI, EndTime: endI}]
 	assert.Equal(t, okA, true)
 	assert.Equal(t, valA.TotalMetrics.SystemStat.UserTimeSeconds, float64(57))
-	assert.Equal(t, proto.MarshalTextString(valA.AggTimes), proto.MarshalTextString(&pbm.AggregatedMetrics{Calls: 1, TotalTime: float64(time.Second), MinTime: float64(time.Second), MaxTime: float64(time.Second), MeanTime: float64(time.Second), StddevTime: 0}))
+	assert.True(t, proto.Equal(valA.AggTimes, &pbm.AggregatedMetrics{Calls: 1, TotalTime: float64(time.Second), MinTime: float64(time.Second), MaxTime: float64(time.Second), MeanTime: float64(time.Second), StddevTime: 0}))
 	assert.Equal(t, valA.QueryKey.Ssid, int32(1))
 
 	err = aggStorage.AggQuery(testProto)
@@ -126,7 +125,7 @@ func TestAggregate(t *testing.T) {
 	valA, okA = aggStorage.aggQueries[AggKey{QueryID: 123, StartTime: startI, EndTime: endI}]
 	assert.Equal(t, okA, true)
 	assert.Equal(t, valA.TotalMetrics.SystemStat.UserTimeSeconds, float64(114))
-	assert.Equal(t, proto.MarshalTextString(valA.AggTimes), proto.MarshalTextString(&pbm.AggregatedMetrics{Calls: 2, TotalTime: float64(2 * time.Second), MinTime: float64(time.Second), MaxTime: float64(time.Second), MeanTime: float64(time.Second)}))
+	assert.True(t, proto.Equal(valA.AggTimes, &pbm.AggregatedMetrics{Calls: 2, TotalTime: float64(2 * time.Second), MinTime: float64(time.Second), MaxTime: float64(time.Second), MeanTime: float64(time.Second)}))
 	assert.Equal(t, valA.QueryKey.Ssid, int32(0))
 
 	for i := 0; i < aggStorage.maxQueriesPerUser+20; i++ {
@@ -164,7 +163,7 @@ func TestAggregate(t *testing.T) {
 
 	assert.Equal(t, okA, true)
 	assert.Equal(t, valA.TotalMetrics.SystemStat.UserTimeSeconds, float64(57*20))
-	assert.Equal(t, proto.MarshalTextString(valA.AggTimes), proto.MarshalTextString(&pbm.AggregatedMetrics{Calls: 20, TotalTime: float64(20 * time.Second), MinTime: float64(time.Second), MaxTime: float64(time.Second), MeanTime: float64(time.Second)}))
+	assert.True(t, proto.Equal(valA.AggTimes, &pbm.AggregatedMetrics{Calls: 20, TotalTime: float64(20 * time.Second), MinTime: float64(time.Second), MaxTime: float64(time.Second), MeanTime: float64(time.Second)}))
 	assert.Equal(t, valA.QueryKey.Ssid, int32(0))
 
 }

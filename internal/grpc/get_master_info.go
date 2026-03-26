@@ -96,22 +96,22 @@ func (ms *MultipleSorter) Less(i, j int) bool {
 	// Try all but the last comparison.
 	var k int
 	for k = 0; k < len(ms.Fields); k++ {
-		switch {
-		case ms.Fields[k].FieldName == pbm.SessionField_SESSION_FIELD_KEY:
+		switch ms.Fields[k].FieldName {
+		case pbm.SessionField_SESSION_FIELD_KEY:
 			if less(ms.Fields[k].Order, p.SessionKey.SessId, q.SessionKey.SessId) {
 				return true
 			}
 			if less(ms.Fields[k].Order, q.SessionKey.SessId, p.SessionKey.SessId) {
 				return false
 			}
-		case ms.Fields[k].FieldName == pbm.SessionField_SESSION_FIELD_HOST:
+		case pbm.SessionField_SESSION_FIELD_HOST:
 			if less(ms.Fields[k].Order, p.Hostname, q.Hostname) {
 				return true
 			}
 			if less(ms.Fields[k].Order, q.Hostname, p.Hostname) {
 				return false
 			}
-		case ms.Fields[k].FieldName == pbm.SessionField_SESSION_FIELD_PID:
+		case pbm.SessionField_SESSION_FIELD_PID:
 
 			left, right := int64(0.0), int64(0.0)
 			if p.SessionInfo != nil {
@@ -126,7 +126,7 @@ func (ms *MultipleSorter) Less(i, j int) bool {
 			if less(ms.Fields[k].Order, right, left) {
 				return false
 			}
-		case ms.Fields[k].FieldName == pbm.SessionField_SESSION_FIELD_DATABASE:
+		case pbm.SessionField_SESSION_FIELD_DATABASE:
 
 			left, right := "", ""
 			if p.SessionInfo != nil {
@@ -141,7 +141,7 @@ func (ms *MultipleSorter) Less(i, j int) bool {
 			if less(ms.Fields[k].Order, right, left) {
 				return false
 			}
-		case ms.Fields[k].FieldName == pbm.SessionField_SESSION_FIELD_USER:
+		case pbm.SessionField_SESSION_FIELD_USER:
 
 			left, right := "", ""
 			if p.SessionInfo != nil {
@@ -156,7 +156,7 @@ func (ms *MultipleSorter) Less(i, j int) bool {
 			if less(ms.Fields[k].Order, right, left) {
 				return false
 			}
-		case ms.Fields[k].FieldName == pbm.SessionField_SESSION_FIELD_APPLICATION_NAME:
+		case pbm.SessionField_SESSION_FIELD_APPLICATION_NAME:
 
 			left, right := "", ""
 			if p.SessionInfo != nil {
@@ -171,7 +171,7 @@ func (ms *MultipleSorter) Less(i, j int) bool {
 			if less(ms.Fields[k].Order, right, left) {
 				return false
 			}
-		case ms.Fields[k].FieldName == pbm.SessionField_SESSION_FIELD_CLIENT_ADDR:
+		case pbm.SessionField_SESSION_FIELD_CLIENT_ADDR:
 
 			left, right := "", ""
 			if p.SessionInfo != nil {
@@ -186,7 +186,7 @@ func (ms *MultipleSorter) Less(i, j int) bool {
 			if less(ms.Fields[k].Order, right, left) {
 				return false
 			}
-		case ms.Fields[k].FieldName == pbm.SessionField_SESSION_FIELD_CLIENT_HOSTNAME:
+		case pbm.SessionField_SESSION_FIELD_CLIENT_HOSTNAME:
 
 			left, right := "", ""
 			if p.SessionInfo != nil {
@@ -201,7 +201,7 @@ func (ms *MultipleSorter) Less(i, j int) bool {
 			if less(ms.Fields[k].Order, right, left) {
 				return false
 			}
-		case ms.Fields[k].FieldName == pbm.SessionField_SESSION_FIELD_CLIENT_PORT:
+		case pbm.SessionField_SESSION_FIELD_CLIENT_PORT:
 
 			left, right := int64(0.0), int64(0.0)
 			if p.SessionInfo != nil {
@@ -216,7 +216,7 @@ func (ms *MultipleSorter) Less(i, j int) bool {
 			if less(ms.Fields[k].Order, right, left) {
 				return false
 			}
-		case ms.Fields[k].FieldName == pbm.SessionField_SESSION_FIELD_BACKEND_START:
+		case pbm.SessionField_SESSION_FIELD_BACKEND_START:
 
 			left, right := &timestamppb.Timestamp{}, &timestamppb.Timestamp{}
 			if p.SessionInfo != nil {
@@ -231,7 +231,7 @@ func (ms *MultipleSorter) Less(i, j int) bool {
 			if lesstimestamp(ms.Fields[k].Order, right, left) {
 				return false
 			}
-		case ms.Fields[k].FieldName == pbm.SessionField_SESSION_FIELD_XACT_START:
+		case pbm.SessionField_SESSION_FIELD_XACT_START:
 
 			left, right := &timestamppb.Timestamp{}, &timestamppb.Timestamp{}
 			if p.SessionInfo != nil {
@@ -246,7 +246,7 @@ func (ms *MultipleSorter) Less(i, j int) bool {
 			if lesstimestamp(ms.Fields[k].Order, right, left) {
 				return false
 			}
-		case ms.Fields[k].FieldName == pbm.SessionField_SESSION_FIELD_QUERY_START:
+		case pbm.SessionField_SESSION_FIELD_QUERY_START:
 
 			left, right := &timestamppb.Timestamp{}, &timestamppb.Timestamp{}
 			if p.SessionInfo != nil {
@@ -261,7 +261,7 @@ func (ms *MultipleSorter) Less(i, j int) bool {
 			if lesstimestamp(ms.Fields[k].Order, right, left) {
 				return false
 			}
-		case ms.Fields[k].FieldName == pbm.SessionField_SESSION_FIELD_STATE_CHANGE:
+		case pbm.SessionField_SESSION_FIELD_STATE_CHANGE:
 
 			left, right := &timestamppb.Timestamp{}, &timestamppb.Timestamp{}
 			if p.SessionInfo != nil {
@@ -276,7 +276,7 @@ func (ms *MultipleSorter) Less(i, j int) bool {
 			if lesstimestamp(ms.Fields[k].Order, right, left) {
 				return false
 			}
-		case ms.Fields[k].FieldName == pbm.SessionField_SESSION_FIELD_WAITING_REASON:
+		case pbm.SessionField_SESSION_FIELD_WAITING_REASON:
 
 			left, right := "", ""
 			if p.SessionInfo != nil {
@@ -291,7 +291,7 @@ func (ms *MultipleSorter) Less(i, j int) bool {
 			if less(ms.Fields[k].Order, right, left) {
 				return false
 			}
-		case ms.Fields[k].FieldName == pbm.SessionField_SESSION_FIELD_WAITING:
+		case pbm.SessionField_SESSION_FIELD_WAITING:
 
 			left, right := true, true
 			if p.SessionInfo != nil {
@@ -306,7 +306,7 @@ func (ms *MultipleSorter) Less(i, j int) bool {
 			if lessbool(ms.Fields[k].Order, right, left) {
 				return false
 			}
-		case ms.Fields[k].FieldName == pbm.SessionField_SESSION_FIELD_STATE:
+		case pbm.SessionField_SESSION_FIELD_STATE:
 
 			left, right := "", ""
 			if p.SessionInfo != nil {
@@ -321,7 +321,7 @@ func (ms *MultipleSorter) Less(i, j int) bool {
 			if less(ms.Fields[k].Order, right, left) {
 				return false
 			}
-		case ms.Fields[k].FieldName == pbm.SessionField_SESSION_FIELD_BACKEND_XID:
+		case pbm.SessionField_SESSION_FIELD_BACKEND_XID:
 
 			left, right := "", ""
 			if p.SessionInfo != nil {
@@ -336,7 +336,7 @@ func (ms *MultipleSorter) Less(i, j int) bool {
 			if less(ms.Fields[k].Order, right, left) {
 				return false
 			}
-		case ms.Fields[k].FieldName == pbm.SessionField_SESSION_FIELD_BACKEND_XMIN:
+		case pbm.SessionField_SESSION_FIELD_BACKEND_XMIN:
 
 			left, right := "", ""
 			if p.SessionInfo != nil {
@@ -351,7 +351,7 @@ func (ms *MultipleSorter) Less(i, j int) bool {
 			if less(ms.Fields[k].Order, right, left) {
 				return false
 			}
-		case ms.Fields[k].FieldName == pbm.SessionField_SESSION_FIELD_RSGID:
+		case pbm.SessionField_SESSION_FIELD_RSGID:
 
 			left, right := int64(0.0), int64(0.0)
 			if p.SessionInfo != nil {
@@ -366,7 +366,7 @@ func (ms *MultipleSorter) Less(i, j int) bool {
 			if less(ms.Fields[k].Order, right, left) {
 				return false
 			}
-		case ms.Fields[k].FieldName == pbm.SessionField_SESSION_FIELD_RSGNAME:
+		case pbm.SessionField_SESSION_FIELD_RSGNAME:
 
 			left, right := "", ""
 			if p.SessionInfo != nil {
@@ -381,7 +381,7 @@ func (ms *MultipleSorter) Less(i, j int) bool {
 			if less(ms.Fields[k].Order, right, left) {
 				return false
 			}
-		case ms.Fields[k].FieldName == pbm.SessionField_SESSION_FIELD_RSGQUEUEDURATION:
+		case pbm.SessionField_SESSION_FIELD_RSGQUEUEDURATION:
 
 			left, right := "", ""
 			if p.SessionInfo != nil {
@@ -396,7 +396,7 @@ func (ms *MultipleSorter) Less(i, j int) bool {
 			if less(ms.Fields[k].Order, right, left) {
 				return false
 			}
-		case ms.Fields[k].FieldName == pbm.SessionField_SESSION_FIELD_BLOCKED_BY:
+		case pbm.SessionField_SESSION_FIELD_BLOCKED_BY:
 
 			left, right := int64(0.0), int64(0.0)
 			if p.SessionInfo != nil {
@@ -411,7 +411,7 @@ func (ms *MultipleSorter) Less(i, j int) bool {
 			if less(ms.Fields[k].Order, right, left) {
 				return false
 			}
-		case ms.Fields[k].FieldName == pbm.SessionField_SESSION_FIELD_BLOCKED_REASON:
+		case pbm.SessionField_SESSION_FIELD_BLOCKED_REASON:
 
 			left, right := "", ""
 			if p.SessionInfo != nil {
@@ -426,7 +426,7 @@ func (ms *MultipleSorter) Less(i, j int) bool {
 			if less(ms.Fields[k].Order, right, left) {
 				return false
 			}
-		case ms.Fields[k].FieldName == pbm.SessionField_SESSION_FIELD_RUNNING_QUERY:
+		case pbm.SessionField_SESSION_FIELD_RUNNING_QUERY:
 
 			left := int64(p.RunningQuery.Ssid)*1000000 + int64(p.RunningQuery.Ccnt)
 			right := int64(q.RunningQuery.Ssid)*1000000 + int64(q.RunningQuery.Ccnt)
@@ -436,7 +436,7 @@ func (ms *MultipleSorter) Less(i, j int) bool {
 			if less(ms.Fields[k].Order, right, left) {
 				return false
 			}
-		case ms.Fields[k].FieldName == pbm.SessionField_SESSION_FIELD_RUNNING_QUERY_STATUS:
+		case pbm.SessionField_SESSION_FIELD_RUNNING_QUERY_STATUS:
 
 			left := int64(p.RunningQueryStatus)
 			right := int64(q.RunningQueryStatus)
@@ -446,7 +446,7 @@ func (ms *MultipleSorter) Less(i, j int) bool {
 			if less(ms.Fields[k].Order, right, left) {
 				return false
 			}
-		case ms.Fields[k].FieldName == pbm.SessionField_QUERY_GENERATOR:
+		case pbm.SessionField_QUERY_GENERATOR:
 
 			left, right := int64(0.0), int64(0.0)
 			if p.RunningQueryInfo != nil {
@@ -461,7 +461,7 @@ func (ms *MultipleSorter) Less(i, j int) bool {
 			if less(ms.Fields[k].Order, right, left) {
 				return false
 			}
-		case ms.Fields[k].FieldName == pbm.SessionField_QUERY_QUERY_ID:
+		case pbm.SessionField_QUERY_QUERY_ID:
 
 			left, right := uint64(0.0), uint64(0.0)
 			if p.RunningQueryInfo != nil {
@@ -476,7 +476,7 @@ func (ms *MultipleSorter) Less(i, j int) bool {
 			if less(ms.Fields[k].Order, right, left) {
 				return false
 			}
-		case ms.Fields[k].FieldName == pbm.SessionField_QUERY_PLAN_ID:
+		case pbm.SessionField_QUERY_PLAN_ID:
 
 			left, right := uint64(0.0), uint64(0.0)
 			if p.RunningQueryInfo != nil {
@@ -491,7 +491,7 @@ func (ms *MultipleSorter) Less(i, j int) bool {
 			if less(ms.Fields[k].Order, right, left) {
 				return false
 			}
-		case ms.Fields[k].FieldName == pbm.SessionField_QUERY_QUERY_TEXT:
+		case pbm.SessionField_QUERY_QUERY_TEXT:
 
 			left, right := "", ""
 			if p.RunningQueryInfo != nil {
@@ -506,7 +506,7 @@ func (ms *MultipleSorter) Less(i, j int) bool {
 			if less(ms.Fields[k].Order, right, left) {
 				return false
 			}
-		case ms.Fields[k].FieldName == pbm.SessionField_QUERY_PLAN_TEXT:
+		case pbm.SessionField_QUERY_PLAN_TEXT:
 
 			left, right := "", ""
 			if p.RunningQueryInfo != nil {
@@ -521,7 +521,7 @@ func (ms *MultipleSorter) Less(i, j int) bool {
 			if less(ms.Fields[k].Order, right, left) {
 				return false
 			}
-		case ms.Fields[k].FieldName == pbm.SessionField_QUERY_USERNAME:
+		case pbm.SessionField_QUERY_USERNAME:
 
 			left, right := "", ""
 			if p.RunningQueryInfo != nil {
@@ -536,7 +536,7 @@ func (ms *MultipleSorter) Less(i, j int) bool {
 			if less(ms.Fields[k].Order, right, left) {
 				return false
 			}
-		case ms.Fields[k].FieldName == pbm.SessionField_QUERY_DATABASENAME:
+		case pbm.SessionField_QUERY_DATABASENAME:
 
 			left, right := "", ""
 			if p.RunningQueryInfo != nil {
@@ -551,7 +551,7 @@ func (ms *MultipleSorter) Less(i, j int) bool {
 			if less(ms.Fields[k].Order, right, left) {
 				return false
 			}
-		case ms.Fields[k].FieldName == pbm.SessionField_QUERY_RSGNAME:
+		case pbm.SessionField_QUERY_RSGNAME:
 
 			left, right := "", ""
 			if p.RunningQueryInfo != nil {
@@ -566,7 +566,7 @@ func (ms *MultipleSorter) Less(i, j int) bool {
 			if less(ms.Fields[k].Order, right, left) {
 				return false
 			}
-		case ms.Fields[k].FieldName == pbm.SessionField_TOTAL_RUNNINGTIMESECONDS:
+		case pbm.SessionField_TOTAL_RUNNINGTIMESECONDS:
 
 			left, right := 0.0, 0.0
 			if p.TotalMetrics != nil && p.TotalMetrics.SystemStat != nil {
@@ -581,7 +581,7 @@ func (ms *MultipleSorter) Less(i, j int) bool {
 			if less(ms.Fields[k].Order, right, left) {
 				return false
 			}
-		case ms.Fields[k].FieldName == pbm.SessionField_TOTAL_USERTIMESECONDS:
+		case pbm.SessionField_TOTAL_USERTIMESECONDS:
 
 			left, right := 0.0, 0.0
 			if p.TotalMetrics != nil && p.TotalMetrics.SystemStat != nil {
@@ -596,7 +596,7 @@ func (ms *MultipleSorter) Less(i, j int) bool {
 			if less(ms.Fields[k].Order, right, left) {
 				return false
 			}
-		case ms.Fields[k].FieldName == pbm.SessionField_TOTAL_KERNELTIMESECONDS:
+		case pbm.SessionField_TOTAL_KERNELTIMESECONDS:
 
 			left, right := 0.0, 0.0
 			if p.TotalMetrics != nil && p.TotalMetrics.SystemStat != nil {
@@ -611,7 +611,7 @@ func (ms *MultipleSorter) Less(i, j int) bool {
 			if less(ms.Fields[k].Order, right, left) {
 				return false
 			}
-		case ms.Fields[k].FieldName == pbm.SessionField_TOTAL_VSIZE:
+		case pbm.SessionField_TOTAL_VSIZE:
 
 			left, right := uint64(0.0), uint64(0.0)
 			if p.TotalMetrics != nil && p.TotalMetrics.SystemStat != nil {
@@ -626,7 +626,7 @@ func (ms *MultipleSorter) Less(i, j int) bool {
 			if less(ms.Fields[k].Order, right, left) {
 				return false
 			}
-		case ms.Fields[k].FieldName == pbm.SessionField_TOTAL_RSS:
+		case pbm.SessionField_TOTAL_RSS:
 
 			left, right := uint64(0.0), uint64(0.0)
 			if p.TotalMetrics != nil && p.TotalMetrics.SystemStat != nil {
@@ -641,7 +641,7 @@ func (ms *MultipleSorter) Less(i, j int) bool {
 			if less(ms.Fields[k].Order, right, left) {
 				return false
 			}
-		case ms.Fields[k].FieldName == pbm.SessionField_TOTAL_VMPEAKKB:
+		case pbm.SessionField_TOTAL_VMPEAKKB:
 
 			left, right := uint64(0.0), uint64(0.0)
 			if p.TotalMetrics != nil && p.TotalMetrics.SystemStat != nil {
@@ -656,7 +656,7 @@ func (ms *MultipleSorter) Less(i, j int) bool {
 			if less(ms.Fields[k].Order, right, left) {
 				return false
 			}
-		case ms.Fields[k].FieldName == pbm.SessionField_TOTAL_RCHAR:
+		case pbm.SessionField_TOTAL_RCHAR:
 
 			left, right := uint64(0.0), uint64(0.0)
 			if p.TotalMetrics != nil && p.TotalMetrics.SystemStat != nil {
@@ -671,7 +671,7 @@ func (ms *MultipleSorter) Less(i, j int) bool {
 			if less(ms.Fields[k].Order, right, left) {
 				return false
 			}
-		case ms.Fields[k].FieldName == pbm.SessionField_TOTAL_WCHAR:
+		case pbm.SessionField_TOTAL_WCHAR:
 
 			left, right := uint64(0.0), uint64(0.0)
 			if p.TotalMetrics != nil && p.TotalMetrics.SystemStat != nil {
@@ -686,7 +686,7 @@ func (ms *MultipleSorter) Less(i, j int) bool {
 			if less(ms.Fields[k].Order, right, left) {
 				return false
 			}
-		case ms.Fields[k].FieldName == pbm.SessionField_TOTAL_SYSCR:
+		case pbm.SessionField_TOTAL_SYSCR:
 
 			left, right := uint64(0.0), uint64(0.0)
 			if p.TotalMetrics != nil && p.TotalMetrics.SystemStat != nil {
@@ -701,7 +701,7 @@ func (ms *MultipleSorter) Less(i, j int) bool {
 			if less(ms.Fields[k].Order, right, left) {
 				return false
 			}
-		case ms.Fields[k].FieldName == pbm.SessionField_TOTAL_SYSCW:
+		case pbm.SessionField_TOTAL_SYSCW:
 
 			left, right := uint64(0.0), uint64(0.0)
 			if p.TotalMetrics != nil && p.TotalMetrics.SystemStat != nil {
@@ -716,7 +716,7 @@ func (ms *MultipleSorter) Less(i, j int) bool {
 			if less(ms.Fields[k].Order, right, left) {
 				return false
 			}
-		case ms.Fields[k].FieldName == pbm.SessionField_TOTAL_READ_BYTES:
+		case pbm.SessionField_TOTAL_READ_BYTES:
 
 			left, right := uint64(0.0), uint64(0.0)
 			if p.TotalMetrics != nil && p.TotalMetrics.SystemStat != nil {
@@ -731,7 +731,7 @@ func (ms *MultipleSorter) Less(i, j int) bool {
 			if less(ms.Fields[k].Order, right, left) {
 				return false
 			}
-		case ms.Fields[k].FieldName == pbm.SessionField_TOTAL_WRITE_BYTES:
+		case pbm.SessionField_TOTAL_WRITE_BYTES:
 
 			left, right := uint64(0.0), uint64(0.0)
 			if p.TotalMetrics != nil && p.TotalMetrics.SystemStat != nil {
@@ -746,7 +746,7 @@ func (ms *MultipleSorter) Less(i, j int) bool {
 			if less(ms.Fields[k].Order, right, left) {
 				return false
 			}
-		case ms.Fields[k].FieldName == pbm.SessionField_TOTAL_CANCELLED_WRITE_BYTES:
+		case pbm.SessionField_TOTAL_CANCELLED_WRITE_BYTES:
 
 			left, right := uint64(0.0), uint64(0.0)
 			if p.TotalMetrics != nil && p.TotalMetrics.SystemStat != nil {
@@ -761,7 +761,7 @@ func (ms *MultipleSorter) Less(i, j int) bool {
 			if less(ms.Fields[k].Order, right, left) {
 				return false
 			}
-		case ms.Fields[k].FieldName == pbm.SessionField_TOTAL_NTUPLES:
+		case pbm.SessionField_TOTAL_NTUPLES:
 
 			left, right := uint64(0.0), uint64(0.0)
 			if p.TotalMetrics != nil && p.TotalMetrics.Instrumentation != nil {
@@ -776,7 +776,7 @@ func (ms *MultipleSorter) Less(i, j int) bool {
 			if less(ms.Fields[k].Order, right, left) {
 				return false
 			}
-		case ms.Fields[k].FieldName == pbm.SessionField_TOTAL_NLOOPS:
+		case pbm.SessionField_TOTAL_NLOOPS:
 
 			left, right := uint64(0.0), uint64(0.0)
 			if p.TotalMetrics != nil && p.TotalMetrics.Instrumentation != nil {
@@ -791,7 +791,7 @@ func (ms *MultipleSorter) Less(i, j int) bool {
 			if less(ms.Fields[k].Order, right, left) {
 				return false
 			}
-		case ms.Fields[k].FieldName == pbm.SessionField_TOTAL_TUPLECOUNT:
+		case pbm.SessionField_TOTAL_TUPLECOUNT:
 
 			left, right := uint64(0.0), uint64(0.0)
 			if p.TotalMetrics != nil && p.TotalMetrics.Instrumentation != nil {
@@ -806,7 +806,7 @@ func (ms *MultipleSorter) Less(i, j int) bool {
 			if less(ms.Fields[k].Order, right, left) {
 				return false
 			}
-		case ms.Fields[k].FieldName == pbm.SessionField_TOTAL_FIRSTTUPLE:
+		case pbm.SessionField_TOTAL_FIRSTTUPLE:
 
 			left, right := 0.0, 0.0
 			if p.TotalMetrics != nil && p.TotalMetrics.Instrumentation != nil {
@@ -821,7 +821,7 @@ func (ms *MultipleSorter) Less(i, j int) bool {
 			if less(ms.Fields[k].Order, right, left) {
 				return false
 			}
-		case ms.Fields[k].FieldName == pbm.SessionField_TOTAL_STARTUP:
+		case pbm.SessionField_TOTAL_STARTUP:
 
 			left, right := 0.0, 0.0
 			if p.TotalMetrics != nil && p.TotalMetrics.Instrumentation != nil {
@@ -836,7 +836,7 @@ func (ms *MultipleSorter) Less(i, j int) bool {
 			if less(ms.Fields[k].Order, right, left) {
 				return false
 			}
-		case ms.Fields[k].FieldName == pbm.SessionField_TOTAL_TOTAL:
+		case pbm.SessionField_TOTAL_TOTAL:
 
 			left, right := 0.0, 0.0
 			if p.TotalMetrics != nil && p.TotalMetrics.Instrumentation != nil {
@@ -851,7 +851,7 @@ func (ms *MultipleSorter) Less(i, j int) bool {
 			if less(ms.Fields[k].Order, right, left) {
 				return false
 			}
-		case ms.Fields[k].FieldName == pbm.SessionField_TOTAL_SHARED_BLKS_HIT:
+		case pbm.SessionField_TOTAL_SHARED_BLKS_HIT:
 
 			left, right := uint64(0.0), uint64(0.0)
 			if p.TotalMetrics != nil && p.TotalMetrics.Instrumentation != nil {
@@ -866,7 +866,7 @@ func (ms *MultipleSorter) Less(i, j int) bool {
 			if less(ms.Fields[k].Order, right, left) {
 				return false
 			}
-		case ms.Fields[k].FieldName == pbm.SessionField_TOTAL_SHARED_BLKS_READ:
+		case pbm.SessionField_TOTAL_SHARED_BLKS_READ:
 
 			left, right := uint64(0.0), uint64(0.0)
 			if p.TotalMetrics != nil && p.TotalMetrics.Instrumentation != nil {
@@ -881,7 +881,7 @@ func (ms *MultipleSorter) Less(i, j int) bool {
 			if less(ms.Fields[k].Order, right, left) {
 				return false
 			}
-		case ms.Fields[k].FieldName == pbm.SessionField_TOTAL_SHARED_BLKS_DIRTIED:
+		case pbm.SessionField_TOTAL_SHARED_BLKS_DIRTIED:
 
 			left, right := uint64(0.0), uint64(0.0)
 			if p.TotalMetrics != nil && p.TotalMetrics.Instrumentation != nil {
@@ -896,7 +896,7 @@ func (ms *MultipleSorter) Less(i, j int) bool {
 			if less(ms.Fields[k].Order, right, left) {
 				return false
 			}
-		case ms.Fields[k].FieldName == pbm.SessionField_TOTAL_SHARED_BLKS_WRITTEN:
+		case pbm.SessionField_TOTAL_SHARED_BLKS_WRITTEN:
 
 			left, right := uint64(0.0), uint64(0.0)
 			if p.TotalMetrics != nil && p.TotalMetrics.Instrumentation != nil {
@@ -911,7 +911,7 @@ func (ms *MultipleSorter) Less(i, j int) bool {
 			if less(ms.Fields[k].Order, right, left) {
 				return false
 			}
-		case ms.Fields[k].FieldName == pbm.SessionField_TOTAL_LOCAL_BLKS_HIT:
+		case pbm.SessionField_TOTAL_LOCAL_BLKS_HIT:
 
 			left, right := uint64(0.0), uint64(0.0)
 			if p.TotalMetrics != nil && p.TotalMetrics.Instrumentation != nil {
@@ -926,7 +926,7 @@ func (ms *MultipleSorter) Less(i, j int) bool {
 			if less(ms.Fields[k].Order, right, left) {
 				return false
 			}
-		case ms.Fields[k].FieldName == pbm.SessionField_TOTAL_LOCAL_BLKS_READ:
+		case pbm.SessionField_TOTAL_LOCAL_BLKS_READ:
 
 			left, right := uint64(0.0), uint64(0.0)
 			if p.TotalMetrics != nil && p.TotalMetrics.Instrumentation != nil {
@@ -941,7 +941,7 @@ func (ms *MultipleSorter) Less(i, j int) bool {
 			if less(ms.Fields[k].Order, right, left) {
 				return false
 			}
-		case ms.Fields[k].FieldName == pbm.SessionField_TOTAL_LOCAL_BLKS_DIRTIED:
+		case pbm.SessionField_TOTAL_LOCAL_BLKS_DIRTIED:
 
 			left, right := uint64(0.0), uint64(0.0)
 			if p.TotalMetrics != nil && p.TotalMetrics.Instrumentation != nil {
@@ -956,7 +956,7 @@ func (ms *MultipleSorter) Less(i, j int) bool {
 			if less(ms.Fields[k].Order, right, left) {
 				return false
 			}
-		case ms.Fields[k].FieldName == pbm.SessionField_TOTAL_LOCAL_BLKS_WRITTEN:
+		case pbm.SessionField_TOTAL_LOCAL_BLKS_WRITTEN:
 
 			left, right := uint64(0.0), uint64(0.0)
 			if p.TotalMetrics != nil && p.TotalMetrics.Instrumentation != nil {
@@ -971,7 +971,7 @@ func (ms *MultipleSorter) Less(i, j int) bool {
 			if less(ms.Fields[k].Order, right, left) {
 				return false
 			}
-		case ms.Fields[k].FieldName == pbm.SessionField_TOTAL_TEMP_BLKS_READ:
+		case pbm.SessionField_TOTAL_TEMP_BLKS_READ:
 
 			left, right := uint64(0.0), uint64(0.0)
 			if p.TotalMetrics != nil && p.TotalMetrics.Instrumentation != nil {
@@ -986,7 +986,7 @@ func (ms *MultipleSorter) Less(i, j int) bool {
 			if less(ms.Fields[k].Order, right, left) {
 				return false
 			}
-		case ms.Fields[k].FieldName == pbm.SessionField_TOTAL_TEMP_BLKS_WRITTEN:
+		case pbm.SessionField_TOTAL_TEMP_BLKS_WRITTEN:
 
 			left, right := uint64(0.0), uint64(0.0)
 			if p.TotalMetrics != nil && p.TotalMetrics.Instrumentation != nil {
@@ -1001,7 +1001,7 @@ func (ms *MultipleSorter) Less(i, j int) bool {
 			if less(ms.Fields[k].Order, right, left) {
 				return false
 			}
-		case ms.Fields[k].FieldName == pbm.SessionField_TOTAL_BLK_READ_TIME:
+		case pbm.SessionField_TOTAL_BLK_READ_TIME:
 
 			left, right := 0.0, 0.0
 			if p.TotalMetrics != nil && p.TotalMetrics.Instrumentation != nil {
@@ -1016,7 +1016,7 @@ func (ms *MultipleSorter) Less(i, j int) bool {
 			if less(ms.Fields[k].Order, right, left) {
 				return false
 			}
-		case ms.Fields[k].FieldName == pbm.SessionField_TOTAL_BLK_WRITE_TIME:
+		case pbm.SessionField_TOTAL_BLK_WRITE_TIME:
 
 			left, right := 0.0, 0.0
 			if p.TotalMetrics != nil && p.TotalMetrics.Instrumentation != nil {
@@ -1031,7 +1031,7 @@ func (ms *MultipleSorter) Less(i, j int) bool {
 			if less(ms.Fields[k].Order, right, left) {
 				return false
 			}
-		case ms.Fields[k].FieldName == pbm.SessionField_TOTAL_SPILL_FILECOUNT:
+		case pbm.SessionField_TOTAL_SPILL_FILECOUNT:
 
 			left, right := int64(0.0), int64(0.0)
 			if p.TotalMetrics != nil && p.TotalMetrics.Spill != nil {
@@ -1046,7 +1046,7 @@ func (ms *MultipleSorter) Less(i, j int) bool {
 			if less(ms.Fields[k].Order, right, left) {
 				return false
 			}
-		case ms.Fields[k].FieldName == pbm.SessionField_TOTAL_SPILL_TOTALBYTES:
+		case pbm.SessionField_TOTAL_SPILL_TOTALBYTES:
 
 			left, right := int64(0.0), int64(0.0)
 			if p.TotalMetrics != nil && p.TotalMetrics.Spill != nil {
@@ -1061,7 +1061,7 @@ func (ms *MultipleSorter) Less(i, j int) bool {
 			if less(ms.Fields[k].Order, right, left) {
 				return false
 			}
-		case ms.Fields[k].FieldName == pbm.SessionField_TOTAL_NET_SENT_TOTAL_BYTES:
+		case pbm.SessionField_TOTAL_NET_SENT_TOTAL_BYTES:
 
 			left, right := uint32(0.0), uint32(0.0)
 			if p.TotalMetrics != nil && p.TotalMetrics.Instrumentation != nil && p.TotalMetrics.Instrumentation.Sent != nil {
@@ -1076,7 +1076,7 @@ func (ms *MultipleSorter) Less(i, j int) bool {
 			if less(ms.Fields[k].Order, right, left) {
 				return false
 			}
-		case ms.Fields[k].FieldName == pbm.SessionField_TOTAL_NET_SENT_TUPLE_BYTES:
+		case pbm.SessionField_TOTAL_NET_SENT_TUPLE_BYTES:
 
 			left, right := uint32(0.0), uint32(0.0)
 			if p.TotalMetrics != nil && p.TotalMetrics.Instrumentation != nil && p.TotalMetrics.Instrumentation.Sent != nil {
@@ -1091,7 +1091,7 @@ func (ms *MultipleSorter) Less(i, j int) bool {
 			if less(ms.Fields[k].Order, right, left) {
 				return false
 			}
-		case ms.Fields[k].FieldName == pbm.SessionField_TOTAL_NET_SENT_CHUNKS:
+		case pbm.SessionField_TOTAL_NET_SENT_CHUNKS:
 
 			left, right := uint32(0.0), uint32(0.0)
 			if p.TotalMetrics != nil && p.TotalMetrics.Instrumentation != nil && p.TotalMetrics.Instrumentation.Sent != nil {
@@ -1106,7 +1106,7 @@ func (ms *MultipleSorter) Less(i, j int) bool {
 			if less(ms.Fields[k].Order, right, left) {
 				return false
 			}
-		case ms.Fields[k].FieldName == pbm.SessionField_TOTAL_NET_RECV_TOTAL_BYTES:
+		case pbm.SessionField_TOTAL_NET_RECV_TOTAL_BYTES:
 
 			left, right := uint32(0.0), uint32(0.0)
 			if p.TotalMetrics != nil && p.TotalMetrics.Instrumentation != nil && p.TotalMetrics.Instrumentation.Received != nil {
@@ -1121,7 +1121,7 @@ func (ms *MultipleSorter) Less(i, j int) bool {
 			if less(ms.Fields[k].Order, right, left) {
 				return false
 			}
-		case ms.Fields[k].FieldName == pbm.SessionField_TOTAL_NET_RECV_TUPLE_BYTES:
+		case pbm.SessionField_TOTAL_NET_RECV_TUPLE_BYTES:
 
 			left, right := uint32(0.0), uint32(0.0)
 			if p.TotalMetrics != nil && p.TotalMetrics.Instrumentation != nil && p.TotalMetrics.Instrumentation.Received != nil {
@@ -1136,7 +1136,7 @@ func (ms *MultipleSorter) Less(i, j int) bool {
 			if less(ms.Fields[k].Order, right, left) {
 				return false
 			}
-		case ms.Fields[k].FieldName == pbm.SessionField_TOTAL_NET_RECV_CHUNKS:
+		case pbm.SessionField_TOTAL_NET_RECV_CHUNKS:
 
 			left, right := uint32(0.0), uint32(0.0)
 			if p.TotalMetrics != nil && p.TotalMetrics.Instrumentation != nil && p.TotalMetrics.Instrumentation.Received != nil {
@@ -1151,7 +1151,7 @@ func (ms *MultipleSorter) Less(i, j int) bool {
 			if less(ms.Fields[k].Order, right, left) {
 				return false
 			}
-		case ms.Fields[k].FieldName == pbm.SessionField_LAST_RUNNINGTIMESECONDS:
+		case pbm.SessionField_LAST_RUNNINGTIMESECONDS:
 
 			left, right := 0.0, 0.0
 			if p.LastMetrics != nil && p.LastMetrics.SystemStat != nil {
@@ -1166,7 +1166,7 @@ func (ms *MultipleSorter) Less(i, j int) bool {
 			if less(ms.Fields[k].Order, right, left) {
 				return false
 			}
-		case ms.Fields[k].FieldName == pbm.SessionField_LAST_USERTIMESECONDS:
+		case pbm.SessionField_LAST_USERTIMESECONDS:
 
 			left, right := 0.0, 0.0
 			if p.LastMetrics != nil && p.LastMetrics.SystemStat != nil {
@@ -1181,7 +1181,7 @@ func (ms *MultipleSorter) Less(i, j int) bool {
 			if less(ms.Fields[k].Order, right, left) {
 				return false
 			}
-		case ms.Fields[k].FieldName == pbm.SessionField_LAST_KERNELTIMESECONDS:
+		case pbm.SessionField_LAST_KERNELTIMESECONDS:
 
 			left, right := 0.0, 0.0
 			if p.LastMetrics != nil && p.LastMetrics.SystemStat != nil {
@@ -1196,7 +1196,7 @@ func (ms *MultipleSorter) Less(i, j int) bool {
 			if less(ms.Fields[k].Order, right, left) {
 				return false
 			}
-		case ms.Fields[k].FieldName == pbm.SessionField_LAST_VSIZE:
+		case pbm.SessionField_LAST_VSIZE:
 
 			left, right := uint64(0.0), uint64(0.0)
 			if p.LastMetrics != nil && p.LastMetrics.SystemStat != nil {
@@ -1211,7 +1211,7 @@ func (ms *MultipleSorter) Less(i, j int) bool {
 			if less(ms.Fields[k].Order, right, left) {
 				return false
 			}
-		case ms.Fields[k].FieldName == pbm.SessionField_LAST_RSS:
+		case pbm.SessionField_LAST_RSS:
 
 			left, right := uint64(0.0), uint64(0.0)
 			if p.LastMetrics != nil && p.LastMetrics.SystemStat != nil {
@@ -1226,7 +1226,7 @@ func (ms *MultipleSorter) Less(i, j int) bool {
 			if less(ms.Fields[k].Order, right, left) {
 				return false
 			}
-		case ms.Fields[k].FieldName == pbm.SessionField_LAST_VMPEAKKB:
+		case pbm.SessionField_LAST_VMPEAKKB:
 
 			left, right := uint64(0.0), uint64(0.0)
 			if p.LastMetrics != nil && p.LastMetrics.SystemStat != nil {
@@ -1241,7 +1241,7 @@ func (ms *MultipleSorter) Less(i, j int) bool {
 			if less(ms.Fields[k].Order, right, left) {
 				return false
 			}
-		case ms.Fields[k].FieldName == pbm.SessionField_LAST_RCHAR:
+		case pbm.SessionField_LAST_RCHAR:
 
 			left, right := uint64(0.0), uint64(0.0)
 			if p.LastMetrics != nil && p.LastMetrics.SystemStat != nil {
@@ -1256,7 +1256,7 @@ func (ms *MultipleSorter) Less(i, j int) bool {
 			if less(ms.Fields[k].Order, right, left) {
 				return false
 			}
-		case ms.Fields[k].FieldName == pbm.SessionField_LAST_WCHAR:
+		case pbm.SessionField_LAST_WCHAR:
 
 			left, right := uint64(0.0), uint64(0.0)
 			if p.LastMetrics != nil && p.LastMetrics.SystemStat != nil {
@@ -1271,7 +1271,7 @@ func (ms *MultipleSorter) Less(i, j int) bool {
 			if less(ms.Fields[k].Order, right, left) {
 				return false
 			}
-		case ms.Fields[k].FieldName == pbm.SessionField_LAST_SYSCR:
+		case pbm.SessionField_LAST_SYSCR:
 
 			left, right := uint64(0.0), uint64(0.0)
 			if p.LastMetrics != nil && p.LastMetrics.SystemStat != nil {
@@ -1286,7 +1286,7 @@ func (ms *MultipleSorter) Less(i, j int) bool {
 			if less(ms.Fields[k].Order, right, left) {
 				return false
 			}
-		case ms.Fields[k].FieldName == pbm.SessionField_LAST_SYSCW:
+		case pbm.SessionField_LAST_SYSCW:
 
 			left, right := uint64(0.0), uint64(0.0)
 			if p.LastMetrics != nil && p.LastMetrics.SystemStat != nil {
@@ -1301,7 +1301,7 @@ func (ms *MultipleSorter) Less(i, j int) bool {
 			if less(ms.Fields[k].Order, right, left) {
 				return false
 			}
-		case ms.Fields[k].FieldName == pbm.SessionField_LAST_READ_BYTES:
+		case pbm.SessionField_LAST_READ_BYTES:
 
 			left, right := uint64(0.0), uint64(0.0)
 			if p.LastMetrics != nil && p.LastMetrics.SystemStat != nil {
@@ -1316,7 +1316,7 @@ func (ms *MultipleSorter) Less(i, j int) bool {
 			if less(ms.Fields[k].Order, right, left) {
 				return false
 			}
-		case ms.Fields[k].FieldName == pbm.SessionField_LAST_WRITE_BYTES:
+		case pbm.SessionField_LAST_WRITE_BYTES:
 
 			left, right := uint64(0.0), uint64(0.0)
 			if p.LastMetrics != nil && p.LastMetrics.SystemStat != nil {
@@ -1331,7 +1331,7 @@ func (ms *MultipleSorter) Less(i, j int) bool {
 			if less(ms.Fields[k].Order, right, left) {
 				return false
 			}
-		case ms.Fields[k].FieldName == pbm.SessionField_LAST_CANCELLED_WRITE_BYTES:
+		case pbm.SessionField_LAST_CANCELLED_WRITE_BYTES:
 
 			left, right := uint64(0.0), uint64(0.0)
 			if p.LastMetrics != nil && p.LastMetrics.SystemStat != nil {
@@ -1346,7 +1346,7 @@ func (ms *MultipleSorter) Less(i, j int) bool {
 			if less(ms.Fields[k].Order, right, left) {
 				return false
 			}
-		case ms.Fields[k].FieldName == pbm.SessionField_LAST_NTUPLES:
+		case pbm.SessionField_LAST_NTUPLES:
 
 			left, right := uint64(0.0), uint64(0.0)
 			if p.LastMetrics != nil && p.LastMetrics.Instrumentation != nil {
@@ -1361,7 +1361,7 @@ func (ms *MultipleSorter) Less(i, j int) bool {
 			if less(ms.Fields[k].Order, right, left) {
 				return false
 			}
-		case ms.Fields[k].FieldName == pbm.SessionField_LAST_NLOOPS:
+		case pbm.SessionField_LAST_NLOOPS:
 
 			left, right := uint64(0.0), uint64(0.0)
 			if p.LastMetrics != nil && p.LastMetrics.Instrumentation != nil {
@@ -1376,7 +1376,7 @@ func (ms *MultipleSorter) Less(i, j int) bool {
 			if less(ms.Fields[k].Order, right, left) {
 				return false
 			}
-		case ms.Fields[k].FieldName == pbm.SessionField_LAST_TUPLECOUNT:
+		case pbm.SessionField_LAST_TUPLECOUNT:
 
 			left, right := uint64(0.0), uint64(0.0)
 			if p.LastMetrics != nil && p.LastMetrics.Instrumentation != nil {
@@ -1391,7 +1391,7 @@ func (ms *MultipleSorter) Less(i, j int) bool {
 			if less(ms.Fields[k].Order, right, left) {
 				return false
 			}
-		case ms.Fields[k].FieldName == pbm.SessionField_LAST_FIRSTTUPLE:
+		case pbm.SessionField_LAST_FIRSTTUPLE:
 
 			left, right := 0.0, 0.0
 			if p.LastMetrics != nil && p.LastMetrics.Instrumentation != nil {
@@ -1406,7 +1406,7 @@ func (ms *MultipleSorter) Less(i, j int) bool {
 			if less(ms.Fields[k].Order, right, left) {
 				return false
 			}
-		case ms.Fields[k].FieldName == pbm.SessionField_LAST_STARTUP:
+		case pbm.SessionField_LAST_STARTUP:
 
 			left, right := 0.0, 0.0
 			if p.LastMetrics != nil && p.LastMetrics.Instrumentation != nil {
@@ -1421,7 +1421,7 @@ func (ms *MultipleSorter) Less(i, j int) bool {
 			if less(ms.Fields[k].Order, right, left) {
 				return false
 			}
-		case ms.Fields[k].FieldName == pbm.SessionField_LAST_TOTAL:
+		case pbm.SessionField_LAST_TOTAL:
 
 			left, right := 0.0, 0.0
 			if p.LastMetrics != nil && p.LastMetrics.Instrumentation != nil {
@@ -1436,7 +1436,7 @@ func (ms *MultipleSorter) Less(i, j int) bool {
 			if less(ms.Fields[k].Order, right, left) {
 				return false
 			}
-		case ms.Fields[k].FieldName == pbm.SessionField_LAST_SHARED_BLKS_HIT:
+		case pbm.SessionField_LAST_SHARED_BLKS_HIT:
 
 			left, right := uint64(0.0), uint64(0.0)
 			if p.LastMetrics != nil && p.LastMetrics.Instrumentation != nil {
@@ -1451,7 +1451,7 @@ func (ms *MultipleSorter) Less(i, j int) bool {
 			if less(ms.Fields[k].Order, right, left) {
 				return false
 			}
-		case ms.Fields[k].FieldName == pbm.SessionField_LAST_SHARED_BLKS_READ:
+		case pbm.SessionField_LAST_SHARED_BLKS_READ:
 
 			left, right := uint64(0.0), uint64(0.0)
 			if p.LastMetrics != nil && p.LastMetrics.Instrumentation != nil {
@@ -1466,7 +1466,7 @@ func (ms *MultipleSorter) Less(i, j int) bool {
 			if less(ms.Fields[k].Order, right, left) {
 				return false
 			}
-		case ms.Fields[k].FieldName == pbm.SessionField_LAST_SHARED_BLKS_DIRTIED:
+		case pbm.SessionField_LAST_SHARED_BLKS_DIRTIED:
 
 			left, right := uint64(0.0), uint64(0.0)
 			if p.LastMetrics != nil && p.LastMetrics.Instrumentation != nil {
@@ -1481,7 +1481,7 @@ func (ms *MultipleSorter) Less(i, j int) bool {
 			if less(ms.Fields[k].Order, right, left) {
 				return false
 			}
-		case ms.Fields[k].FieldName == pbm.SessionField_LAST_SHARED_BLKS_WRITTEN:
+		case pbm.SessionField_LAST_SHARED_BLKS_WRITTEN:
 
 			left, right := uint64(0.0), uint64(0.0)
 			if p.LastMetrics != nil && p.LastMetrics.Instrumentation != nil {
@@ -1496,7 +1496,7 @@ func (ms *MultipleSorter) Less(i, j int) bool {
 			if less(ms.Fields[k].Order, right, left) {
 				return false
 			}
-		case ms.Fields[k].FieldName == pbm.SessionField_LAST_LOCAL_BLKS_HIT:
+		case pbm.SessionField_LAST_LOCAL_BLKS_HIT:
 
 			left, right := uint64(0.0), uint64(0.0)
 			if p.LastMetrics != nil && p.LastMetrics.Instrumentation != nil {
@@ -1511,7 +1511,7 @@ func (ms *MultipleSorter) Less(i, j int) bool {
 			if less(ms.Fields[k].Order, right, left) {
 				return false
 			}
-		case ms.Fields[k].FieldName == pbm.SessionField_LAST_LOCAL_BLKS_READ:
+		case pbm.SessionField_LAST_LOCAL_BLKS_READ:
 
 			left, right := uint64(0.0), uint64(0.0)
 			if p.LastMetrics != nil && p.LastMetrics.Instrumentation != nil {
@@ -1526,7 +1526,7 @@ func (ms *MultipleSorter) Less(i, j int) bool {
 			if less(ms.Fields[k].Order, right, left) {
 				return false
 			}
-		case ms.Fields[k].FieldName == pbm.SessionField_LAST_LOCAL_BLKS_DIRTIED:
+		case pbm.SessionField_LAST_LOCAL_BLKS_DIRTIED:
 
 			left, right := uint64(0.0), uint64(0.0)
 			if p.LastMetrics != nil && p.LastMetrics.Instrumentation != nil {
@@ -1541,7 +1541,7 @@ func (ms *MultipleSorter) Less(i, j int) bool {
 			if less(ms.Fields[k].Order, right, left) {
 				return false
 			}
-		case ms.Fields[k].FieldName == pbm.SessionField_LAST_LOCAL_BLKS_WRITTEN:
+		case pbm.SessionField_LAST_LOCAL_BLKS_WRITTEN:
 
 			left, right := uint64(0.0), uint64(0.0)
 			if p.LastMetrics != nil && p.LastMetrics.Instrumentation != nil {
@@ -1556,7 +1556,7 @@ func (ms *MultipleSorter) Less(i, j int) bool {
 			if less(ms.Fields[k].Order, right, left) {
 				return false
 			}
-		case ms.Fields[k].FieldName == pbm.SessionField_LAST_TEMP_BLKS_READ:
+		case pbm.SessionField_LAST_TEMP_BLKS_READ:
 
 			left, right := uint64(0.0), uint64(0.0)
 			if p.LastMetrics != nil && p.LastMetrics.Instrumentation != nil {
@@ -1571,7 +1571,7 @@ func (ms *MultipleSorter) Less(i, j int) bool {
 			if less(ms.Fields[k].Order, right, left) {
 				return false
 			}
-		case ms.Fields[k].FieldName == pbm.SessionField_LAST_TEMP_BLKS_WRITTEN:
+		case pbm.SessionField_LAST_TEMP_BLKS_WRITTEN:
 
 			left, right := uint64(0.0), uint64(0.0)
 			if p.LastMetrics != nil && p.LastMetrics.Instrumentation != nil {
@@ -1586,7 +1586,7 @@ func (ms *MultipleSorter) Less(i, j int) bool {
 			if less(ms.Fields[k].Order, right, left) {
 				return false
 			}
-		case ms.Fields[k].FieldName == pbm.SessionField_LAST_BLK_READ_TIME:
+		case pbm.SessionField_LAST_BLK_READ_TIME:
 
 			left, right := 0.0, 0.0
 			if p.LastMetrics != nil && p.LastMetrics.Instrumentation != nil {
@@ -1601,7 +1601,7 @@ func (ms *MultipleSorter) Less(i, j int) bool {
 			if less(ms.Fields[k].Order, right, left) {
 				return false
 			}
-		case ms.Fields[k].FieldName == pbm.SessionField_LAST_BLK_WRITE_TIME:
+		case pbm.SessionField_LAST_BLK_WRITE_TIME:
 
 			left, right := 0.0, 0.0
 			if p.LastMetrics != nil && p.LastMetrics.Instrumentation != nil {
@@ -1616,7 +1616,7 @@ func (ms *MultipleSorter) Less(i, j int) bool {
 			if less(ms.Fields[k].Order, right, left) {
 				return false
 			}
-		case ms.Fields[k].FieldName == pbm.SessionField_LAST_SPILL_FILECOUNT:
+		case pbm.SessionField_LAST_SPILL_FILECOUNT:
 
 			left, right := int64(0.0), int64(0.0)
 			if p.LastMetrics != nil && p.LastMetrics.Spill != nil {
@@ -1631,7 +1631,7 @@ func (ms *MultipleSorter) Less(i, j int) bool {
 			if less(ms.Fields[k].Order, right, left) {
 				return false
 			}
-		case ms.Fields[k].FieldName == pbm.SessionField_LAST_SPILL_TOTALBYTES:
+		case pbm.SessionField_LAST_SPILL_TOTALBYTES:
 
 			left, right := int64(0.0), int64(0.0)
 			if p.LastMetrics != nil && p.LastMetrics.Spill != nil {
@@ -1646,7 +1646,7 @@ func (ms *MultipleSorter) Less(i, j int) bool {
 			if less(ms.Fields[k].Order, right, left) {
 				return false
 			}
-		case ms.Fields[k].FieldName == pbm.SessionField_LAST_NET_SENT_TOTAL_BYTES:
+		case pbm.SessionField_LAST_NET_SENT_TOTAL_BYTES:
 
 			left, right := uint32(0.0), uint32(0.0)
 			if p.LastMetrics != nil && p.LastMetrics.Instrumentation != nil && p.LastMetrics.Instrumentation.Sent != nil {
@@ -1661,7 +1661,7 @@ func (ms *MultipleSorter) Less(i, j int) bool {
 			if less(ms.Fields[k].Order, right, left) {
 				return false
 			}
-		case ms.Fields[k].FieldName == pbm.SessionField_LAST_NET_SENT_TUPLE_BYTES:
+		case pbm.SessionField_LAST_NET_SENT_TUPLE_BYTES:
 
 			left, right := uint32(0.0), uint32(0.0)
 			if p.LastMetrics != nil && p.LastMetrics.Instrumentation != nil && p.LastMetrics.Instrumentation.Sent != nil {
@@ -1676,7 +1676,7 @@ func (ms *MultipleSorter) Less(i, j int) bool {
 			if less(ms.Fields[k].Order, right, left) {
 				return false
 			}
-		case ms.Fields[k].FieldName == pbm.SessionField_LAST_NET_SENT_CHUNKS:
+		case pbm.SessionField_LAST_NET_SENT_CHUNKS:
 
 			left, right := uint32(0.0), uint32(0.0)
 			if p.LastMetrics != nil && p.LastMetrics.Instrumentation != nil && p.LastMetrics.Instrumentation.Sent != nil {
@@ -1691,7 +1691,7 @@ func (ms *MultipleSorter) Less(i, j int) bool {
 			if less(ms.Fields[k].Order, right, left) {
 				return false
 			}
-		case ms.Fields[k].FieldName == pbm.SessionField_LAST_NET_RECV_TOTAL_BYTES:
+		case pbm.SessionField_LAST_NET_RECV_TOTAL_BYTES:
 
 			left, right := uint32(0.0), uint32(0.0)
 			if p.LastMetrics != nil && p.LastMetrics.Instrumentation != nil && p.LastMetrics.Instrumentation.Received != nil {
@@ -1706,7 +1706,7 @@ func (ms *MultipleSorter) Less(i, j int) bool {
 			if less(ms.Fields[k].Order, right, left) {
 				return false
 			}
-		case ms.Fields[k].FieldName == pbm.SessionField_LAST_NET_RECV_TUPLE_BYTES:
+		case pbm.SessionField_LAST_NET_RECV_TUPLE_BYTES:
 
 			left, right := uint32(0.0), uint32(0.0)
 			if p.LastMetrics != nil && p.LastMetrics.Instrumentation != nil && p.LastMetrics.Instrumentation.Received != nil {
@@ -1721,7 +1721,7 @@ func (ms *MultipleSorter) Less(i, j int) bool {
 			if less(ms.Fields[k].Order, right, left) {
 				return false
 			}
-		case ms.Fields[k].FieldName == pbm.SessionField_LAST_NET_RECV_CHUNKS:
+		case pbm.SessionField_LAST_NET_RECV_CHUNKS:
 
 			left, right := uint32(0.0), uint32(0.0)
 			if p.LastMetrics != nil && p.LastMetrics.Instrumentation != nil && p.LastMetrics.Instrumentation.Received != nil {
@@ -1736,7 +1736,7 @@ func (ms *MultipleSorter) Less(i, j int) bool {
 			if less(ms.Fields[k].Order, right, left) {
 				return false
 			}
-		case ms.Fields[k].FieldName == pbm.SessionField_QUERY_RUNNINGTIMESECONDS:
+		case pbm.SessionField_QUERY_RUNNINGTIMESECONDS:
 
 			left, right := 0.0, 0.0
 			if p.QueryMetrics != nil && p.QueryMetrics.SystemStat != nil {
@@ -1751,7 +1751,7 @@ func (ms *MultipleSorter) Less(i, j int) bool {
 			if less(ms.Fields[k].Order, right, left) {
 				return false
 			}
-		case ms.Fields[k].FieldName == pbm.SessionField_QUERY_USERTIMESECONDS:
+		case pbm.SessionField_QUERY_USERTIMESECONDS:
 
 			left, right := 0.0, 0.0
 			if p.QueryMetrics != nil && p.QueryMetrics.SystemStat != nil {
@@ -1766,7 +1766,7 @@ func (ms *MultipleSorter) Less(i, j int) bool {
 			if less(ms.Fields[k].Order, right, left) {
 				return false
 			}
-		case ms.Fields[k].FieldName == pbm.SessionField_QUERY_KERNELTIMESECONDS:
+		case pbm.SessionField_QUERY_KERNELTIMESECONDS:
 
 			left, right := 0.0, 0.0
 			if p.QueryMetrics != nil && p.QueryMetrics.SystemStat != nil {
@@ -1781,7 +1781,7 @@ func (ms *MultipleSorter) Less(i, j int) bool {
 			if less(ms.Fields[k].Order, right, left) {
 				return false
 			}
-		case ms.Fields[k].FieldName == pbm.SessionField_QUERY_VSIZE:
+		case pbm.SessionField_QUERY_VSIZE:
 
 			left, right := uint64(0.0), uint64(0.0)
 			if p.QueryMetrics != nil && p.QueryMetrics.SystemStat != nil {
@@ -1796,7 +1796,7 @@ func (ms *MultipleSorter) Less(i, j int) bool {
 			if less(ms.Fields[k].Order, right, left) {
 				return false
 			}
-		case ms.Fields[k].FieldName == pbm.SessionField_QUERY_RSS:
+		case pbm.SessionField_QUERY_RSS:
 
 			left, right := uint64(0.0), uint64(0.0)
 			if p.QueryMetrics != nil && p.QueryMetrics.SystemStat != nil {
@@ -1811,7 +1811,7 @@ func (ms *MultipleSorter) Less(i, j int) bool {
 			if less(ms.Fields[k].Order, right, left) {
 				return false
 			}
-		case ms.Fields[k].FieldName == pbm.SessionField_QUERY_VMPEAKKB:
+		case pbm.SessionField_QUERY_VMPEAKKB:
 
 			left, right := uint64(0.0), uint64(0.0)
 			if p.QueryMetrics != nil && p.QueryMetrics.SystemStat != nil {
@@ -1826,7 +1826,7 @@ func (ms *MultipleSorter) Less(i, j int) bool {
 			if less(ms.Fields[k].Order, right, left) {
 				return false
 			}
-		case ms.Fields[k].FieldName == pbm.SessionField_QUERY_RCHAR:
+		case pbm.SessionField_QUERY_RCHAR:
 
 			left, right := uint64(0.0), uint64(0.0)
 			if p.QueryMetrics != nil && p.QueryMetrics.SystemStat != nil {
@@ -1841,7 +1841,7 @@ func (ms *MultipleSorter) Less(i, j int) bool {
 			if less(ms.Fields[k].Order, right, left) {
 				return false
 			}
-		case ms.Fields[k].FieldName == pbm.SessionField_QUERY_WCHAR:
+		case pbm.SessionField_QUERY_WCHAR:
 
 			left, right := uint64(0.0), uint64(0.0)
 			if p.QueryMetrics != nil && p.QueryMetrics.SystemStat != nil {
@@ -1856,7 +1856,7 @@ func (ms *MultipleSorter) Less(i, j int) bool {
 			if less(ms.Fields[k].Order, right, left) {
 				return false
 			}
-		case ms.Fields[k].FieldName == pbm.SessionField_QUERY_SYSCR:
+		case pbm.SessionField_QUERY_SYSCR:
 
 			left, right := uint64(0.0), uint64(0.0)
 			if p.QueryMetrics != nil && p.QueryMetrics.SystemStat != nil {
@@ -1871,7 +1871,7 @@ func (ms *MultipleSorter) Less(i, j int) bool {
 			if less(ms.Fields[k].Order, right, left) {
 				return false
 			}
-		case ms.Fields[k].FieldName == pbm.SessionField_QUERY_SYSCW:
+		case pbm.SessionField_QUERY_SYSCW:
 
 			left, right := uint64(0.0), uint64(0.0)
 			if p.QueryMetrics != nil && p.QueryMetrics.SystemStat != nil {
@@ -1886,7 +1886,7 @@ func (ms *MultipleSorter) Less(i, j int) bool {
 			if less(ms.Fields[k].Order, right, left) {
 				return false
 			}
-		case ms.Fields[k].FieldName == pbm.SessionField_QUERY_READ_BYTES:
+		case pbm.SessionField_QUERY_READ_BYTES:
 
 			left, right := uint64(0.0), uint64(0.0)
 			if p.QueryMetrics != nil && p.QueryMetrics.SystemStat != nil {
@@ -1901,7 +1901,7 @@ func (ms *MultipleSorter) Less(i, j int) bool {
 			if less(ms.Fields[k].Order, right, left) {
 				return false
 			}
-		case ms.Fields[k].FieldName == pbm.SessionField_QUERY_WRITE_BYTES:
+		case pbm.SessionField_QUERY_WRITE_BYTES:
 
 			left, right := uint64(0.0), uint64(0.0)
 			if p.QueryMetrics != nil && p.QueryMetrics.SystemStat != nil {
@@ -1916,7 +1916,7 @@ func (ms *MultipleSorter) Less(i, j int) bool {
 			if less(ms.Fields[k].Order, right, left) {
 				return false
 			}
-		case ms.Fields[k].FieldName == pbm.SessionField_QUERY_CANCELLED_WRITE_BYTES:
+		case pbm.SessionField_QUERY_CANCELLED_WRITE_BYTES:
 
 			left, right := uint64(0.0), uint64(0.0)
 			if p.QueryMetrics != nil && p.QueryMetrics.SystemStat != nil {
@@ -1931,7 +1931,7 @@ func (ms *MultipleSorter) Less(i, j int) bool {
 			if less(ms.Fields[k].Order, right, left) {
 				return false
 			}
-		case ms.Fields[k].FieldName == pbm.SessionField_QUERY_NTUPLES:
+		case pbm.SessionField_QUERY_NTUPLES:
 
 			left, right := uint64(0.0), uint64(0.0)
 			if p.QueryMetrics != nil && p.QueryMetrics.Instrumentation != nil {
@@ -1946,7 +1946,7 @@ func (ms *MultipleSorter) Less(i, j int) bool {
 			if less(ms.Fields[k].Order, right, left) {
 				return false
 			}
-		case ms.Fields[k].FieldName == pbm.SessionField_QUERY_NLOOPS:
+		case pbm.SessionField_QUERY_NLOOPS:
 
 			left, right := uint64(0.0), uint64(0.0)
 			if p.QueryMetrics != nil && p.QueryMetrics.Instrumentation != nil {
@@ -1961,7 +1961,7 @@ func (ms *MultipleSorter) Less(i, j int) bool {
 			if less(ms.Fields[k].Order, right, left) {
 				return false
 			}
-		case ms.Fields[k].FieldName == pbm.SessionField_QUERY_TUPLECOUNT:
+		case pbm.SessionField_QUERY_TUPLECOUNT:
 
 			left, right := uint64(0.0), uint64(0.0)
 			if p.QueryMetrics != nil && p.QueryMetrics.Instrumentation != nil {
@@ -1976,7 +1976,7 @@ func (ms *MultipleSorter) Less(i, j int) bool {
 			if less(ms.Fields[k].Order, right, left) {
 				return false
 			}
-		case ms.Fields[k].FieldName == pbm.SessionField_QUERY_FIRSTTUPLE:
+		case pbm.SessionField_QUERY_FIRSTTUPLE:
 
 			left, right := 0.0, 0.0
 			if p.QueryMetrics != nil && p.QueryMetrics.Instrumentation != nil {
@@ -1991,7 +1991,7 @@ func (ms *MultipleSorter) Less(i, j int) bool {
 			if less(ms.Fields[k].Order, right, left) {
 				return false
 			}
-		case ms.Fields[k].FieldName == pbm.SessionField_QUERY_STARTUP:
+		case pbm.SessionField_QUERY_STARTUP:
 
 			left, right := 0.0, 0.0
 			if p.QueryMetrics != nil && p.QueryMetrics.Instrumentation != nil {
@@ -2006,7 +2006,7 @@ func (ms *MultipleSorter) Less(i, j int) bool {
 			if less(ms.Fields[k].Order, right, left) {
 				return false
 			}
-		case ms.Fields[k].FieldName == pbm.SessionField_QUERY_TOTAL:
+		case pbm.SessionField_QUERY_TOTAL:
 
 			left, right := 0.0, 0.0
 			if p.QueryMetrics != nil && p.QueryMetrics.Instrumentation != nil {
@@ -2021,7 +2021,7 @@ func (ms *MultipleSorter) Less(i, j int) bool {
 			if less(ms.Fields[k].Order, right, left) {
 				return false
 			}
-		case ms.Fields[k].FieldName == pbm.SessionField_QUERY_SHARED_BLKS_HIT:
+		case pbm.SessionField_QUERY_SHARED_BLKS_HIT:
 
 			left, right := uint64(0.0), uint64(0.0)
 			if p.QueryMetrics != nil && p.QueryMetrics.Instrumentation != nil {
@@ -2036,7 +2036,7 @@ func (ms *MultipleSorter) Less(i, j int) bool {
 			if less(ms.Fields[k].Order, right, left) {
 				return false
 			}
-		case ms.Fields[k].FieldName == pbm.SessionField_QUERY_SHARED_BLKS_READ:
+		case pbm.SessionField_QUERY_SHARED_BLKS_READ:
 
 			left, right := uint64(0.0), uint64(0.0)
 			if p.QueryMetrics != nil && p.QueryMetrics.Instrumentation != nil {
@@ -2051,7 +2051,7 @@ func (ms *MultipleSorter) Less(i, j int) bool {
 			if less(ms.Fields[k].Order, right, left) {
 				return false
 			}
-		case ms.Fields[k].FieldName == pbm.SessionField_QUERY_SHARED_BLKS_DIRTIED:
+		case pbm.SessionField_QUERY_SHARED_BLKS_DIRTIED:
 
 			left, right := uint64(0.0), uint64(0.0)
 			if p.QueryMetrics != nil && p.QueryMetrics.Instrumentation != nil {
@@ -2066,7 +2066,7 @@ func (ms *MultipleSorter) Less(i, j int) bool {
 			if less(ms.Fields[k].Order, right, left) {
 				return false
 			}
-		case ms.Fields[k].FieldName == pbm.SessionField_QUERY_SHARED_BLKS_WRITTEN:
+		case pbm.SessionField_QUERY_SHARED_BLKS_WRITTEN:
 
 			left, right := uint64(0.0), uint64(0.0)
 			if p.QueryMetrics != nil && p.QueryMetrics.Instrumentation != nil {
@@ -2081,7 +2081,7 @@ func (ms *MultipleSorter) Less(i, j int) bool {
 			if less(ms.Fields[k].Order, right, left) {
 				return false
 			}
-		case ms.Fields[k].FieldName == pbm.SessionField_QUERY_LOCAL_BLKS_HIT:
+		case pbm.SessionField_QUERY_LOCAL_BLKS_HIT:
 
 			left, right := uint64(0.0), uint64(0.0)
 			if p.QueryMetrics != nil && p.QueryMetrics.Instrumentation != nil {
@@ -2096,7 +2096,7 @@ func (ms *MultipleSorter) Less(i, j int) bool {
 			if less(ms.Fields[k].Order, right, left) {
 				return false
 			}
-		case ms.Fields[k].FieldName == pbm.SessionField_QUERY_LOCAL_BLKS_READ:
+		case pbm.SessionField_QUERY_LOCAL_BLKS_READ:
 
 			left, right := uint64(0.0), uint64(0.0)
 			if p.QueryMetrics != nil && p.QueryMetrics.Instrumentation != nil {
@@ -2111,7 +2111,7 @@ func (ms *MultipleSorter) Less(i, j int) bool {
 			if less(ms.Fields[k].Order, right, left) {
 				return false
 			}
-		case ms.Fields[k].FieldName == pbm.SessionField_QUERY_LOCAL_BLKS_DIRTIED:
+		case pbm.SessionField_QUERY_LOCAL_BLKS_DIRTIED:
 
 			left, right := uint64(0.0), uint64(0.0)
 			if p.QueryMetrics != nil && p.QueryMetrics.Instrumentation != nil {
@@ -2126,7 +2126,7 @@ func (ms *MultipleSorter) Less(i, j int) bool {
 			if less(ms.Fields[k].Order, right, left) {
 				return false
 			}
-		case ms.Fields[k].FieldName == pbm.SessionField_QUERY_LOCAL_BLKS_WRITTEN:
+		case pbm.SessionField_QUERY_LOCAL_BLKS_WRITTEN:
 
 			left, right := uint64(0.0), uint64(0.0)
 			if p.QueryMetrics != nil && p.QueryMetrics.Instrumentation != nil {
@@ -2141,7 +2141,7 @@ func (ms *MultipleSorter) Less(i, j int) bool {
 			if less(ms.Fields[k].Order, right, left) {
 				return false
 			}
-		case ms.Fields[k].FieldName == pbm.SessionField_QUERY_TEMP_BLKS_READ:
+		case pbm.SessionField_QUERY_TEMP_BLKS_READ:
 
 			left, right := uint64(0.0), uint64(0.0)
 			if p.QueryMetrics != nil && p.QueryMetrics.Instrumentation != nil {
@@ -2156,7 +2156,7 @@ func (ms *MultipleSorter) Less(i, j int) bool {
 			if less(ms.Fields[k].Order, right, left) {
 				return false
 			}
-		case ms.Fields[k].FieldName == pbm.SessionField_QUERY_TEMP_BLKS_WRITTEN:
+		case pbm.SessionField_QUERY_TEMP_BLKS_WRITTEN:
 
 			left, right := uint64(0.0), uint64(0.0)
 			if p.QueryMetrics != nil && p.QueryMetrics.Instrumentation != nil {
@@ -2171,7 +2171,7 @@ func (ms *MultipleSorter) Less(i, j int) bool {
 			if less(ms.Fields[k].Order, right, left) {
 				return false
 			}
-		case ms.Fields[k].FieldName == pbm.SessionField_QUERY_BLK_READ_TIME:
+		case pbm.SessionField_QUERY_BLK_READ_TIME:
 
 			left, right := 0.0, 0.0
 			if p.QueryMetrics != nil && p.QueryMetrics.Instrumentation != nil {
@@ -2186,7 +2186,7 @@ func (ms *MultipleSorter) Less(i, j int) bool {
 			if less(ms.Fields[k].Order, right, left) {
 				return false
 			}
-		case ms.Fields[k].FieldName == pbm.SessionField_QUERY_BLK_WRITE_TIME:
+		case pbm.SessionField_QUERY_BLK_WRITE_TIME:
 
 			left, right := 0.0, 0.0
 			if p.QueryMetrics != nil && p.QueryMetrics.Instrumentation != nil {
@@ -2201,7 +2201,7 @@ func (ms *MultipleSorter) Less(i, j int) bool {
 			if less(ms.Fields[k].Order, right, left) {
 				return false
 			}
-		case ms.Fields[k].FieldName == pbm.SessionField_QUERY_SPILL_FILECOUNT:
+		case pbm.SessionField_QUERY_SPILL_FILECOUNT:
 
 			left, right := int64(0.0), int64(0.0)
 			if p.QueryMetrics != nil && p.QueryMetrics.Spill != nil {
@@ -2216,7 +2216,7 @@ func (ms *MultipleSorter) Less(i, j int) bool {
 			if less(ms.Fields[k].Order, right, left) {
 				return false
 			}
-		case ms.Fields[k].FieldName == pbm.SessionField_QUERY_SPILL_TOTALBYTES:
+		case pbm.SessionField_QUERY_SPILL_TOTALBYTES:
 
 			left, right := int64(0.0), int64(0.0)
 			if p.QueryMetrics != nil && p.QueryMetrics.Spill != nil {
@@ -2231,7 +2231,7 @@ func (ms *MultipleSorter) Less(i, j int) bool {
 			if less(ms.Fields[k].Order, right, left) {
 				return false
 			}
-		case ms.Fields[k].FieldName == pbm.SessionField_QUERY_NET_SENT_TOTAL_BYTES:
+		case pbm.SessionField_QUERY_NET_SENT_TOTAL_BYTES:
 
 			left, right := uint32(0.0), uint32(0.0)
 			if p.QueryMetrics != nil && p.QueryMetrics.Instrumentation != nil && p.QueryMetrics.Instrumentation.Sent != nil {
@@ -2246,7 +2246,7 @@ func (ms *MultipleSorter) Less(i, j int) bool {
 			if less(ms.Fields[k].Order, right, left) {
 				return false
 			}
-		case ms.Fields[k].FieldName == pbm.SessionField_QUERY_NET_SENT_TUPLE_BYTES:
+		case pbm.SessionField_QUERY_NET_SENT_TUPLE_BYTES:
 
 			left, right := uint32(0.0), uint32(0.0)
 			if p.QueryMetrics != nil && p.QueryMetrics.Instrumentation != nil && p.QueryMetrics.Instrumentation.Sent != nil {
@@ -2261,7 +2261,7 @@ func (ms *MultipleSorter) Less(i, j int) bool {
 			if less(ms.Fields[k].Order, right, left) {
 				return false
 			}
-		case ms.Fields[k].FieldName == pbm.SessionField_QUERY_NET_SENT_CHUNKS:
+		case pbm.SessionField_QUERY_NET_SENT_CHUNKS:
 
 			left, right := uint32(0.0), uint32(0.0)
 			if p.QueryMetrics != nil && p.QueryMetrics.Instrumentation != nil && p.QueryMetrics.Instrumentation.Sent != nil {
@@ -2276,7 +2276,7 @@ func (ms *MultipleSorter) Less(i, j int) bool {
 			if less(ms.Fields[k].Order, right, left) {
 				return false
 			}
-		case ms.Fields[k].FieldName == pbm.SessionField_QUERY_NET_RECV_TOTAL_BYTES:
+		case pbm.SessionField_QUERY_NET_RECV_TOTAL_BYTES:
 
 			left, right := uint32(0.0), uint32(0.0)
 			if p.QueryMetrics != nil && p.QueryMetrics.Instrumentation != nil && p.QueryMetrics.Instrumentation.Received != nil {
@@ -2291,7 +2291,7 @@ func (ms *MultipleSorter) Less(i, j int) bool {
 			if less(ms.Fields[k].Order, right, left) {
 				return false
 			}
-		case ms.Fields[k].FieldName == pbm.SessionField_QUERY_NET_RECV_TUPLE_BYTES:
+		case pbm.SessionField_QUERY_NET_RECV_TUPLE_BYTES:
 
 			left, right := uint32(0), uint32(0)
 			if p.QueryMetrics != nil && p.QueryMetrics.Instrumentation != nil && p.QueryMetrics.Instrumentation.Received != nil {
@@ -2306,7 +2306,7 @@ func (ms *MultipleSorter) Less(i, j int) bool {
 			if less(ms.Fields[k].Order, right, left) {
 				return false
 			}
-		case ms.Fields[k].FieldName == pbm.SessionField_RUNNING_QUERY_SLICES:
+		case pbm.SessionField_RUNNING_QUERY_SLICES:
 			left, right := p.RunningQuerySlices, q.RunningQuerySlices
 			if less(ms.Fields[k].Order, left, right) {
 				return true
@@ -2348,28 +2348,28 @@ func FilterOutSession(filters []*pbm.SessionFilter, sessionState *pbc.SessionSta
 		sortMap[filter.FieldName] = false
 	}
 	for _, filter := range filters {
-		switch {
-		case filter.FieldName == pbm.SessionFilterEnum_SESSION_FILTER_HOST:
+		switch filter.FieldName {
+		case pbm.SessionFilterEnum_SESSION_FILTER_HOST:
 			if sessionState.Hostname == filter.Value {
 				sortMap[pbm.SessionFilterEnum_SESSION_FILTER_HOST] = true
 			}
-		case filter.FieldName == pbm.SessionFilterEnum_SESSION_FILTER_USER:
+		case pbm.SessionFilterEnum_SESSION_FILTER_USER:
 			if sessionState.SessionInfo.User == filter.Value {
 				sortMap[pbm.SessionFilterEnum_SESSION_FILTER_USER] = true
 			}
-		case filter.FieldName == pbm.SessionFilterEnum_SESSION_FILTER_DATABASE:
+		case pbm.SessionFilterEnum_SESSION_FILTER_DATABASE:
 			if sessionState.SessionInfo.Database == filter.Value {
 				sortMap[pbm.SessionFilterEnum_SESSION_FILTER_DATABASE] = true
 			}
-		case filter.FieldName == pbm.SessionFilterEnum_SESSION_FILTER_APPLICATION_NAME:
+		case pbm.SessionFilterEnum_SESSION_FILTER_APPLICATION_NAME:
 			if sessionState.SessionInfo.ApplicationName == filter.Value {
 				sortMap[pbm.SessionFilterEnum_SESSION_FILTER_APPLICATION_NAME] = true
 			}
-		case filter.FieldName == pbm.SessionFilterEnum_SESSION_FILTER_CLIENT_HOSTNAME:
+		case pbm.SessionFilterEnum_SESSION_FILTER_CLIENT_HOSTNAME:
 			if sessionState.SessionInfo.ClientHostname == filter.Value {
 				sortMap[pbm.SessionFilterEnum_SESSION_FILTER_CLIENT_HOSTNAME] = true
 			}
-		case filter.FieldName == pbm.SessionFilterEnum_SESSION_FILTER_STATE:
+		case pbm.SessionFilterEnum_SESSION_FILTER_STATE:
 			switch filterValue := filter.Value; filterValue {
 			case "SESSION_STATUS_IDLE":
 				if strings.EqualFold(sessionState.SessionInfo.State, "IDLE") {
@@ -2396,11 +2396,11 @@ func FilterOutSession(filters []*pbm.SessionFilter, sessionState *pbc.SessionSta
 					sortMap[pbm.SessionFilterEnum_SESSION_FILTER_STATE] = true
 				}
 			}
-		case filter.FieldName == pbm.SessionFilterEnum_SESSION_FILTER_RSGNAME:
+		case pbm.SessionFilterEnum_SESSION_FILTER_RSGNAME:
 			if sessionState.SessionInfo.Rsgname == filter.Value {
 				sortMap[pbm.SessionFilterEnum_SESSION_FILTER_RSGNAME] = true
 			}
-		case filter.FieldName == pbm.SessionFilterEnum_SESSION_FILTER_SESS_ID:
+		case pbm.SessionFilterEnum_SESSION_FILTER_SESS_ID:
 			i, err := strconv.ParseInt(filter.Value, 10, 64)
 			if err != nil {
 				return true
@@ -2408,7 +2408,7 @@ func FilterOutSession(filters []*pbm.SessionFilter, sessionState *pbc.SessionSta
 			if sessionState.SessionKey.SessId == i {
 				sortMap[pbm.SessionFilterEnum_SESSION_FILTER_SESS_ID] = true
 			}
-		case filter.FieldName == pbm.SessionFilterEnum_SESSION_FILTER_TM_ID:
+		case pbm.SessionFilterEnum_SESSION_FILTER_TM_ID:
 			i, err := strconv.ParseInt(filter.Value, 10, 64)
 			if err != nil {
 				return true

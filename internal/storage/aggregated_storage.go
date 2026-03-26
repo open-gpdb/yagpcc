@@ -211,13 +211,11 @@ func (a *AggregatedStorage) AggQuery(qT *pbm.TotalQueryData) error {
 	}
 	if !okAgg {
 		aValNew := &AggVal{
-			QueryText:         qT.QueryStat.QueryInfo.QueryText,
-			PlanText:          qT.QueryStat.QueryInfo.PlanText,
-			TemplateQueryText: qT.QueryStat.QueryInfo.TemplateQueryText,
-			TemplatePlanText:  qT.QueryStat.QueryInfo.TemplatePlanText,
-			TotalMetrics:      &pbc.GPMetrics{},
-			AggTimes:          &pbm.AggregatedMetrics{},
-			QueryKey:          qT.QueryStat.QueryKey,
+			QueryText:    qT.QueryStat.QueryInfo.QueryText,
+			PlanText:     qT.QueryStat.QueryInfo.PlanText,
+			TotalMetrics: &pbc.GPMetrics{},
+			AggTimes:     &pbm.AggregatedMetrics{},
+			QueryKey:     qT.QueryStat.QueryKey,
 		}
 		a.mx.Lock()
 		// check once again

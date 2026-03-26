@@ -67,18 +67,30 @@ func getGrpcClientConnection(ctx context.Context, hostname string, portn uint32,
 			return conn, nil
 		}
 	}
-	ctxT, ctxTCancel := context.WithTimeout(ctx, time.Second*time.Duration(segConnectTimeoutSec))
-	defer ctxTCancel()
+	connectTimeout := time.Second * time.Duration(segConnectTimeoutSec)
 	if portn > 0 {
-		conn, err = grpc.DialContext(ctxT, getSegAddr(hostname, portn), grpc.WithTransportCredentials(insecure.NewCredentials()), grpc.WithBlock())
+		conn, err = grpc.NewClient(
+			getSegAddr(hostname, portn),
+			grpc.WithTransportCredentials(insecure.NewCredentials()),
+			grpc.WithConnectParams(grpc.ConnectParams{
+				MinConnectTimeout: connectTimeout,
+			}),
+		)
 		if err != nil {
 			return nil, err
 		}
 	} else {
-		dialer := func(addr string, t time.Duration) (net.Conn, error) {
-			return net.Dial("unix", addr)
-		}
-		conn, err = grpc.DialContext(ctxT, hostname, grpc.WithTransportCredentials(insecure.NewCredentials()), grpc.WithBlock(), grpc.WithDialer(dialer))
+		conn, err = grpc.NewClient(
+			hostname,
+			grpc.WithTransportCredentials(insecure.NewCredentials()),
+			grpc.WithContextDialer(func(ctx context.Context, addr string) (net.Conn, error) {
+				var d net.Dialer
+				return d.DialContext(ctx, "unix", addr)
+			}),
+			grpc.WithConnectParams(grpc.ConnectParams{
+				MinConnectTimeout: connectTimeout,
+			}),
+		)
 		if err != nil {
 			return nil, err
 		}

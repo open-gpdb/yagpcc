@@ -51,8 +51,16 @@ func TestParallelSetGet(t *testing.T) {
 	dial := setupGRPCDialer(t, nil, backgroundStorage)
 
 	ctx := context.Background()
+	connectTimeout := 5 * time.Second
 
-	conn, err := grpc.DialContext(ctx, "", grpc.WithTransportCredentials(insecure.NewCredentials()), grpc.WithContextDialer(dial))
+	conn, err := grpc.NewClient(
+		"localhost",
+		grpc.WithContextDialer(dial),
+		grpc.WithTransportCredentials(insecure.NewCredentials()),
+		grpc.WithConnectParams(grpc.ConnectParams{
+			MinConnectTimeout: connectTimeout,
+		}),
+	)
 	require.NoError(t, err)
 
 	controlC := pb.NewAgentControlClient(conn)
@@ -65,7 +73,14 @@ func TestParallelSetGet(t *testing.T) {
 			t.Parallel()
 			ctx := context.Background()
 
-			conn, err := grpc.DialContext(ctx, "", grpc.WithTransportCredentials(insecure.NewCredentials()), grpc.WithContextDialer(dial))
+			conn, err := grpc.NewClient(
+				"localhost",
+				grpc.WithContextDialer(dial),
+				grpc.WithTransportCredentials(insecure.NewCredentials()),
+				grpc.WithConnectParams(grpc.ConnectParams{
+					MinConnectTimeout: connectTimeout,
+				}),
+			)
 			if err != nil {
 				log.Fatal(err)
 			}

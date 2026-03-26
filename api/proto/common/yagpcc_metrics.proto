@@ -174,7 +174,7 @@ message SystemStat {
     // Importance: major (possibly wrong aggregation algorithm)
     // Aggregation: max
     // Deprecated: duplicate of vsize.
-    uint64 VmSizeKb = 6 [deprecated = true];
+    uint64 VmSizeKb = 6;
 
     // VmPeakKb: max peak virtual memory size that the backend process
     // associated with query or session has consumed since its inception.

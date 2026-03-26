@@ -649,8 +649,6 @@ type SystemStat struct {
 	// Importance: major (possibly wrong aggregation algorithm)
 	// Aggregation: max
 	// Deprecated: duplicate of vsize.
-	//
-	// Deprecated: Marked as deprecated in api/proto/common/yagpcc_metrics.proto.
 	VmSizeKb uint64 `protobuf:"varint,6,opt,name=VmSizeKb,proto3" json:"VmSizeKb,omitempty"`
 	// VmPeakKb: max peak virtual memory size that the backend process
 	// associated with query or session has consumed since its inception.
@@ -780,7 +778,6 @@ func (x *SystemStat) GetRss() uint64 {
 	return 0
 }
 
-// Deprecated: Marked as deprecated in api/proto/common/yagpcc_metrics.proto.
 func (x *SystemStat) GetVmSizeKb() uint64 {
 	if x != nil {
 		return x.VmSizeKb
@@ -1651,15 +1648,15 @@ const file_api_proto_common_yagpcc_metrics_proto_rawDesc = "" +
 	"\n" +
 	"SegmentKey\x12\x12\n" +
 	"\x04dbid\x18\x01 \x01(\x05R\x04dbid\x12\x1a\n" +
-	"\bsegindex\x18\x02 \x01(\x05R\bsegindex\"\xc4\x03\n" +
+	"\bsegindex\x18\x02 \x01(\x05R\bsegindex\"\xc0\x03\n" +
 	"\n" +
 	"SystemStat\x12.\n" +
 	"\x12runningTimeSeconds\x18\x01 \x01(\x01R\x12runningTimeSeconds\x12(\n" +
 	"\x0fuserTimeSeconds\x18\x02 \x01(\x01R\x0fuserTimeSeconds\x12,\n" +
 	"\x11kernelTimeSeconds\x18\x03 \x01(\x01R\x11kernelTimeSeconds\x12\x14\n" +
 	"\x05vsize\x18\x04 \x01(\x04R\x05vsize\x12\x10\n" +
-	"\x03rss\x18\x05 \x01(\x04R\x03rss\x12\x1e\n" +
-	"\bVmSizeKb\x18\x06 \x01(\x04B\x02\x18\x01R\bVmSizeKb\x12\x1a\n" +
+	"\x03rss\x18\x05 \x01(\x04R\x03rss\x12\x1a\n" +
+	"\bVmSizeKb\x18\x06 \x01(\x04R\bVmSizeKb\x12\x1a\n" +
 	"\bVmPeakKb\x18\a \x01(\x04R\bVmPeakKb\x12\x14\n" +
 	"\x05rchar\x18\b \x01(\x04R\x05rchar\x12\x14\n" +
 	"\x05wchar\x18\t \x01(\x04R\x05wchar\x12\x14\n" +
