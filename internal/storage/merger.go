@@ -170,14 +170,14 @@ func AggregateQueryStat(resultQ *pbm.TotalQueryData, qKey QueryKey, rQ *RunningQ
 					if !resultQ.QueryStat.StartTime.IsValid() {
 						resultQ.QueryStat.StartTime = resultQ.QueryStat.QueryInfo.StartTime
 					} else {
-						resultQ.QueryStat.StartTime = utils.MinTime(resultQ.QueryStat.StartTime, resultQ.QueryStat.QueryInfo.StartTime)
+						resultQ.QueryStat.StartTime = chooseTimestampMin(resultQ.QueryStat.StartTime, resultQ.QueryStat.QueryInfo.StartTime)
 					}
 				}
 				if resultQ.QueryStat.QueryInfo.EndTime.IsValid() {
 					if !resultQ.QueryStat.EndTime.IsValid() {
 						resultQ.QueryStat.EndTime = resultQ.QueryStat.QueryInfo.EndTime
 					} else {
-						resultQ.QueryStat.EndTime = utils.MaxTime(resultQ.QueryStat.EndTime, resultQ.QueryStat.QueryInfo.EndTime)
+						resultQ.QueryStat.EndTime = chooseTimestampMax(resultQ.QueryStat.EndTime, resultQ.QueryStat.QueryInfo.EndTime)
 					}
 				}
 			}
