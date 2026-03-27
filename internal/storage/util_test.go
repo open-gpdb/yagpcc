@@ -2,8 +2,11 @@ package storage
 
 import (
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
+	"google.golang.org/protobuf/proto"
+	"google.golang.org/protobuf/types/known/timestamppb"
 
 	pbc "github.com/open-gpdb/yagpcc/api/proto/common"
 	"github.com/open-gpdb/yagpcc/internal/utils"
@@ -1004,4 +1007,68 @@ func TestGroupGPMetrics_MemoryMax(t *testing.T) {
 
 		})
 	}
+}
+
+func TestChooseTimestampMin(t *testing.T) {
+	t0 := timestamppb.New(time.Date(2020, 1, 1, 10, 0, 0, 0, time.UTC))
+	t1 := timestamppb.New(time.Date(2021, 1, 1, 10, 0, 0, 0, time.UTC))
+
+	t.Run("both nil", func(t *testing.T) {
+		assert.Nil(t, chooseTimestampMin(nil, nil))
+	})
+
+	t.Run("invalid dest valid source", func(t *testing.T) {
+		assert.True(t, proto.Equal(t0, chooseTimestampMin(nil, t0)))
+	})
+
+	t.Run("valid dest invalid source", func(t *testing.T) {
+		assert.True(t, proto.Equal(t1, chooseTimestampMin(t1, nil)))
+	})
+
+	t.Run("source earlier", func(t *testing.T) {
+		assert.True(t, proto.Equal(t0, chooseTimestampMin(t1, t0)))
+	})
+
+	t.Run("dest earlier", func(t *testing.T) {
+		assert.True(t, proto.Equal(t0, chooseTimestampMin(t0, t1)))
+	})
+
+	t.Run("equal wall time returns dest", func(t *testing.T) {
+		a := timestamppb.New(time.Date(2022, 6, 1, 12, 0, 0, 0, time.UTC))
+		b := timestamppb.New(time.Date(2022, 6, 1, 12, 0, 0, 0, time.UTC))
+		got := chooseTimestampMin(a, b)
+		assert.True(t, proto.Equal(a, got))
+	})
+}
+
+func TestChooseTimestampMax(t *testing.T) {
+	t0 := timestamppb.New(time.Date(2020, 1, 1, 10, 0, 0, 0, time.UTC))
+	t1 := timestamppb.New(time.Date(2021, 1, 1, 10, 0, 0, 0, time.UTC))
+
+	t.Run("both nil", func(t *testing.T) {
+		assert.Nil(t, chooseTimestampMax(nil, nil))
+	})
+
+	t.Run("invalid dest valid source", func(t *testing.T) {
+		assert.True(t, proto.Equal(t1, chooseTimestampMax(nil, t1)))
+	})
+
+	t.Run("valid dest invalid source", func(t *testing.T) {
+		assert.True(t, proto.Equal(t0, chooseTimestampMax(t0, nil)))
+	})
+
+	t.Run("source later", func(t *testing.T) {
+		assert.True(t, proto.Equal(t1, chooseTimestampMax(t0, t1)))
+	})
+
+	t.Run("dest later", func(t *testing.T) {
+		assert.True(t, proto.Equal(t1, chooseTimestampMax(t1, t0)))
+	})
+
+	t.Run("equal wall time returns dest", func(t *testing.T) {
+		a := timestamppb.New(time.Date(2022, 6, 1, 12, 0, 0, 0, time.UTC))
+		b := timestamppb.New(time.Date(2022, 6, 1, 12, 0, 0, 0, time.UTC))
+		got := chooseTimestampMax(a, b)
+		assert.True(t, proto.Equal(a, got))
+	})
 }

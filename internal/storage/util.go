@@ -218,10 +218,10 @@ func GroupGPMetrics(dest *pbc.GPMetrics, source *pbc.GPMetrics, aggKind Aggregat
 }
 
 func chooseTimestampMax(dest *timestamppb.Timestamp, source *timestamppb.Timestamp) *timestamppb.Timestamp {
-	if source == nil {
+	if !source.IsValid() {
 		return dest
 	}
-	if dest == nil {
+	if !dest.IsValid() {
 		return source
 	}
 	if source.Seconds > dest.Seconds {
@@ -231,10 +231,10 @@ func chooseTimestampMax(dest *timestamppb.Timestamp, source *timestamppb.Timesta
 }
 
 func chooseTimestampMin(dest *timestamppb.Timestamp, source *timestamppb.Timestamp) *timestamppb.Timestamp {
-	if source == nil {
+	if !source.IsValid() {
 		return dest
 	}
-	if dest == nil {
+	if !dest.IsValid() {
 		return source
 	}
 	if source.Seconds < dest.Seconds {
