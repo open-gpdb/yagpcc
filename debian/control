@@ -1,0 +1,13 @@
+Source: yagpcc
+Section: database
+Priority: optional
+Maintainer: Leonid Borchuk <le.borchuk@gmail.com>
+Build-Depends: 
+Standards-Version: 3.8.0
+Homepage: https://github.com/open-gpdb/yagpcc
+
+Package: yagpcc
+Conflicts: 
+Architecture: any
+Depends: 
+Description: yagpcc (Yet Another MPP Postgres Command Center) is a diagnostic and monitoring agent for Apache Cloudberry/Greenplum clusters. It collects query and session telemetry from the database (via the gp-hooks-collector extension), aggregates it across Master and Segment hosts, and exposes it over gRPC for real-time and historical use

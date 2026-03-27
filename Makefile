@@ -32,3 +32,8 @@ fmt:
 
 lint:
 	golangci-lint run --timeout=10m
+
+version = $(shell git describe --tags --abbrev=0)
+package:
+	sed -i 's/YAGPCC_VERSION/${version}/g' debian/changelog
+	dpkg-buildpackage -us -uc
