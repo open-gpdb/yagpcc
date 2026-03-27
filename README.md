@@ -18,7 +18,11 @@
 
 ## Building
 
-**Prerequisites:** Go 1.25+ (see `go.mod`).
+**Prerequisites:** 
+- Go 1.25+ (see `go.mod`).
+- protoc compiler (see https://protobuf.dev/installation/ `apt install -y protobuf-compiler`)
+- protoc-gen-go, use https://protobuf.dev/reference/go/go-generated/ `go install google.golang.org/protobuf/cmd/protoc-gen-go@latest`
+- protoc-gen-go-grpc, use `go install google.golang.org/grpc/cmd/protoc-gen-go-grpc@latest`
 
 Build the binary (generates protos and outputs to `devbin/yagpcc`):
 

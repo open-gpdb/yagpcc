@@ -18,7 +18,7 @@ genbin:
 	mkdir -p devbin
 
 build: genproto genbin
-	go build -pgo=auto -o devbin/yagpcc $(LDFLAGS) ./cmd/server
+	go build -pgo=auto -o devbin/yagpcc $(GOFLAGS) ./cmd/server
 
 ####################### TESTS #######################
 
