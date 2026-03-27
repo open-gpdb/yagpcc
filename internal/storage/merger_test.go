@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/assert"
+	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/timestamppb"
 
 	pbm "github.com/open-gpdb/yagpcc/api/proto/agent_master"
@@ -376,6 +377,8 @@ func TestAggregateQueryStat(t *testing.T) {
 	assert.Equal(t, qT.QueryStat.TotalQueryMetrics.SystemStat.KernelTimeSeconds, float64(1))
 	assert.Equal(t, qT.QueryStat.QueryInfo.QueryText, "SELECT master")
 	assert.Equal(t, qT.QueryStat.Message, "All Ok")
+	assert.True(t, proto.Equal(startQ, qT.QueryStat.StartTime))
+	assert.True(t, proto.Equal(endQ, qT.QueryStat.EndTime))
 	assert.Equal(t, len(qT.SegmentQueryMetrics), 2)
 
 	sort.Slice(qT.SegmentQueryMetrics, func(i int, j int) bool {
@@ -390,4 +393,83 @@ func TestAggregateQueryStat(t *testing.T) {
 	assert.Equal(t, qT.SegmentQueryMetrics[1].SegmentMetrics.SystemStat.UserTimeSeconds, float64(1))
 	assert.Equal(t, qT.SegmentQueryMetrics[1].SegmentMetrics.SystemStat.KernelTimeSeconds, float64(1))
 	assert.Nil(t, qT.SegmentQueryMetrics[1].SegmentMetrics.Instrumentation)
+}
+
+func TestAggregateQueryStat_MasterQueryStatTimesFromQueryInfo(t *testing.T) {
+	startQ := timestamppb.New(time.Date(2021, 3, 15, 10, 30, 0, 0, time.UTC))
+	endQ := timestamppb.New(time.Date(2021, 3, 15, 11, 45, 0, 0, time.UTC))
+
+	s := NewRunningQueriesStorage()
+	_, err := s.StoreInfoInStorage(
+		&NodeKey{QKey: QueryKey{Ssid: 100, Ccnt: 1}, SKey: SegmentKey{Segindex: -1}, SliceID: 0},
+		int32(pbc.QueryStatus_QUERY_STATUS_DONE),
+		MeasuredQueryTimes{
+			QueryStart: startQ,
+			QueryEnd:   endQ,
+		},
+		&pbc.QueryInfo{QueryText: "SELECT 1"},
+		nil,
+		&pbc.GPMetrics{Instrumentation: &pbc.MetricInstrumentation{Nloops: 1}},
+	)
+	assert.NoError(t, err)
+
+	qT := &pbm.TotalQueryData{
+		QueryStat:           &pbm.QueryStat{},
+		SegmentQueryMetrics: make([]*pbm.SegmentMetrics, 0),
+	}
+	qKey := QueryKey{Ssid: 100, Ccnt: 1}
+	rQ := s.runningQueries[qKey]
+	err = AggregateQueryStat(qT, qKey, rQ, 1, AggSegmentHost)
+	assert.NoError(t, err)
+
+	assert.True(t, proto.Equal(startQ, qT.QueryStat.StartTime))
+	assert.True(t, proto.Equal(endQ, qT.QueryStat.EndTime))
+}
+
+// Two master slices (-1) share the same start time but different end times; QueryStat.EndTime must be the maximum.
+// Same start avoids dependence on map iteration order when merging distinct start times.
+func TestAggregateQueryStat_MasterEndTimeMaxAcrossMasterSlices(t *testing.T) {
+	sameStart := timestamppb.New(time.Date(2022, 1, 10, 8, 0, 0, 0, time.UTC))
+	earlierEnd := timestamppb.New(time.Date(2022, 1, 10, 8, 30, 0, 0, time.UTC))
+	laterEnd := timestamppb.New(time.Date(2022, 1, 10, 9, 0, 0, 0, time.UTC))
+
+	s := NewRunningQueriesStorage()
+	qKey := QueryKey{Ssid: 101, Ccnt: 1}
+
+	_, err := s.StoreInfoInStorage(
+		&NodeKey{QKey: qKey, SKey: SegmentKey{Segindex: -1}, SliceID: 0},
+		int32(pbc.QueryStatus_QUERY_STATUS_START),
+		MeasuredQueryTimes{
+			QueryStart: sameStart,
+			QueryEnd:   earlierEnd,
+		},
+		&pbc.QueryInfo{QueryText: "first"},
+		nil,
+		&pbc.GPMetrics{Instrumentation: &pbc.MetricInstrumentation{Nloops: 1}},
+	)
+	assert.NoError(t, err)
+
+	_, err = s.StoreInfoInStorage(
+		&NodeKey{QKey: qKey, SKey: SegmentKey{Segindex: -1}, SliceID: 1},
+		int32(pbc.QueryStatus_QUERY_STATUS_START),
+		MeasuredQueryTimes{
+			QueryStart: sameStart,
+			QueryEnd:   laterEnd,
+		},
+		&pbc.QueryInfo{QueryText: "second"},
+		nil,
+		&pbc.GPMetrics{Instrumentation: &pbc.MetricInstrumentation{Nloops: 2}},
+	)
+	assert.NoError(t, err)
+
+	qT := &pbm.TotalQueryData{
+		QueryStat:           &pbm.QueryStat{},
+		SegmentQueryMetrics: make([]*pbm.SegmentMetrics, 0),
+	}
+	rQ := s.runningQueries[qKey]
+	err = AggregateQueryStat(qT, qKey, rQ, 1, AggSegmentHost)
+	assert.NoError(t, err)
+
+	assert.True(t, proto.Equal(sameStart, qT.QueryStat.StartTime))
+	assert.True(t, proto.Equal(laterEnd, qT.QueryStat.EndTime))
 }

@@ -99,7 +99,7 @@ func (bs *BackgroundStorage) AggtregateDataToQueryAndSession(qKey storage.QueryK
 		qT.QueryStat.StartTime = timestamppb.New(time.Now())
 	}
 	if !qT.QueryStat.EndTime.IsValid() {
-		qT.QueryStat.EndTime = qT.QueryStat.StartTime
+		qT.QueryStat.EndTime = timestamppb.New(time.Now())
 	}
 	if qT.QueryStat.EndTime.GetSeconds() < qT.QueryStat.StartTime.GetSeconds() {
 		qT.QueryStat.EndTime = qT.QueryStat.StartTime

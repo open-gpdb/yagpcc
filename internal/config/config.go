@@ -112,7 +112,7 @@ func DefaultConfig() (*Config, error) {
 		MasterConnectionFirstTries: 86400,
 		IgnoreDatabaseError:        false,
 		MinimumQueryDurationSec:    10 * 60,
-		MaxShortQueriesPerUser:     500,
+		MaxShortQueriesPerUser:     2000,
 		ShortAggInterval:           time.Duration(time.Minute * 10),
 		SessionRefreshInterval:     time.Duration(time.Second * 30),
 		QueriesRefreshInterval:     time.Duration(time.Second * 1),

@@ -7,6 +7,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/timestamppb"
 
 	"github.com/open-gpdb/yagpcc/internal/utils"
@@ -53,4 +54,30 @@ func TestGetTimeForTimestamp(t *testing.T) {
 func TestGetTimeAsString(t *testing.T) {
 	assert.Equal(t, "0001-01-01T00:00:00+00:00", utils.GetTimeAsString(time.Time{}))
 	assert.Equal(t, "2025-02-21T16:07:02+00:00", utils.GetTimeAsString(time.Date(2025, 02, 21, 16, 07, 02, 123, time.UTC)))
+}
+
+func TestMinTime(t *testing.T) {
+	early := timestamppb.New(time.Date(2020, 1, 2, 3, 4, 5, 0, time.UTC))
+	later := timestamppb.New(time.Date(2021, 1, 2, 3, 4, 5, 0, time.UTC))
+
+	assert.True(t, proto.Equal(early, utils.MinTime(early, later)))
+	assert.True(t, proto.Equal(early, utils.MinTime(later, early)))
+	assert.True(t, proto.Equal(early, utils.MinTime(early, early)))
+
+	assert.Nil(t, utils.MinTime(nil, nil))
+	assert.True(t, proto.Equal(early, utils.MinTime(early, nil)))
+	assert.True(t, proto.Equal(early, utils.MinTime(nil, early)))
+}
+
+func TestMaxTime(t *testing.T) {
+	early := timestamppb.New(time.Date(2020, 1, 2, 3, 4, 5, 0, time.UTC))
+	later := timestamppb.New(time.Date(2021, 1, 2, 3, 4, 5, 0, time.UTC))
+
+	assert.True(t, proto.Equal(later, utils.MaxTime(early, later)))
+	assert.True(t, proto.Equal(later, utils.MaxTime(later, early)))
+	assert.True(t, proto.Equal(early, utils.MaxTime(early, early)))
+
+	assert.Nil(t, utils.MaxTime(nil, nil))
+	assert.True(t, proto.Equal(early, utils.MaxTime(early, nil)))
+	assert.True(t, proto.Equal(early, utils.MaxTime(nil, early)))
 }
