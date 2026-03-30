@@ -241,6 +241,74 @@ func TestSortAndFilterSessions(t *testing.T) {
 	})
 }
 
+func TestSortNetworkStatLongFields(t *testing.T) {
+	type F = pbm.SessionField
+	for _, tc := range []struct {
+		f    F
+		slot string
+		sent bool
+		kind string
+	}{
+		{F(pbm.SessionField_TOTAL_NET_SENT_TOTAL_BYTES), "total", true, "bytes"},
+		{F(pbm.SessionField_TOTAL_NET_SENT_TUPLE_BYTES), "total", true, "tuple"},
+		{F(pbm.SessionField_TOTAL_NET_SENT_CHUNKS), "total", true, "chunks"},
+		{F(pbm.SessionField_TOTAL_NET_RECV_TOTAL_BYTES), "total", false, "bytes"},
+		{F(pbm.SessionField_TOTAL_NET_RECV_TUPLE_BYTES), "total", false, "tuple"},
+		{F(pbm.SessionField_TOTAL_NET_RECV_CHUNKS), "total", false, "chunks"},
+		{F(pbm.SessionField_LAST_NET_SENT_TOTAL_BYTES), "last", true, "bytes"},
+		{F(pbm.SessionField_LAST_NET_SENT_TUPLE_BYTES), "last", true, "tuple"},
+		{F(pbm.SessionField_LAST_NET_SENT_CHUNKS), "last", true, "chunks"},
+		{F(pbm.SessionField_LAST_NET_RECV_TOTAL_BYTES), "last", false, "bytes"},
+		{F(pbm.SessionField_LAST_NET_RECV_TUPLE_BYTES), "last", false, "tuple"},
+		{F(pbm.SessionField_LAST_NET_RECV_CHUNKS), "last", false, "chunks"},
+		{F(pbm.SessionField_QUERY_NET_SENT_TOTAL_BYTES), "query", true, "bytes"},
+		{F(pbm.SessionField_QUERY_NET_SENT_TUPLE_BYTES), "query", true, "tuple"},
+		{F(pbm.SessionField_QUERY_NET_SENT_CHUNKS), "query", true, "chunks"},
+		{F(pbm.SessionField_QUERY_NET_RECV_TOTAL_BYTES), "query", false, "bytes"},
+		{F(pbm.SessionField_QUERY_NET_RECV_TUPLE_BYTES), "query", false, "tuple"},
+	} {
+		t.Run(tc.f.String(), func(t *testing.T) {
+			stat := func(u32 uint32, u64 uint64) *pbc.NetworkStat {
+				switch tc.kind {
+				case "tuple":
+					return &pbc.NetworkStat{TupleBytes: u32, TupleBytesLong: u64}
+				case "chunks":
+					return &pbc.NetworkStat{Chunks: u32, ChunksLong: u64}
+				default:
+					return &pbc.NetworkStat{TotalBytes: u32, TotalBytesLong: u64}
+				}
+			}
+			stat1, stat2 := stat(5, 5_000_000_000), stat(10, 3_000_000_000)
+
+			mk := func(id int64, s *pbc.NetworkStat) *pbc.SessionState {
+				instr := &pbc.MetricInstrumentation{}
+				if tc.sent {
+					instr.Sent = s
+				} else {
+					instr.Received = s
+				}
+				st := &pbc.SessionState{SessionKey: &pbc.SessionKey{SessId: id}}
+				m := &pbc.GPMetrics{Instrumentation: instr}
+				switch tc.slot {
+				case "total":
+					st.TotalMetrics = m
+				case "last":
+					st.LastMetrics = m
+				case "query":
+					st.QueryMetrics = m
+				}
+				return st
+			}
+
+			sessions := []*pbc.SessionState{mk(1, stat1), mk(2, stat2)}
+			fields := []*pbm.SessionFieldWrapper{{FieldName: tc.f, Order: pbm.SortOrder_SORT_DESC}}
+			require.NoError(t, grpc.SortResult(&sessions, fields))
+			assert.Equal(t, int64(1), sessions[0].SessionKey.SessId)
+			assert.Equal(t, int64(2), sessions[1].SessionKey.SessId)
+		})
+	}
+}
+
 func TestMasterMethods(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	sessionMocker := NewMockStatActivityLister(ctrl)
