@@ -17,14 +17,12 @@ const (
 
 var (
 	configPathValue *string
-	configPathFlag  *pflag.Flag
 )
 
 const configFile string = "yagpcc.yaml"
 
 func registerConfigPathFlag(set *pflag.FlagSet) {
 	configPathValue = set.String(flagNameConfigPath, "", "Path where to look for configuration files")
-	configPathFlag = set.Lookup(flagNameConfigPath)
 }
 
 func main() {
