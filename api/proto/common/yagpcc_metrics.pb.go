@@ -850,25 +850,21 @@ type NetworkStat struct {
 	//
 	// Importance: major
 	// Aggregation: sum
-	TotalBytes uint32 `protobuf:"varint,1,opt,name=total_bytes,json=totalBytes,proto3" json:"total_bytes,omitempty"`
+	TotalBytes uint64 `protobuf:"varint,1,opt,name=total_bytes,json=totalBytes,proto3" json:"total_bytes,omitempty"`
 	// tuple_bytes: total number of tuples only bytes (without headers) that all of backend processes
 	// associated with query or session sent/received to/from the network layer.
 	//
 	// Importance: minor
 	// Aggregation: sum
-	TupleBytes uint32 `protobuf:"varint,2,opt,name=tuple_bytes,json=tupleBytes,proto3" json:"tuple_bytes,omitempty"`
+	TupleBytes uint64 `protobuf:"varint,2,opt,name=tuple_bytes,json=tupleBytes,proto3" json:"tuple_bytes,omitempty"`
 	// chunks: total number of chunks (tuples only) that all of backend processes
 	// associated with query or session sent/received to/from the network layer.
 	//
 	// Importance: normal
 	// Aggregation: sum
-	Chunks uint32 `protobuf:"varint,3,opt,name=chunks,proto3" json:"chunks,omitempty"`
-	// the stats here is the same except uses uint64, uint32 is too snal for aggregated stat
-	TotalBytesLong uint64 `protobuf:"varint,4,opt,name=total_bytes_long,json=totalBytesLong,proto3" json:"total_bytes_long,omitempty"`
-	TupleBytesLong uint64 `protobuf:"varint,5,opt,name=tuple_bytes_long,json=tupleBytesLong,proto3" json:"tuple_bytes_long,omitempty"`
-	ChunksLong     uint64 `protobuf:"varint,6,opt,name=chunks_long,json=chunksLong,proto3" json:"chunks_long,omitempty"`
-	unknownFields  protoimpl.UnknownFields
-	sizeCache      protoimpl.SizeCache
+	Chunks        uint64 `protobuf:"varint,3,opt,name=chunks,proto3" json:"chunks,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
 }
 
 func (x *NetworkStat) Reset() {
@@ -901,44 +897,23 @@ func (*NetworkStat) Descriptor() ([]byte, []int) {
 	return file_api_proto_common_yagpcc_metrics_proto_rawDescGZIP(), []int{7}
 }
 
-func (x *NetworkStat) GetTotalBytes() uint32 {
+func (x *NetworkStat) GetTotalBytes() uint64 {
 	if x != nil {
 		return x.TotalBytes
 	}
 	return 0
 }
 
-func (x *NetworkStat) GetTupleBytes() uint32 {
+func (x *NetworkStat) GetTupleBytes() uint64 {
 	if x != nil {
 		return x.TupleBytes
 	}
 	return 0
 }
 
-func (x *NetworkStat) GetChunks() uint32 {
+func (x *NetworkStat) GetChunks() uint64 {
 	if x != nil {
 		return x.Chunks
-	}
-	return 0
-}
-
-func (x *NetworkStat) GetTotalBytesLong() uint64 {
-	if x != nil {
-		return x.TotalBytesLong
-	}
-	return 0
-}
-
-func (x *NetworkStat) GetTupleBytesLong() uint64 {
-	if x != nil {
-		return x.TupleBytesLong
-	}
-	return 0
-}
-
-func (x *NetworkStat) GetChunksLong() uint64 {
-	if x != nil {
-		return x.ChunksLong
 	}
 	return 0
 }
@@ -1667,17 +1642,13 @@ const file_api_proto_common_yagpcc_metrics_proto_rawDesc = "" +
 	"read_bytes\x18\f \x01(\x04R\treadBytes\x12\x1f\n" +
 	"\vwrite_bytes\x18\r \x01(\x04R\n" +
 	"writeBytes\x122\n" +
-	"\x15cancelled_write_bytes\x18\x0e \x01(\x04R\x13cancelledWriteBytes\"\xdc\x01\n" +
+	"\x15cancelled_write_bytes\x18\x0e \x01(\x04R\x13cancelledWriteBytes\"\xaa\x01\n" +
 	"\vNetworkStat\x12\x1f\n" +
-	"\vtotal_bytes\x18\x01 \x01(\rR\n" +
+	"\vtotal_bytes\x18\x01 \x01(\x04R\n" +
 	"totalBytes\x12\x1f\n" +
-	"\vtuple_bytes\x18\x02 \x01(\rR\n" +
+	"\vtuple_bytes\x18\x02 \x01(\x04R\n" +
 	"tupleBytes\x12\x16\n" +
-	"\x06chunks\x18\x03 \x01(\rR\x06chunks\x12(\n" +
-	"\x10total_bytes_long\x18\x04 \x01(\x04R\x0etotalBytesLong\x12(\n" +
-	"\x10tuple_bytes_long\x18\x05 \x01(\x04R\x0etupleBytesLong\x12\x1f\n" +
-	"\vchunks_long\x18\x06 \x01(\x04R\n" +
-	"chunksLong\"\xfb\x05\n" +
+	"\x06chunks\x18\x03 \x01(\x04R\x06chunksJ\x04\b\x04\x10\x05J\x04\b\x05\x10\x06J\x04\b\x06\x10\aR\x10total_bytes_longR\x10tuple_bytes_longR\vchunks_long\"\xfb\x05\n" +
 	"\x10InterconnectStat\x121\n" +
 	"\x15total_recv_queue_size\x18\x01 \x01(\x04R\x12totalRecvQueueSize\x12@\n" +
 	"\x1drecv_queue_size_counting_time\x18\x02 \x01(\x04R\x19recvQueueSizeCountingTime\x12%\n" +
