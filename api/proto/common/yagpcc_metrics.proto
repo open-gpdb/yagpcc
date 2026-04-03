@@ -252,27 +252,21 @@ message NetworkStat {
     //
     // Importance: major
     // Aggregation: sum
-    uint32 total_bytes = 1;
+    uint64 total_bytes = 1;
 
     // tuple_bytes: total number of tuples only bytes (without headers) that all of backend processes
     // associated with query or session sent/received to/from the network layer.
     //
     // Importance: minor
     // Aggregation: sum
-    uint32 tuple_bytes = 2;
+    uint64 tuple_bytes = 2;
 
     // chunks: total number of chunks (tuples only) that all of backend processes
     // associated with query or session sent/received to/from the network layer.
     //
     // Importance: normal
     // Aggregation: sum
-    uint32 chunks = 3;
-
-    // the stats here is the same except uses uint64, uint32 is too snal for aggregated stat
-    uint64 total_bytes_long = 4;
-    uint64 tuple_bytes_long = 5;
-    uint64 chunks_long = 6;
-
+    uint64 chunks = 3;
 }
 
 // InterconnectStat: detailed interconnect statistics.

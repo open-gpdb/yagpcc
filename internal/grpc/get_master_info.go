@@ -1065,10 +1065,10 @@ func (ms *MultipleSorter) Less(i, j int) bool {
 
 			left, right := uint64(0), uint64(0)
 			if p.TotalMetrics != nil && p.TotalMetrics.Instrumentation != nil && p.TotalMetrics.Instrumentation.Sent != nil {
-				left = max(uint64(p.TotalMetrics.Instrumentation.Sent.TotalBytes), p.TotalMetrics.Instrumentation.Sent.TotalBytesLong)
+				left = p.TotalMetrics.Instrumentation.Sent.TotalBytes
 			}
 			if q.TotalMetrics != nil && q.TotalMetrics.Instrumentation != nil && q.TotalMetrics.Instrumentation.Sent != nil {
-				right = max(uint64(q.TotalMetrics.Instrumentation.Sent.TotalBytes), q.TotalMetrics.Instrumentation.Sent.TotalBytesLong)
+				right = q.TotalMetrics.Instrumentation.Sent.TotalBytes
 			}
 			if less(ms.Fields[k].Order, left, right) {
 				return true
@@ -1080,10 +1080,10 @@ func (ms *MultipleSorter) Less(i, j int) bool {
 
 			left, right := uint64(0), uint64(0)
 			if p.TotalMetrics != nil && p.TotalMetrics.Instrumentation != nil && p.TotalMetrics.Instrumentation.Sent != nil {
-				left = max(uint64(p.TotalMetrics.Instrumentation.Sent.TupleBytes), p.TotalMetrics.Instrumentation.Sent.TupleBytesLong)
+				left = p.TotalMetrics.Instrumentation.Sent.TupleBytes
 			}
 			if q.TotalMetrics != nil && q.TotalMetrics.Instrumentation != nil && q.TotalMetrics.Instrumentation.Sent != nil {
-				right = max(uint64(q.TotalMetrics.Instrumentation.Sent.TupleBytes), q.TotalMetrics.Instrumentation.Sent.TupleBytesLong)
+				right = q.TotalMetrics.Instrumentation.Sent.TupleBytes
 			}
 			if less(ms.Fields[k].Order, left, right) {
 				return true
@@ -1095,10 +1095,10 @@ func (ms *MultipleSorter) Less(i, j int) bool {
 
 			left, right := uint64(0), uint64(0)
 			if p.TotalMetrics != nil && p.TotalMetrics.Instrumentation != nil && p.TotalMetrics.Instrumentation.Sent != nil {
-				left = max(uint64(p.TotalMetrics.Instrumentation.Sent.Chunks), p.TotalMetrics.Instrumentation.Sent.ChunksLong)
+				left = p.TotalMetrics.Instrumentation.Sent.Chunks
 			}
 			if q.TotalMetrics != nil && q.TotalMetrics.Instrumentation != nil && q.TotalMetrics.Instrumentation.Sent != nil {
-				right = max(uint64(q.TotalMetrics.Instrumentation.Sent.Chunks), q.TotalMetrics.Instrumentation.Sent.ChunksLong)
+				right = q.TotalMetrics.Instrumentation.Sent.Chunks
 			}
 			if less(ms.Fields[k].Order, left, right) {
 				return true
@@ -1110,10 +1110,10 @@ func (ms *MultipleSorter) Less(i, j int) bool {
 
 			left, right := uint64(0), uint64(0)
 			if p.TotalMetrics != nil && p.TotalMetrics.Instrumentation != nil && p.TotalMetrics.Instrumentation.Received != nil {
-				left = max(uint64(p.TotalMetrics.Instrumentation.Received.TotalBytes), p.TotalMetrics.Instrumentation.Received.TotalBytesLong)
+				left = p.TotalMetrics.Instrumentation.Received.TotalBytes
 			}
 			if q.TotalMetrics != nil && q.TotalMetrics.Instrumentation != nil && q.TotalMetrics.Instrumentation.Received != nil {
-				right = max(uint64(q.TotalMetrics.Instrumentation.Received.TotalBytes), q.TotalMetrics.Instrumentation.Received.TotalBytesLong)
+				right = q.TotalMetrics.Instrumentation.Received.TotalBytes
 			}
 			if less(ms.Fields[k].Order, left, right) {
 				return true
@@ -1125,10 +1125,10 @@ func (ms *MultipleSorter) Less(i, j int) bool {
 
 			left, right := uint64(0), uint64(0)
 			if p.TotalMetrics != nil && p.TotalMetrics.Instrumentation != nil && p.TotalMetrics.Instrumentation.Received != nil {
-				left = max(uint64(p.TotalMetrics.Instrumentation.Received.TupleBytes), p.TotalMetrics.Instrumentation.Received.TupleBytesLong)
+				left = p.TotalMetrics.Instrumentation.Received.TupleBytes
 			}
 			if q.TotalMetrics != nil && q.TotalMetrics.Instrumentation != nil && q.TotalMetrics.Instrumentation.Received != nil {
-				right = max(uint64(q.TotalMetrics.Instrumentation.Received.TupleBytes), q.TotalMetrics.Instrumentation.Received.TupleBytesLong)
+				right = q.TotalMetrics.Instrumentation.Received.TupleBytes
 			}
 			if less(ms.Fields[k].Order, left, right) {
 				return true
@@ -1140,10 +1140,10 @@ func (ms *MultipleSorter) Less(i, j int) bool {
 
 			left, right := uint64(0), uint64(0)
 			if p.TotalMetrics != nil && p.TotalMetrics.Instrumentation != nil && p.TotalMetrics.Instrumentation.Received != nil {
-				left = max(uint64(p.TotalMetrics.Instrumentation.Received.Chunks), p.TotalMetrics.Instrumentation.Received.ChunksLong)
+				left = p.TotalMetrics.Instrumentation.Received.Chunks
 			}
 			if q.TotalMetrics != nil && q.TotalMetrics.Instrumentation != nil && q.TotalMetrics.Instrumentation.Received != nil {
-				right = max(uint64(q.TotalMetrics.Instrumentation.Received.Chunks), q.TotalMetrics.Instrumentation.Received.ChunksLong)
+				right = q.TotalMetrics.Instrumentation.Received.Chunks
 			}
 			if less(ms.Fields[k].Order, left, right) {
 				return true
@@ -1650,10 +1650,10 @@ func (ms *MultipleSorter) Less(i, j int) bool {
 
 			left, right := uint64(0), uint64(0)
 			if p.LastMetrics != nil && p.LastMetrics.Instrumentation != nil && p.LastMetrics.Instrumentation.Sent != nil {
-				left = max(uint64(p.LastMetrics.Instrumentation.Sent.TotalBytes), p.LastMetrics.Instrumentation.Sent.TotalBytesLong)
+				left = p.LastMetrics.Instrumentation.Sent.TotalBytes
 			}
 			if q.LastMetrics != nil && q.LastMetrics.Instrumentation != nil && q.LastMetrics.Instrumentation.Sent != nil {
-				right = max(uint64(q.LastMetrics.Instrumentation.Sent.TotalBytes), q.LastMetrics.Instrumentation.Sent.TotalBytesLong)
+				right = q.LastMetrics.Instrumentation.Sent.TotalBytes
 			}
 			if less(ms.Fields[k].Order, left, right) {
 				return true
@@ -1665,10 +1665,10 @@ func (ms *MultipleSorter) Less(i, j int) bool {
 
 			left, right := uint64(0), uint64(0)
 			if p.LastMetrics != nil && p.LastMetrics.Instrumentation != nil && p.LastMetrics.Instrumentation.Sent != nil {
-				left = max(uint64(p.LastMetrics.Instrumentation.Sent.TupleBytes), p.LastMetrics.Instrumentation.Sent.TupleBytesLong)
+				left = p.LastMetrics.Instrumentation.Sent.TupleBytes
 			}
 			if q.LastMetrics != nil && q.LastMetrics.Instrumentation != nil && q.LastMetrics.Instrumentation.Sent != nil {
-				right = max(uint64(q.LastMetrics.Instrumentation.Sent.TupleBytes), q.LastMetrics.Instrumentation.Sent.TupleBytesLong)
+				right = q.LastMetrics.Instrumentation.Sent.TupleBytes
 			}
 			if less(ms.Fields[k].Order, left, right) {
 				return true
@@ -1680,10 +1680,10 @@ func (ms *MultipleSorter) Less(i, j int) bool {
 
 			left, right := uint64(0), uint64(0)
 			if p.LastMetrics != nil && p.LastMetrics.Instrumentation != nil && p.LastMetrics.Instrumentation.Sent != nil {
-				left = max(uint64(p.LastMetrics.Instrumentation.Sent.Chunks), p.LastMetrics.Instrumentation.Sent.ChunksLong)
+				left = p.LastMetrics.Instrumentation.Sent.Chunks
 			}
 			if q.LastMetrics != nil && q.LastMetrics.Instrumentation != nil && q.LastMetrics.Instrumentation.Sent != nil {
-				right = max(uint64(q.LastMetrics.Instrumentation.Sent.Chunks), q.LastMetrics.Instrumentation.Sent.ChunksLong)
+				right = q.LastMetrics.Instrumentation.Sent.Chunks
 			}
 			if less(ms.Fields[k].Order, left, right) {
 				return true
@@ -1695,10 +1695,10 @@ func (ms *MultipleSorter) Less(i, j int) bool {
 
 			left, right := uint64(0), uint64(0)
 			if p.LastMetrics != nil && p.LastMetrics.Instrumentation != nil && p.LastMetrics.Instrumentation.Received != nil {
-				left = max(uint64(p.LastMetrics.Instrumentation.Received.TotalBytes), p.LastMetrics.Instrumentation.Received.TotalBytesLong)
+				left = p.LastMetrics.Instrumentation.Received.TotalBytes
 			}
 			if q.LastMetrics != nil && q.LastMetrics.Instrumentation != nil && q.LastMetrics.Instrumentation.Received != nil {
-				right = max(uint64(q.LastMetrics.Instrumentation.Received.TotalBytes), q.LastMetrics.Instrumentation.Received.TotalBytesLong)
+				right = q.LastMetrics.Instrumentation.Received.TotalBytes
 			}
 			if less(ms.Fields[k].Order, left, right) {
 				return true
@@ -1710,10 +1710,10 @@ func (ms *MultipleSorter) Less(i, j int) bool {
 
 			left, right := uint64(0), uint64(0)
 			if p.LastMetrics != nil && p.LastMetrics.Instrumentation != nil && p.LastMetrics.Instrumentation.Received != nil {
-				left = max(uint64(p.LastMetrics.Instrumentation.Received.TupleBytes), p.LastMetrics.Instrumentation.Received.TupleBytesLong)
+				left = p.LastMetrics.Instrumentation.Received.TupleBytes
 			}
 			if q.LastMetrics != nil && q.LastMetrics.Instrumentation != nil && q.LastMetrics.Instrumentation.Received != nil {
-				right = max(uint64(q.LastMetrics.Instrumentation.Received.TupleBytes), q.LastMetrics.Instrumentation.Received.TupleBytesLong)
+				right = q.LastMetrics.Instrumentation.Received.TupleBytes
 			}
 			if less(ms.Fields[k].Order, left, right) {
 				return true
@@ -1725,10 +1725,10 @@ func (ms *MultipleSorter) Less(i, j int) bool {
 
 			left, right := uint64(0), uint64(0)
 			if p.LastMetrics != nil && p.LastMetrics.Instrumentation != nil && p.LastMetrics.Instrumentation.Received != nil {
-				left = max(uint64(p.LastMetrics.Instrumentation.Received.Chunks), p.LastMetrics.Instrumentation.Received.ChunksLong)
+				left = p.LastMetrics.Instrumentation.Received.Chunks
 			}
 			if q.LastMetrics != nil && q.LastMetrics.Instrumentation != nil && q.LastMetrics.Instrumentation.Received != nil {
-				right = max(uint64(q.LastMetrics.Instrumentation.Received.Chunks), q.LastMetrics.Instrumentation.Received.ChunksLong)
+				right = q.LastMetrics.Instrumentation.Received.Chunks
 			}
 			if less(ms.Fields[k].Order, left, right) {
 				return true
@@ -2235,10 +2235,10 @@ func (ms *MultipleSorter) Less(i, j int) bool {
 
 			left, right := uint64(0), uint64(0)
 			if p.QueryMetrics != nil && p.QueryMetrics.Instrumentation != nil && p.QueryMetrics.Instrumentation.Sent != nil {
-				left = max(uint64(p.QueryMetrics.Instrumentation.Sent.TotalBytes), p.QueryMetrics.Instrumentation.Sent.TotalBytesLong)
+				left = p.QueryMetrics.Instrumentation.Sent.TotalBytes
 			}
 			if q.QueryMetrics != nil && q.QueryMetrics.Instrumentation != nil && q.QueryMetrics.Instrumentation.Sent != nil {
-				right = max(uint64(q.QueryMetrics.Instrumentation.Sent.TotalBytes), q.QueryMetrics.Instrumentation.Sent.TotalBytesLong)
+				right = q.QueryMetrics.Instrumentation.Sent.TotalBytes
 			}
 			if less(ms.Fields[k].Order, left, right) {
 				return true
@@ -2250,10 +2250,10 @@ func (ms *MultipleSorter) Less(i, j int) bool {
 
 			left, right := uint64(0), uint64(0)
 			if p.QueryMetrics != nil && p.QueryMetrics.Instrumentation != nil && p.QueryMetrics.Instrumentation.Sent != nil {
-				left = max(uint64(p.QueryMetrics.Instrumentation.Sent.TupleBytes), p.QueryMetrics.Instrumentation.Sent.TupleBytesLong)
+				left = p.QueryMetrics.Instrumentation.Sent.TupleBytes
 			}
 			if q.QueryMetrics != nil && q.QueryMetrics.Instrumentation != nil && q.QueryMetrics.Instrumentation.Sent != nil {
-				right = max(uint64(q.QueryMetrics.Instrumentation.Sent.TupleBytes), q.QueryMetrics.Instrumentation.Sent.TupleBytesLong)
+				right = q.QueryMetrics.Instrumentation.Sent.TupleBytes
 			}
 			if less(ms.Fields[k].Order, left, right) {
 				return true
@@ -2265,10 +2265,10 @@ func (ms *MultipleSorter) Less(i, j int) bool {
 
 			left, right := uint64(0), uint64(0)
 			if p.QueryMetrics != nil && p.QueryMetrics.Instrumentation != nil && p.QueryMetrics.Instrumentation.Sent != nil {
-				left = max(uint64(p.QueryMetrics.Instrumentation.Sent.Chunks), p.QueryMetrics.Instrumentation.Sent.ChunksLong)
+				left = p.QueryMetrics.Instrumentation.Sent.Chunks
 			}
 			if q.QueryMetrics != nil && q.QueryMetrics.Instrumentation != nil && q.QueryMetrics.Instrumentation.Sent != nil {
-				right = max(uint64(q.QueryMetrics.Instrumentation.Sent.Chunks), q.QueryMetrics.Instrumentation.Sent.ChunksLong)
+				right = q.QueryMetrics.Instrumentation.Sent.Chunks
 			}
 			if less(ms.Fields[k].Order, left, right) {
 				return true
@@ -2280,10 +2280,10 @@ func (ms *MultipleSorter) Less(i, j int) bool {
 
 			left, right := uint64(0), uint64(0)
 			if p.QueryMetrics != nil && p.QueryMetrics.Instrumentation != nil && p.QueryMetrics.Instrumentation.Received != nil {
-				left = max(uint64(p.QueryMetrics.Instrumentation.Received.TotalBytes), p.QueryMetrics.Instrumentation.Received.TotalBytesLong)
+				left = p.QueryMetrics.Instrumentation.Received.TotalBytes
 			}
 			if q.QueryMetrics != nil && q.QueryMetrics.Instrumentation != nil && q.QueryMetrics.Instrumentation.Received != nil {
-				right = max(uint64(q.QueryMetrics.Instrumentation.Received.TotalBytes), q.QueryMetrics.Instrumentation.Received.TotalBytesLong)
+				right = q.QueryMetrics.Instrumentation.Received.TotalBytes
 			}
 			if less(ms.Fields[k].Order, left, right) {
 				return true
@@ -2295,10 +2295,10 @@ func (ms *MultipleSorter) Less(i, j int) bool {
 
 			left, right := uint64(0), uint64(0)
 			if p.QueryMetrics != nil && p.QueryMetrics.Instrumentation != nil && p.QueryMetrics.Instrumentation.Received != nil {
-				left = max(uint64(p.QueryMetrics.Instrumentation.Received.TupleBytes), p.QueryMetrics.Instrumentation.Received.TupleBytesLong)
+				left = p.QueryMetrics.Instrumentation.Received.TupleBytes
 			}
 			if q.QueryMetrics != nil && q.QueryMetrics.Instrumentation != nil && q.QueryMetrics.Instrumentation.Received != nil {
-				right = max(uint64(q.QueryMetrics.Instrumentation.Received.TupleBytes), q.QueryMetrics.Instrumentation.Received.TupleBytesLong)
+				right = q.QueryMetrics.Instrumentation.Received.TupleBytes
 			}
 			if less(ms.Fields[k].Order, left, right) {
 				return true

@@ -166,9 +166,6 @@ func GroupGPMetrics(dest *pbc.GPMetrics, source *pbc.GPMetrics, aggKind Aggregat
 					dest.Instrumentation.Sent.TotalBytes += source.Instrumentation.Sent.TotalBytes
 					dest.Instrumentation.Sent.TupleBytes += source.Instrumentation.Sent.TupleBytes
 					dest.Instrumentation.Sent.Chunks += source.Instrumentation.Sent.Chunks
-					dest.Instrumentation.Sent.TotalBytesLong += source.Instrumentation.Sent.TotalBytesLong
-					dest.Instrumentation.Sent.TupleBytesLong += source.Instrumentation.Sent.TupleBytesLong
-					dest.Instrumentation.Sent.ChunksLong += source.Instrumentation.Sent.ChunksLong
 				}
 			}
 
@@ -179,9 +176,6 @@ func GroupGPMetrics(dest *pbc.GPMetrics, source *pbc.GPMetrics, aggKind Aggregat
 					dest.Instrumentation.Received.TotalBytes += source.Instrumentation.Received.TotalBytes
 					dest.Instrumentation.Received.TupleBytes += source.Instrumentation.Received.TupleBytes
 					dest.Instrumentation.Received.Chunks += source.Instrumentation.Received.Chunks
-					dest.Instrumentation.Received.TotalBytesLong += source.Instrumentation.Received.TotalBytesLong
-					dest.Instrumentation.Received.TupleBytesLong += source.Instrumentation.Received.TupleBytesLong
-					dest.Instrumentation.Received.ChunksLong += source.Instrumentation.Received.ChunksLong
 				}
 			}
 
@@ -332,26 +326,20 @@ func MergeGPMetrics(dest *pbc.GPMetrics, source *pbc.GPMetrics) error {
 			if source.Instrumentation.Sent != nil {
 				if dest.Instrumentation.Sent == nil {
 					dest.Instrumentation.Sent = proto.Clone(source.Instrumentation.Sent).(*pbc.NetworkStat)
-					dest.Instrumentation.Sent.TotalBytesLong = max(uint64(source.Instrumentation.Sent.TotalBytes), source.Instrumentation.Sent.TotalBytesLong)
-					dest.Instrumentation.Sent.TupleBytesLong = max(uint64(source.Instrumentation.Sent.TupleBytes), source.Instrumentation.Sent.TupleBytesLong)
-					dest.Instrumentation.Sent.ChunksLong = max(uint64(source.Instrumentation.Sent.Chunks), source.Instrumentation.Sent.ChunksLong)
 				} else {
-					dest.Instrumentation.Sent.TotalBytesLong = max(max(uint64(source.Instrumentation.Sent.TotalBytes), source.Instrumentation.Sent.TotalBytesLong), dest.Instrumentation.Sent.TotalBytesLong)
-					dest.Instrumentation.Sent.TupleBytesLong = max(max(uint64(source.Instrumentation.Sent.TupleBytes), source.Instrumentation.Sent.TupleBytesLong), dest.Instrumentation.Sent.TupleBytesLong)
-					dest.Instrumentation.Sent.ChunksLong = max(max(uint64(source.Instrumentation.Sent.Chunks), source.Instrumentation.Sent.ChunksLong), dest.Instrumentation.Sent.ChunksLong)
+					dest.Instrumentation.Sent.TotalBytes = max(source.Instrumentation.Sent.TotalBytes, dest.Instrumentation.Sent.TotalBytes)
+					dest.Instrumentation.Sent.TupleBytes = max(source.Instrumentation.Sent.TupleBytes, dest.Instrumentation.Sent.TupleBytes)
+					dest.Instrumentation.Sent.Chunks = max(source.Instrumentation.Sent.Chunks, dest.Instrumentation.Sent.Chunks)
 				}
 			}
 
 			if source.Instrumentation.Received != nil {
 				if dest.Instrumentation.Received == nil {
 					dest.Instrumentation.Received = proto.Clone(source.Instrumentation.Received).(*pbc.NetworkStat)
-					dest.Instrumentation.Received.TotalBytesLong = max(uint64(source.Instrumentation.Received.TotalBytes), source.Instrumentation.Received.TotalBytesLong)
-					dest.Instrumentation.Received.TupleBytesLong = max(uint64(source.Instrumentation.Received.TupleBytes), source.Instrumentation.Received.TupleBytesLong)
-					dest.Instrumentation.Received.ChunksLong = max(uint64(source.Instrumentation.Received.Chunks), source.Instrumentation.Received.ChunksLong)
 				} else {
-					dest.Instrumentation.Received.TotalBytesLong = max(max(uint64(source.Instrumentation.Received.TotalBytes), source.Instrumentation.Received.TotalBytesLong), dest.Instrumentation.Received.TotalBytesLong)
-					dest.Instrumentation.Received.TupleBytesLong = max(max(uint64(source.Instrumentation.Received.TupleBytes), source.Instrumentation.Received.TupleBytesLong), dest.Instrumentation.Received.TupleBytesLong)
-					dest.Instrumentation.Received.ChunksLong = max(max(uint64(source.Instrumentation.Received.Chunks), source.Instrumentation.Received.ChunksLong), dest.Instrumentation.Received.ChunksLong)
+					dest.Instrumentation.Received.TotalBytes = max(source.Instrumentation.Received.TotalBytes, dest.Instrumentation.Received.TotalBytes)
+					dest.Instrumentation.Received.TupleBytes = max(source.Instrumentation.Received.TupleBytes, dest.Instrumentation.Received.TupleBytes)
+					dest.Instrumentation.Received.Chunks = max(source.Instrumentation.Received.Chunks, dest.Instrumentation.Received.Chunks)
 				}
 			}
 
