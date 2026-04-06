@@ -390,6 +390,12 @@ const (
 	SessionField_TOTAL_INTERCONNECT_TOTAL_RECV_QUEUE_SIZE         SessionField = 219
 	SessionField_SESSION_FIELD_WAIT_EVENT                         SessionField = 220
 	SessionField_SESSION_FIELD_WAIT_EVENT_TYPE                    SessionField = 221
+	SessionField_SESSION_FIELD_AGGREGATED_CALLS                   SessionField = 222
+	SessionField_SESSION_FIELD_AGGREGATED_MIN_TIME              SessionField = 223
+	SessionField_SESSION_FIELD_AGGREGATED_MAX_TIME              SessionField = 224
+	SessionField_SESSION_FIELD_AGGREGATED_MEAN_TIME             SessionField = 225
+	SessionField_SESSION_FIELD_AGGREGATED_STDDEV_TIME           SessionField = 226
+	SessionField_SESSION_FIELD_AGGREGATED_TOTAL_TIME            SessionField = 227
 )
 
 // Enum value maps for SessionField.
@@ -612,6 +618,12 @@ var (
 		219: "TOTAL_INTERCONNECT_TOTAL_RECV_QUEUE_SIZE",
 		220: "SESSION_FIELD_WAIT_EVENT",
 		221: "SESSION_FIELD_WAIT_EVENT_TYPE",
+		222: "SESSION_FIELD_AGGREGATED_CALLS",
+		223: "SESSION_FIELD_AGGREGATED_MIN_TIME",
+		224: "SESSION_FIELD_AGGREGATED_MAX_TIME",
+		225: "SESSION_FIELD_AGGREGATED_MEAN_TIME",
+		226: "SESSION_FIELD_AGGREGATED_STDDEV_TIME",
+		227: "SESSION_FIELD_AGGREGATED_TOTAL_TIME",
 	}
 	SessionField_value = map[string]int32{
 		"SESSION_FIELD_UNSPECIFIED":                        0,
@@ -831,6 +843,12 @@ var (
 		"TOTAL_INTERCONNECT_TOTAL_RECV_QUEUE_SIZE":         219,
 		"SESSION_FIELD_WAIT_EVENT":                         220,
 		"SESSION_FIELD_WAIT_EVENT_TYPE":                    221,
+		"SESSION_FIELD_AGGREGATED_CALLS":                   222,
+		"SESSION_FIELD_AGGREGATED_MIN_TIME":                223,
+		"SESSION_FIELD_AGGREGATED_MAX_TIME":                224,
+		"SESSION_FIELD_AGGREGATED_MEAN_TIME":               225,
+		"SESSION_FIELD_AGGREGATED_STDDEV_TIME":             226,
+		"SESSION_FIELD_AGGREGATED_TOTAL_TIME":              227,
 	}
 )
 

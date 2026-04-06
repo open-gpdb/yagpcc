@@ -125,6 +125,96 @@ func TestSort(t *testing.T) {
 	assert.Equal(t, sessState[2].LastMetrics.SystemStat.RunningTimeSeconds, float64(1))
 }
 
+func TestSortAggregatedSessionStats(t *testing.T) {
+	// Three sessions: distinct aggregate stats; one with nil AggregatedMetrics (treated as zeros).
+	makeSessions := func() []*pbc.SessionState {
+		return []*pbc.SessionState{
+			{
+				SessionKey: &pbc.SessionKey{SessId: 1},
+				AggregatedMetrics: &pbc.AggregatedMetrics{
+					Calls: 1, MinTime: 10, MaxTime: 50, MeanTime: 30, StddevTime: 5, TotalTime: 100,
+				},
+			},
+			{
+				SessionKey: &pbc.SessionKey{SessId: 2},
+				AggregatedMetrics: &pbc.AggregatedMetrics{
+					Calls: 5, MinTime: 1, MaxTime: 200, MeanTime: 100, StddevTime: 20, TotalTime: 500,
+				},
+			},
+			{
+				SessionKey:        &pbc.SessionKey{SessId: 3},
+				AggregatedMetrics: nil,
+			},
+		}
+	}
+
+	t.Run("by aggregated total_time desc", func(t *testing.T) {
+		sessions := makeSessions()
+		fields := []*pbm.SessionFieldWrapper{
+			{FieldName: pbm.SessionField_SESSION_FIELD_AGGREGATED_TOTAL_TIME, Order: pbm.SortOrder_SORT_DESC},
+		}
+		require.NoError(t, grpc.SortResult(&sessions, fields))
+		require.Equal(t, int64(2), sessions[0].SessionKey.SessId)
+		require.Equal(t, int64(1), sessions[1].SessionKey.SessId)
+		require.Equal(t, int64(3), sessions[2].SessionKey.SessId)
+	})
+
+	t.Run("by aggregated calls asc", func(t *testing.T) {
+		sessions := makeSessions()
+		fields := []*pbm.SessionFieldWrapper{
+			{FieldName: pbm.SessionField_SESSION_FIELD_AGGREGATED_CALLS, Order: pbm.SortOrder_SORT_ASC},
+		}
+		require.NoError(t, grpc.SortResult(&sessions, fields))
+		require.Equal(t, int64(3), sessions[0].SessionKey.SessId)
+		require.Equal(t, int64(1), sessions[1].SessionKey.SessId)
+		require.Equal(t, int64(2), sessions[2].SessionKey.SessId)
+	})
+
+	t.Run("by aggregated max_time desc", func(t *testing.T) {
+		sessions := makeSessions()
+		fields := []*pbm.SessionFieldWrapper{
+			{FieldName: pbm.SessionField_SESSION_FIELD_AGGREGATED_MAX_TIME, Order: pbm.SortOrder_SORT_DESC},
+		}
+		require.NoError(t, grpc.SortResult(&sessions, fields))
+		require.Equal(t, int64(2), sessions[0].SessionKey.SessId)
+		require.Equal(t, int64(1), sessions[1].SessionKey.SessId)
+		require.Equal(t, int64(3), sessions[2].SessionKey.SessId)
+	})
+
+	t.Run("by aggregated min_time asc", func(t *testing.T) {
+		sessions := makeSessions()
+		fields := []*pbm.SessionFieldWrapper{
+			{FieldName: pbm.SessionField_SESSION_FIELD_AGGREGATED_MIN_TIME, Order: pbm.SortOrder_SORT_ASC},
+		}
+		require.NoError(t, grpc.SortResult(&sessions, fields))
+		require.Equal(t, int64(2), sessions[0].SessionKey.SessId)
+		require.Equal(t, int64(1), sessions[1].SessionKey.SessId)
+		require.Equal(t, int64(3), sessions[2].SessionKey.SessId)
+	})
+
+	t.Run("by aggregated mean_time desc", func(t *testing.T) {
+		sessions := makeSessions()
+		fields := []*pbm.SessionFieldWrapper{
+			{FieldName: pbm.SessionField_SESSION_FIELD_AGGREGATED_MEAN_TIME, Order: pbm.SortOrder_SORT_DESC},
+		}
+		require.NoError(t, grpc.SortResult(&sessions, fields))
+		require.Equal(t, int64(2), sessions[0].SessionKey.SessId)
+		require.Equal(t, int64(1), sessions[1].SessionKey.SessId)
+		require.Equal(t, int64(3), sessions[2].SessionKey.SessId)
+	})
+
+	t.Run("by aggregated stddev_time desc", func(t *testing.T) {
+		sessions := makeSessions()
+		fields := []*pbm.SessionFieldWrapper{
+			{FieldName: pbm.SessionField_SESSION_FIELD_AGGREGATED_STDDEV_TIME, Order: pbm.SortOrder_SORT_DESC},
+		}
+		require.NoError(t, grpc.SortResult(&sessions, fields))
+		require.Equal(t, int64(2), sessions[0].SessionKey.SessId)
+		require.Equal(t, int64(1), sessions[1].SessionKey.SessId)
+		require.Equal(t, int64(3), sessions[2].SessionKey.SessId)
+	})
+}
+
 func TestFilterOut(t *testing.T) {
 	sessionState := &pbc.SessionState{
 		SessionKey: &pbc.SessionKey{SessId: 1},

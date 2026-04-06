@@ -391,6 +391,12 @@ enum SessionField {
     TOTAL_INTERCONNECT_TOTAL_RECV_QUEUE_SIZE         = 219;
     SESSION_FIELD_WAIT_EVENT                         = 220;
     SESSION_FIELD_WAIT_EVENT_TYPE                    = 221;
+    SESSION_FIELD_AGGREGATED_CALLS                   = 222;
+    SESSION_FIELD_AGGREGATED_MIN_TIME                = 223;
+    SESSION_FIELD_AGGREGATED_MAX_TIME                = 224;
+    SESSION_FIELD_AGGREGATED_MEAN_TIME               = 225;
+    SESSION_FIELD_AGGREGATED_STDDEV_TIME             = 226;
+    SESSION_FIELD_AGGREGATED_TOTAL_TIME              = 227;
 }
 
 message SessionFieldWrapper {

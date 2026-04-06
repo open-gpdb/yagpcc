@@ -2336,6 +2336,90 @@ func (ms *MultipleSorter) Less(i, j int) bool {
 			if less(ms.Fields[k].Order, right, left) {
 				return false
 			}
+		case pbm.SessionField_SESSION_FIELD_AGGREGATED_CALLS:
+			left, right := int64(0), int64(0)
+			if p.AggregatedMetrics != nil {
+				left = p.AggregatedMetrics.Calls
+			}
+			if q.AggregatedMetrics != nil {
+				right = q.AggregatedMetrics.Calls
+			}
+			if less(ms.Fields[k].Order, left, right) {
+				return true
+			}
+			if less(ms.Fields[k].Order, right, left) {
+				return false
+			}
+		case pbm.SessionField_SESSION_FIELD_AGGREGATED_MIN_TIME:
+			left, right := 0.0, 0.0
+			if p.AggregatedMetrics != nil {
+				left = p.AggregatedMetrics.MinTime
+			}
+			if q.AggregatedMetrics != nil {
+				right = q.AggregatedMetrics.MinTime
+			}
+			if less(ms.Fields[k].Order, left, right) {
+				return true
+			}
+			if less(ms.Fields[k].Order, right, left) {
+				return false
+			}
+		case pbm.SessionField_SESSION_FIELD_AGGREGATED_MAX_TIME:
+			left, right := 0.0, 0.0
+			if p.AggregatedMetrics != nil {
+				left = p.AggregatedMetrics.MaxTime
+			}
+			if q.AggregatedMetrics != nil {
+				right = q.AggregatedMetrics.MaxTime
+			}
+			if less(ms.Fields[k].Order, left, right) {
+				return true
+			}
+			if less(ms.Fields[k].Order, right, left) {
+				return false
+			}
+		case pbm.SessionField_SESSION_FIELD_AGGREGATED_MEAN_TIME:
+			left, right := 0.0, 0.0
+			if p.AggregatedMetrics != nil {
+				left = p.AggregatedMetrics.MeanTime
+			}
+			if q.AggregatedMetrics != nil {
+				right = q.AggregatedMetrics.MeanTime
+			}
+			if less(ms.Fields[k].Order, left, right) {
+				return true
+			}
+			if less(ms.Fields[k].Order, right, left) {
+				return false
+			}
+		case pbm.SessionField_SESSION_FIELD_AGGREGATED_STDDEV_TIME:
+			left, right := 0.0, 0.0
+			if p.AggregatedMetrics != nil {
+				left = p.AggregatedMetrics.StddevTime
+			}
+			if q.AggregatedMetrics != nil {
+				right = q.AggregatedMetrics.StddevTime
+			}
+			if less(ms.Fields[k].Order, left, right) {
+				return true
+			}
+			if less(ms.Fields[k].Order, right, left) {
+				return false
+			}
+		case pbm.SessionField_SESSION_FIELD_AGGREGATED_TOTAL_TIME:
+			left, right := 0.0, 0.0
+			if p.AggregatedMetrics != nil {
+				left = p.AggregatedMetrics.TotalTime
+			}
+			if q.AggregatedMetrics != nil {
+				right = q.AggregatedMetrics.TotalTime
+			}
+			if less(ms.Fields[k].Order, left, right) {
+				return true
+			}
+			if less(ms.Fields[k].Order, right, left) {
+				return false
+			}
 		case pbm.SessionField_RUNNING_QUERY_SLICES:
 			left, right := p.RunningQuerySlices, q.RunningQuerySlices
 			if less(ms.Fields[k].Order, left, right) {
