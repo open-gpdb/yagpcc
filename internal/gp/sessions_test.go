@@ -3,10 +3,13 @@ package gp
 import (
 	"os"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"google.golang.org/protobuf/types/known/timestamppb"
 
+	pbm "github.com/open-gpdb/yagpcc/api/proto/agent_master"
 	pbc "github.com/open-gpdb/yagpcc/api/proto/common"
 	"github.com/open-gpdb/yagpcc/internal/utils"
 )
@@ -311,6 +314,46 @@ func TestAggregateSessMetrics(t *testing.T) {
 	assert.Nil(t, valS.SessionData.TotalGPMetrics.SystemStat)
 	assert.Nil(t, valS.SessionData.LongRunningGPMetrics.SystemStat)
 
+}
+
+func TestUpdateSessionStatAggregatedMetricsOnlyNestingLevelZero(t *testing.T) {
+	s := NewSessionsStorage(nil)
+	qKey := &pbc.QueryKey{Ssid: 1, Tmid: 100, Ccnt: 1}
+	qInfo := &pbc.QueryInfo{QueryId: 1234, QueryText: "Select 1"}
+	require.NoError(t, s.UpdateSessionQuery(qKey, qInfo, 0, &pbc.AdditionalQueryInfo{NestedLevel: 0}, false))
+
+	t0 := time.Unix(1000, 0)
+	qStat := func(d time.Duration) *pbm.QueryStat {
+		return &pbm.QueryStat{
+			QueryKey:          qKey,
+			StartTime:         timestamppb.New(t0),
+			EndTime:           timestamppb.New(t0.Add(d)),
+			TotalQueryMetrics: &pbc.GPMetrics{},
+		}
+	}
+
+	require.NoError(t, s.UpdateSessionStat(qStat(5*time.Second), 1))
+	valS, ok := s.GetSession(SessionKey{SessID: 1})
+	require.True(t, ok)
+	require.NotNil(t, valS.SessionData.AggregatedMetrics)
+	assert.Equal(t, int64(0), valS.SessionData.AggregatedMetrics.Calls,
+		"nested_level!=0 must not contribute to session AggregatedMetrics")
+
+	require.NoError(t, s.UpdateSessionStat(qStat(2*time.Second), 0))
+	valS, _ = s.GetSession(SessionKey{SessID: 1})
+	assert.Equal(t, int64(1), valS.SessionData.AggregatedMetrics.Calls)
+	assert.Equal(t, float64(2*time.Second), valS.SessionData.AggregatedMetrics.TotalTime)
+
+	require.NoError(t, s.UpdateSessionStat(qStat(3*time.Second), 2))
+	valS, _ = s.GetSession(SessionKey{SessID: 1})
+	assert.Equal(t, int64(1), valS.SessionData.AggregatedMetrics.Calls,
+		"higher nesting_level must not add another aggregated call")
+	assert.Equal(t, float64(2*time.Second), valS.SessionData.AggregatedMetrics.TotalTime)
+
+	require.NoError(t, s.UpdateSessionStat(qStat(time.Second), 0))
+	valS, _ = s.GetSession(SessionKey{SessID: 1})
+	assert.Equal(t, int64(2), valS.SessionData.AggregatedMetrics.Calls)
+	assert.Equal(t, float64(2*time.Second+time.Second), valS.SessionData.AggregatedMetrics.TotalTime)
 }
 
 func TestCanLock(t *testing.T) {

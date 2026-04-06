@@ -7,7 +7,6 @@ import (
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/timestamppb"
 
-	pbm "github.com/open-gpdb/yagpcc/api/proto/agent_master"
 	pbc "github.com/open-gpdb/yagpcc/api/proto/common"
 )
 
@@ -18,7 +17,7 @@ type (
 	}
 )
 
-func GroupAggMetrics(dest *pbm.AggregatedMetrics, queryDuration time.Duration) error {
+func GroupAggMetrics(dest *pbc.AggregatedMetrics, queryDuration time.Duration) error {
 	if dest == nil {
 		return fmt.Errorf("cannot merge with nil dst")
 	}

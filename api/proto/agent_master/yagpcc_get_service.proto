@@ -133,15 +133,6 @@ message QueryStatWrite {
     int64 slices                                    = 19; // the number of registered slices for a query
 }
 
-message AggregatedMetrics {
-    int64 calls         = 1;
-    double min_time     = 2;  // min_exec_time
-    double max_time     = 3;  // max_exec_time
-    double mean_time    = 4;  // mean_exec_time
-    double stddev_time  = 5;  // stddev_exec_time
-    double total_time   = 6;  // total_exec_time
-}
-
 message SegmentMetrics {
     reserved 5, 10;
     string cluster_id                              = 1;
@@ -398,6 +389,8 @@ enum SessionField {
     TOTAL_INTERCONNECT_TOTAL_BUFFERS                 = 217;
     TOTAL_INTERCONNECT_TOTAL_CAPACITY                = 218;
     TOTAL_INTERCONNECT_TOTAL_RECV_QUEUE_SIZE         = 219;
+    SESSION_FIELD_WAIT_EVENT                         = 220;
+    SESSION_FIELD_WAIT_EVENT_TYPE                    = 221;
 }
 
 message SessionFieldWrapper {

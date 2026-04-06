@@ -58,8 +58,10 @@ type (
 		QuerySubmit     time.Time
 		QueryEnd        time.Time
 		QueryMessage    string // Query status, in most cases we store here Error Message
-		SegmentNodes    SegmentIndexNodes
-		QueryLock       sync.RWMutex
+		// NestedLevel from AdditionalQueryInfo on the coordinator/master slice (-1 if unknown).
+		NestedLevel  int64
+		SegmentNodes SegmentIndexNodes
+		QueryLock    sync.RWMutex
 	}
 	RunningQueryType map[QueryKey]*RunningQuery
 
@@ -256,6 +258,7 @@ func (s *RunningQueriesStorage) newQuery(QKey *QueryKey, status int32, mQTimes M
 		QueryStart:      qNow,
 		QueryEnd:        qNow,
 		QuerySubmit:     qNow,
+		NestedLevel:     -1,
 		SegmentNodes:    make(SegmentIndexNodes),
 	}
 
@@ -407,6 +410,12 @@ func (s *RunningQueriesStorage) StoreInfoInStorage(
 			rQ = s.newQuery(&nKey.QKey, status, mQTimes)
 		}
 		s.mx.Unlock()
+	}
+
+	if addInfo != nil && (nKey.SliceID == MainSliceId || nKey.SliceID == UnsetSliceId) {
+		rQ.QueryLock.Lock()
+		rQ.NestedLevel = addInfo.NestedLevel
+		rQ.QueryLock.Unlock()
 	}
 
 	rQ.QueryLock.RLock()

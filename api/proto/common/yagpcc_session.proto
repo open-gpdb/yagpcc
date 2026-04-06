@@ -120,6 +120,12 @@ message SessionInfo {
     // locked_mode: name of the lock mode held by `blocked_by_sess_id` session.
     // Same as pg_lock.mode.
     string locked_mode                      = 23;
+
+    // wait_event: wait event name when the session is waiting (e.g. pg_stat_activity.wait_event).
+    string wait_event                       = 24;
+
+    // wait_event_type: wait event class (e.g. pg_stat_activity.wait_event_type).
+    string wait_event_type                  = 25;
 }
 
 // QueryDesc: contains detailed information about a query,
@@ -190,4 +196,7 @@ message SessionState {
 
     // running_query_slices: total number of slices used for the currently executing query.
     int64 running_query_slices               = 16;
+
+    // Aggregate session stat how many query calls was performed
+    AggregatedMetrics aggregated_metrics     = 17;
 }

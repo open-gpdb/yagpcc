@@ -426,6 +426,36 @@ func (ms *MultipleSorter) Less(i, j int) bool {
 			if less(ms.Fields[k].Order, right, left) {
 				return false
 			}
+		case pbm.SessionField_SESSION_FIELD_WAIT_EVENT:
+
+			left, right := "", ""
+			if p.SessionInfo != nil {
+				left = p.SessionInfo.WaitEvent
+			}
+			if q.SessionInfo != nil {
+				right = q.SessionInfo.WaitEvent
+			}
+			if less(ms.Fields[k].Order, left, right) {
+				return true
+			}
+			if less(ms.Fields[k].Order, right, left) {
+				return false
+			}
+		case pbm.SessionField_SESSION_FIELD_WAIT_EVENT_TYPE:
+
+			left, right := "", ""
+			if p.SessionInfo != nil {
+				left = p.SessionInfo.WaitEventType
+			}
+			if q.SessionInfo != nil {
+				right = q.SessionInfo.WaitEventType
+			}
+			if less(ms.Fields[k].Order, left, right) {
+				return true
+			}
+			if less(ms.Fields[k].Order, right, left) {
+				return false
+			}
 		case pbm.SessionField_SESSION_FIELD_RUNNING_QUERY:
 
 			left := int64(p.RunningQuery.Ssid)*1000000 + int64(p.RunningQuery.Ccnt)

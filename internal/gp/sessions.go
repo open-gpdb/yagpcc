@@ -61,6 +61,7 @@ type (
 		TotalGPMetrics       *pbc.GPMetrics
 		LongRunningGPMetrics *pbc.GPMetrics
 		QueryGPMetrics       *pbc.GPMetrics
+		AggregatedMetrics    *pbc.AggregatedMetrics
 		RunningQueryLevel    int64
 		RunningQuerySlices   int64
 	}
@@ -79,6 +80,7 @@ type (
 		TotalGPMetrics       *pbc.GPMetrics
 		LongRunningGPMetrics *pbc.GPMetrics
 		QueryGPMetrics       *pbc.GPMetrics
+		AggregatedMetrics    *pbc.AggregatedMetrics
 	}
 
 	SessionInfo struct {
@@ -280,6 +282,8 @@ func getSessInfo(gpStatInfo *GpStatActivity) *pbc.SessionInfo {
 		WaitMode:         emptyStrForNil(gpStatInfo.WaitMode),
 		LockedItem:       emptyStrForNil(gpStatInfo.LockedItem),
 		LockedMode:       emptyStrForNil(gpStatInfo.LockedMode),
+		WaitEvent:        emptyStrForNil(gpStatInfo.WaitEvent),
+		WaitEventType:    emptyStrForNil(gpStatInfo.WaitEventType),
 	}
 }
 
@@ -419,6 +423,7 @@ func (s *SessionsStorage) GetQueryDesc(qKey *storage.QueryKey, showStack bool) (
 		TotalMetrics:        &pbc.GPMetrics{},
 		LastMetrics:         &pbc.GPMetrics{},
 		QueryMetrics:        proto.Clone(queryData.QueryStat.TotalQueryMetrics).(*pbc.GPMetrics),
+		AggregatedMetrics:   &pbc.AggregatedMetrics{},
 		RunningQueryLevel:   0,
 		RunningQueryError:   queryData.QueryStat.Message,
 		RunningQuerySlices:  queryData.QueryStat.Slices,
@@ -430,6 +435,9 @@ func (s *SessionsStorage) GetQueryDesc(qKey *storage.QueryKey, showStack bool) (
 		sessState.RunningQueryLevel = int64(len(sessionData.SessionData.RunningQueries.Ccnts))
 		sessState.SessionInfo = getSessInfo(sessionData.SessionData.GpStatInfo)
 		sessState.LastMetrics = proto.Clone(sessionData.SessionData.LongRunningGPMetrics).(*pbc.GPMetrics)
+		if sessionData.SessionData.AggregatedMetrics != nil {
+			sessState.AggregatedMetrics = proto.Clone(sessionData.SessionData.AggregatedMetrics).(*pbc.AggregatedMetrics)
+		}
 		ccnt := GetRunningCcnt(&sessionData.SessionData, pbm.RunningQueryType_RQT_TOP)
 		ccnts := make([]int32, len(sessionData.SessionData.RunningQueries.Ccnts))
 		copy(ccnts, sessionData.SessionData.RunningQueries.Ccnts)
@@ -465,6 +473,10 @@ func (s *SessionsStorage) GetSessionDesc(
 	}
 	valS.SessionLock.RLock()
 	level := len(valS.SessionData.RunningQueries.Ccnts)
+	aggMetrics := &pbc.AggregatedMetrics{}
+	if valS.SessionData.AggregatedMetrics != nil {
+		aggMetrics = proto.Clone(valS.SessionData.AggregatedMetrics).(*pbc.AggregatedMetrics)
+	}
 	sessState := pbc.SessionState{
 		Time:               utils.GetTimestampFromTime(now),
 		SessionKey:         &pbc.SessionKey{SessId: int64(keyS.SessID), TmId: int64(DiscoveredTmID)},
@@ -475,6 +487,7 @@ func (s *SessionsStorage) GetSessionDesc(
 		TotalMetrics:       proto.Clone(valS.SessionData.TotalGPMetrics).(*pbc.GPMetrics),
 		LastMetrics:        proto.Clone(valS.SessionData.LongRunningGPMetrics).(*pbc.GPMetrics),
 		QueryMetrics:       proto.Clone(valS.SessionData.QueryGPMetrics).(*pbc.GPMetrics),
+		AggregatedMetrics:  aggMetrics,
 		RunningQueryLevel:  int64(level),
 		RunningQueryError:  runningQ.QueryMessage,
 		RunningQuerySlices: runningQ.Slices,
@@ -531,6 +544,7 @@ func (s *SessionsStorage) GetSessionDataForWrite(
 		TotalGPMetrics:       sessState.TotalMetrics,
 		LongRunningGPMetrics: sessState.LastMetrics,
 		QueryGPMetrics:       sessState.QueryMetrics,
+		AggregatedMetrics:    sessState.AggregatedMetrics,
 		RunningQueryLevel:    sessState.RunningQueryLevel,
 		RunningQuerySlices:   sessState.RunningQuerySlices,
 	}, nil
@@ -587,6 +601,7 @@ func (s *SessionsStorage) RefreshSessionList(l *zap.SugaredLogger, newList []*Gp
 					TotalGPMetrics:       &pbc.GPMetrics{},
 					LongRunningGPMetrics: &pbc.GPMetrics{},
 					QueryGPMetrics:       &pbc.GPMetrics{},
+					AggregatedMetrics:    &pbc.AggregatedMetrics{},
 				},
 				RefCounter: 0,
 			}
@@ -665,6 +680,7 @@ func (s *SessionsStorage) RegisterNewSessionQuery(valS *SessionInfo, okS bool, q
 				TotalGPMetrics:       &pbc.GPMetrics{},
 				LongRunningGPMetrics: &pbc.GPMetrics{},
 				QueryGPMetrics:       &pbc.GPMetrics{},
+				AggregatedMetrics:    &pbc.AggregatedMetrics{},
 			},
 			RefCounter: 1,
 		}
@@ -679,7 +695,7 @@ func (s *SessionsStorage) RegisterNewSessionQuery(valS *SessionInfo, okS bool, q
 	return valS
 }
 
-func (s *SessionsStorage) UpdateSessionStat(queryStat *pbm.QueryStat) error {
+func (s *SessionsStorage) UpdateSessionStat(queryStat *pbm.QueryStat, nestedLevel int64) error {
 	if queryStat == nil || queryStat.QueryKey == nil {
 		return fmt.Errorf("nil as query stat")
 	}
@@ -693,6 +709,20 @@ func (s *SessionsStorage) UpdateSessionStat(queryStat *pbm.QueryStat) error {
 	}
 	valS.SessionLock.Lock()
 	defer valS.SessionLock.Unlock()
+	if valS.SessionData.AggregatedMetrics == nil {
+		valS.SessionData.AggregatedMetrics = &pbc.AggregatedMetrics{}
+	}
+	if nestedLevel == 0 {
+		start := utils.GetTimeForTimestamp(queryStat.StartTime)
+		end := utils.GetTimeForTimestamp(queryStat.EndTime)
+		dur := end.Sub(start)
+		if dur < 0 {
+			dur = 0
+		}
+		if err := storage.GroupAggMetrics(valS.SessionData.AggregatedMetrics, dur); err != nil {
+			return err
+		}
+	}
 	intermediateResults := make(map[storage.MapAggregateKey]uint64, 0)
 	return storage.GroupGPMetrics(valS.SessionData.TotalGPMetrics, queryStat.TotalQueryMetrics, storage.AggMax, "hostname", intermediateResults)
 }

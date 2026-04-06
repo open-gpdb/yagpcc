@@ -105,8 +105,8 @@ func (bs *BackgroundStorage) AggtregateDataToQueryAndSession(qKey storage.QueryK
 		qT.QueryStat.EndTime = qT.QueryStat.StartTime
 	}
 	qT.QueryStat.CollectTime = qT.QueryStat.EndTime
-	// update session statistics
-	err = bs.SessionStorage.UpdateSessionStat(qT.QueryStat)
+	// update session statistics (aggregated exec times only for top-level queries, nested_level == 0)
+	err = bs.SessionStorage.UpdateSessionStat(qT.QueryStat, qVal.NestedLevel)
 	if err != nil {
 		return nil, fmt.Errorf("fail to aggregate session data %v", err)
 	}

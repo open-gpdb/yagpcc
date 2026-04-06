@@ -39,7 +39,7 @@ type (
 		TemplatePlanText  string
 		TotalMetrics      *pbc.GPMetrics
 		QueryKey          *pbc.QueryKey
-		AggTimes          *pbm.AggregatedMetrics
+		AggTimes          *pbc.AggregatedMetrics
 		QueryLock         sync.RWMutex
 	}
 	AggMapRef map[RefKey]int
@@ -214,7 +214,7 @@ func (a *AggregatedStorage) AggQuery(qT *pbm.TotalQueryData) error {
 			QueryText:    qT.QueryStat.QueryInfo.QueryText,
 			PlanText:     qT.QueryStat.QueryInfo.PlanText,
 			TotalMetrics: &pbc.GPMetrics{},
-			AggTimes:     &pbm.AggregatedMetrics{},
+			AggTimes:     &pbc.AggregatedMetrics{},
 			QueryKey:     qT.QueryStat.QueryKey,
 		}
 		a.mx.Lock()
@@ -237,7 +237,7 @@ func (a *AggregatedStorage) AggQuery(qT *pbm.TotalQueryData) error {
 						TemplateQueryText: "Other queries",
 						TemplatePlanText:  "Other queries",
 						TotalMetrics:      &pbc.GPMetrics{},
-						AggTimes:          &pbm.AggregatedMetrics{},
+						AggTimes:          &pbc.AggregatedMetrics{},
 						QueryKey:          qT.QueryStat.QueryKey,
 					}
 					a.aggQueries[sKey] = aVal
