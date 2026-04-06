@@ -742,8 +742,8 @@ func (s *SessionsStorage) UpdateSessionQuery(
 	}
 
 	level := -1
-	if addQInfo != nil {
-		level = int(addQInfo.NestedLevel)
+	if addQInfo != nil && addQInfo.NestedLevel != nil {
+		level = int(addQInfo.GetNestedLevel())
 	}
 
 	s.mx.RLock()

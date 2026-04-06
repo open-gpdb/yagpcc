@@ -9,6 +9,7 @@ import (
 	"github.com/golang/mock/gomock"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/timestamppb"
 
 	pbm "github.com/open-gpdb/yagpcc/api/proto/agent_master"
@@ -187,9 +188,10 @@ func TestSortAggregatedSessionStats(t *testing.T) {
 			{FieldName: pbm.SessionField_SESSION_FIELD_AGGREGATED_MIN_TIME, Order: pbm.SortOrder_SORT_ASC},
 		}
 		require.NoError(t, grpc.SortResult(&sessions, fields))
-		require.Equal(t, int64(2), sessions[0].SessionKey.SessId)
-		require.Equal(t, int64(1), sessions[1].SessionKey.SessId)
-		require.Equal(t, int64(3), sessions[2].SessionKey.SessId)
+		// nil AggregatedMetrics sorts as 0 for min_time, so session 3 is first.
+		require.Equal(t, int64(3), sessions[0].SessionKey.SessId)
+		require.Equal(t, int64(2), sessions[1].SessionKey.SessId)
+		require.Equal(t, int64(1), sessions[2].SessionKey.SessId)
 	})
 
 	t.Run("by aggregated mean_time desc", func(t *testing.T) {
@@ -341,7 +343,7 @@ func TestMasterMethods(t *testing.T) {
 
 	t.Run("setup", func(t *testing.T) {
 		startQuery := timestamppb.New(time.Now().Add(time.Duration(-1) * time.Hour))
-		addTopLevel := &pbc.AdditionalQueryInfo{NestedLevel: 0}
+		addTopLevel := &pbc.AdditionalQueryInfo{NestedLevel: proto.Int64(0)}
 		for _, request := range []*pb.SetQueryReq{
 			{
 				QueryStatus: pbc.QueryStatus_QUERY_STATUS_END,

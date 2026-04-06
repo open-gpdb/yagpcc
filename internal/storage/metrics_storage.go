@@ -413,9 +413,11 @@ func (s *RunningQueriesStorage) StoreInfoInStorage(
 	}
 
 	if addInfo != nil && (nKey.SliceID == MainSliceId || nKey.SliceID == UnsetSliceId) {
-		rQ.QueryLock.Lock()
-		rQ.NestedLevel = addInfo.NestedLevel
-		rQ.QueryLock.Unlock()
+		if addInfo.NestedLevel != nil {
+			rQ.QueryLock.Lock()
+			rQ.NestedLevel = addInfo.GetNestedLevel()
+			rQ.QueryLock.Unlock()
+		}
 	}
 
 	rQ.QueryLock.RLock()

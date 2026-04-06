@@ -7,6 +7,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/timestamppb"
 
 	pbm "github.com/open-gpdb/yagpcc/api/proto/agent_master"
@@ -275,7 +276,7 @@ func TestAggregateSessMetrics(t *testing.T) {
 	s := NewSessionsStorage(nil)
 	qKey := pbc.QueryKey{Ssid: 1, Tmid: 100, Ccnt: 1}
 	qInfo := pbc.QueryInfo{QueryId: 1234, QueryText: "Select 1"}
-	err := s.UpdateSessionQuery(&qKey, &qInfo, 0, &pbc.AdditionalQueryInfo{NestedLevel: 0}, false)
+	err := s.UpdateSessionQuery(&qKey, &qInfo, 0, &pbc.AdditionalQueryInfo{NestedLevel: proto.Int64(0)}, false)
 	if err != nil {
 		t.Errorf("%v", err)
 	}
@@ -290,7 +291,7 @@ func TestAggregateSessMetrics(t *testing.T) {
 	qKey2 := pbc.QueryKey{Ssid: 1, Tmid: 100, Ccnt: 2}
 	qInfo2 := pbc.QueryInfo{QueryId: 2234, QueryText: "Select 2"}
 
-	err = s.UpdateSessionQuery(&qKey2, &qInfo2, 1, &pbc.AdditionalQueryInfo{NestedLevel: 0}, true)
+	err = s.UpdateSessionQuery(&qKey2, &qInfo2, 1, &pbc.AdditionalQueryInfo{NestedLevel: proto.Int64(0)}, true)
 	if err != nil {
 		t.Errorf("%v", err)
 	}
@@ -302,7 +303,7 @@ func TestAggregateSessMetrics(t *testing.T) {
 	assert.Nil(t, valS.SessionData.TotalGPMetrics.SystemStat)
 	assert.Nil(t, valS.SessionData.LongRunningGPMetrics.SystemStat)
 
-	err = s.UpdateSessionQuery(&qKey, &qInfo, 0, &pbc.AdditionalQueryInfo{NestedLevel: 0}, false)
+	err = s.UpdateSessionQuery(&qKey, &qInfo, 0, &pbc.AdditionalQueryInfo{NestedLevel: proto.Int64(0)}, false)
 	if err != nil {
 		t.Errorf("%v", err)
 	}
@@ -320,7 +321,7 @@ func TestUpdateSessionStatAggregatedMetricsOnlyNestingLevelZero(t *testing.T) {
 	s := NewSessionsStorage(nil)
 	qKey := &pbc.QueryKey{Ssid: 1, Tmid: 100, Ccnt: 1}
 	qInfo := &pbc.QueryInfo{QueryId: 1234, QueryText: "Select 1"}
-	require.NoError(t, s.UpdateSessionQuery(qKey, qInfo, 0, &pbc.AdditionalQueryInfo{NestedLevel: 0}, false))
+	require.NoError(t, s.UpdateSessionQuery(qKey, qInfo, 0, &pbc.AdditionalQueryInfo{NestedLevel: proto.Int64(0)}, false))
 
 	t0 := time.Unix(1000, 0)
 	qStat := func(d time.Duration) *pbm.QueryStat {

@@ -391,11 +391,11 @@ const (
 	SessionField_SESSION_FIELD_WAIT_EVENT                         SessionField = 220
 	SessionField_SESSION_FIELD_WAIT_EVENT_TYPE                    SessionField = 221
 	SessionField_SESSION_FIELD_AGGREGATED_CALLS                   SessionField = 222
-	SessionField_SESSION_FIELD_AGGREGATED_MIN_TIME              SessionField = 223
-	SessionField_SESSION_FIELD_AGGREGATED_MAX_TIME              SessionField = 224
-	SessionField_SESSION_FIELD_AGGREGATED_MEAN_TIME             SessionField = 225
-	SessionField_SESSION_FIELD_AGGREGATED_STDDEV_TIME           SessionField = 226
-	SessionField_SESSION_FIELD_AGGREGATED_TOTAL_TIME            SessionField = 227
+	SessionField_SESSION_FIELD_AGGREGATED_MIN_TIME                SessionField = 223
+	SessionField_SESSION_FIELD_AGGREGATED_MAX_TIME                SessionField = 224
+	SessionField_SESSION_FIELD_AGGREGATED_MEAN_TIME               SessionField = 225
+	SessionField_SESSION_FIELD_AGGREGATED_STDDEV_TIME             SessionField = 226
+	SessionField_SESSION_FIELD_AGGREGATED_TOTAL_TIME              SessionField = 227
 )
 
 // Enum value maps for SessionField.
@@ -2380,7 +2380,7 @@ const file_api_proto_agent_master_yagpcc_get_service_proto_rawDesc = "" +
 	"\tSortOrder\x12\x1a\n" +
 	"\x16SORT_ORDER_UNSPECIFIED\x10\x00\x12\f\n" +
 	"\bSORT_ASC\x10\x01\x12\r\n" +
-	"\tSORT_DESC\x10\x02*\xc32\n" +
+	"\tSORT_DESC\x10\x02*\xb64\n" +
 	"\fSessionField\x12\x1d\n" +
 	"\x19SESSION_FIELD_UNSPECIFIED\x10\x00\x12\x15\n" +
 	"\x11SESSION_FIELD_KEY\x10\x01\x12\x16\n" +
@@ -2605,7 +2605,13 @@ const file_api_proto_agent_master_yagpcc_get_service_proto_rawDesc = "" +
 	"!TOTAL_INTERCONNECT_TOTAL_CAPACITY\x10\xda\x01\x12-\n" +
 	"(TOTAL_INTERCONNECT_TOTAL_RECV_QUEUE_SIZE\x10\xdb\x01\x12\x1d\n" +
 	"\x18SESSION_FIELD_WAIT_EVENT\x10\xdc\x01\x12\"\n" +
-	"\x1dSESSION_FIELD_WAIT_EVENT_TYPE\x10\xdd\x01*\xbc\x02\n" +
+	"\x1dSESSION_FIELD_WAIT_EVENT_TYPE\x10\xdd\x01\x12#\n" +
+	"\x1eSESSION_FIELD_AGGREGATED_CALLS\x10\xde\x01\x12&\n" +
+	"!SESSION_FIELD_AGGREGATED_MIN_TIME\x10\xdf\x01\x12&\n" +
+	"!SESSION_FIELD_AGGREGATED_MAX_TIME\x10\xe0\x01\x12'\n" +
+	"\"SESSION_FIELD_AGGREGATED_MEAN_TIME\x10\xe1\x01\x12)\n" +
+	"$SESSION_FIELD_AGGREGATED_STDDEV_TIME\x10\xe2\x01\x12(\n" +
+	"#SESSION_FIELD_AGGREGATED_TOTAL_TIME\x10\xe3\x01*\xbc\x02\n" +
 	"\x11SessionFilterEnum\x12#\n" +
 	"\x1fSESSION_FILTER_ENUM_UNSPECIFIED\x10\x00\x12\x17\n" +
 	"\x13SESSION_FILTER_HOST\x10\x01\x12\x17\n" +

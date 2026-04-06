@@ -313,10 +313,11 @@ func (x *QueryInfo) GetEndTime() *timestamppb.Timestamp {
 }
 
 type AdditionalQueryInfo struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	NestedLevel   int64                  `protobuf:"varint,1,opt,name=nested_level,json=nestedLevel,proto3" json:"nested_level,omitempty"`
-	ErrorMessage  string                 `protobuf:"bytes,2,opt,name=error_message,json=errorMessage,proto3" json:"error_message,omitempty"`
-	SliceId       int64                  `protobuf:"varint,3,opt,name=slice_id,json=sliceId,proto3" json:"slice_id,omitempty"`
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// If unset, consumers should treat nesting depth as unknown (not the same as 0 = top-level).
+	NestedLevel   *int64 `protobuf:"varint,1,opt,name=nested_level,json=nestedLevel,proto3,oneof" json:"nested_level,omitempty"`
+	ErrorMessage  string `protobuf:"bytes,2,opt,name=error_message,json=errorMessage,proto3" json:"error_message,omitempty"`
+	SliceId       int64  `protobuf:"varint,3,opt,name=slice_id,json=sliceId,proto3" json:"slice_id,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -352,8 +353,8 @@ func (*AdditionalQueryInfo) Descriptor() ([]byte, []int) {
 }
 
 func (x *AdditionalQueryInfo) GetNestedLevel() int64 {
-	if x != nil {
-		return x.NestedLevel
+	if x != nil && x.NestedLevel != nil {
+		return *x.NestedLevel
 	}
 	return 0
 }
@@ -1687,11 +1688,12 @@ const file_api_proto_common_yagpcc_metrics_proto_rawDesc = "" +
 	"submitTime\x129\n" +
 	"\n" +
 	"start_time\x18\r \x01(\v2\x1a.google.protobuf.TimestampR\tstartTime\x125\n" +
-	"\bend_time\x18\x0e \x01(\v2\x1a.google.protobuf.TimestampR\aendTime\"x\n" +
-	"\x13AdditionalQueryInfo\x12!\n" +
-	"\fnested_level\x18\x01 \x01(\x03R\vnestedLevel\x12#\n" +
+	"\bend_time\x18\x0e \x01(\v2\x1a.google.protobuf.TimestampR\aendTime\"\x8e\x01\n" +
+	"\x13AdditionalQueryInfo\x12&\n" +
+	"\fnested_level\x18\x01 \x01(\x03H\x00R\vnestedLevel\x88\x01\x01\x12#\n" +
 	"\rerror_message\x18\x02 \x01(\tR\ferrorMessage\x12\x19\n" +
-	"\bslice_id\x18\x03 \x01(\x03R\asliceId\":\n" +
+	"\bslice_id\x18\x03 \x01(\x03R\asliceIdB\x0f\n" +
+	"\r_nested_level\":\n" +
 	"\x13AdditionalQueryStat\x12#\n" +
 	"\rerror_message\x18\x01 \x01(\tR\ferrorMessage\"\xb1\x01\n" +
 	"\tGPMetrics\x122\n" +
@@ -1868,6 +1870,7 @@ func file_api_proto_common_yagpcc_metrics_proto_init() {
 	if File_api_proto_common_yagpcc_metrics_proto != nil {
 		return
 	}
+	file_api_proto_common_yagpcc_metrics_proto_msgTypes[1].OneofWrappers = []any{}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{

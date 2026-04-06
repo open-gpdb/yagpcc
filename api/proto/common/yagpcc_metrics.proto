@@ -66,7 +66,8 @@ message QueryInfo {
 }
 
 message AdditionalQueryInfo {
-    int64 nested_level                    = 1;
+    // If unset, consumers should treat nesting depth as unknown (not the same as 0 = top-level).
+    optional int64 nested_level           = 1;
     string error_message                  = 2;
     int64 slice_id                        = 3;
 }

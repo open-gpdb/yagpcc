@@ -76,6 +76,20 @@ func jsonMustUnmarshal[T any](t *testing.T, data []byte) T {
 	return result
 }
 
+// firstJSONObjectLine returns the first non-empty line from StoreSerializableData output
+// (multiple flushes may append several JSONL lines).
+func firstJSONObjectLine(t *testing.T, raw []byte) []byte {
+	t.Helper()
+	for _, line := range bytes.Split(bytes.TrimSpace(raw), []byte{'\n'}) {
+		line = bytes.TrimSpace(line)
+		if len(line) > 0 {
+			return line
+		}
+	}
+	require.FailNow(t, "expected non-empty JSON line from writer")
+	return nil
+}
+
 func TestSerializableObject(t *testing.T) {
 	chanOut := make(chan int, 1)
 	mockWriter := mockWriterCh{ChanOut: chanOut}
@@ -252,7 +266,7 @@ from mytable`,
 			},
 		},
 	}
-	actualLastWrite := jsonMustUnmarshal[map[string]any](t, mockWriter.LastWrite())
+	actualLastWrite := jsonMustUnmarshal[map[string]any](t, firstJSONObjectLine(t, mockWriter.LastWrite()))
 
 	assert.Equal(t, expectedLastWrite, actualLastWrite)
 }
@@ -296,7 +310,7 @@ func TestWriteSessionAggregatedMetricsWrittenToFile(t *testing.T) {
 
 	master.StoreSessions(ctx, zLogger, sessChan, mockWriter)
 
-	row := jsonMustUnmarshal[map[string]any](t, mockWriter.LastWrite())
+	row := jsonMustUnmarshal[map[string]any](t, firstJSONObjectLine(t, mockWriter.LastWrite()))
 	am, ok := row["AggregatedMetrics"].(map[string]any)
 	require.True(t, ok, "session JSON line must include AggregatedMetrics object")
 	assert.InDelta(t, float64(3), am["calls"], 0)
@@ -456,7 +470,7 @@ from my_table`,
 		"waitMode": "",
 	}
 
-	actualLastWrite := jsonMustUnmarshal[map[string]any](t, mockWriter.LastWrite())
+	actualLastWrite := jsonMustUnmarshal[map[string]any](t, firstJSONObjectLine(t, mockWriter.LastWrite()))
 	assert.Equal(t, expectedLastWrite, actualLastWrite)
 }
 
