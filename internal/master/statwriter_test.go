@@ -5,7 +5,6 @@ import (
 	"context"
 	"encoding/json"
 	"os"
-	"path/filepath"
 	"sync"
 	"testing"
 	"time"
@@ -259,19 +258,13 @@ from mytable`,
 }
 
 func TestWriteSessionAggregatedMetricsWrittenToFile(t *testing.T) {
-	tmp := t.TempDir()
-	outPath := filepath.Join(tmp, "sessions.jsonl")
-	outFile, err := os.Create(outPath)
-	require.NoError(t, err)
-
-	ctx, cFunc := context.WithTimeout(context.Background(), 2*time.Second)
+	mockWriter := newMockWriter()
+	ctx, cFunc := context.WithTimeout(context.Background(), 1*time.Second)
 	defer cFunc()
 
-	tracePath := filepath.Join(tmp, "trace.log")
-	traceFile, err := os.Create(tracePath)
+	file, err := os.Create("trace.log")
 	require.NoError(t, err)
-	t.Cleanup(func() { _ = traceFile.Close() })
-	zLogger := utils.DualLog(true, traceFile)
+	zLogger := utils.DualLog(true, file)
 
 	gp.DiscoveredTmID = 12345
 	sessChan := make(chan *gp.SessionDataWrite, 1)
@@ -300,16 +293,9 @@ func TestWriteSessionAggregatedMetricsWrittenToFile(t *testing.T) {
 		},
 	}
 
-	master.StoreSessions(ctx, zLogger, sessChan, outFile)
-	require.NoError(t, outFile.Close())
+	master.StoreSessions(ctx, zLogger, sessChan, mockWriter)
 
-	raw, err := os.ReadFile(outPath)
-	require.NoError(t, err)
-	require.NotEmpty(t, raw, "statwriter StoreSerializableData should flush a line to the writer (tick before ctx timeout)")
-
-	line := bytes.TrimSpace(bytes.TrimSuffix(raw, []byte{'\n'}))
-	row := jsonMustUnmarshal[map[string]any](t, line)
-
+	row := jsonMustUnmarshal[map[string]any](t, mockWriter.LastWrite())
 	am, ok := row["AggregatedMetrics"].(map[string]any)
 	require.True(t, ok, "session JSON line must include AggregatedMetrics object")
 	assert.InDelta(t, float64(3), am["calls"], 0)
