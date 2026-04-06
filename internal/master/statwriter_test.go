@@ -262,8 +262,9 @@ func TestWriteSessionAggregatedMetricsWrittenToFile(t *testing.T) {
 	ctx, cFunc := context.WithTimeout(context.Background(), 1*time.Second)
 	defer cFunc()
 
-	file, err := os.Create("trace.log")
+	file, err := os.CreateTemp(t.TempDir(), "trace.log")
 	require.NoError(t, err)
+	t.Cleanup(func() { _ = file.Close() })
 	zLogger := utils.DualLog(true, file)
 
 	gp.DiscoveredTmID = 12345
