@@ -180,6 +180,61 @@ func TestTerminateSessions_NoMatchingSessions_ReturnsEmptyResponses(t *testing.T
 	assert.Empty(t, resp.TerminateResponse)
 }
 
+func TestTerminateSessions_NilBackgroundStorage_ReturnsError(t *testing.T) {
+	srv := actionsServerNoDB(t)
+	ctx := context.Background()
+
+	_, err := srv.TerminateSessions(ctx, &pbm.TerminateSessionsRequest{
+		Database: "somedb",
+	})
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "not initialized")
+}
+
+func TestTerminateSessions_MatchingSessions_ReturnsResponses(t *testing.T) {
+	srv := newTestActionsServer(t)
+	z := zap.NewNop().Sugar()
+
+	err := srv.BackgroundStorage.SessionStorage.RefreshSessionList(z, []*gp.GpStatActivity{
+		{SessID: 1, Datname: "appdb", Usename: "alice"},
+		{SessID: 2, Datname: "otherdb", Usename: "bob"},
+	}, false)
+	require.NoError(t, err)
+
+	ctx := context.Background()
+	resp, err := srv.TerminateSessions(ctx, &pbm.TerminateSessionsRequest{
+		Database: "appdb",
+	})
+	require.NoError(t, err)
+	require.NotNil(t, resp)
+	// Only the session matching "appdb" should appear in the response.
+	require.Len(t, resp.TerminateResponse, 1)
+	// CancelQuery fails because the database is not initialized in tests.
+	assert.Equal(t, pbm.TerminateResponseStatusCode_TERMINATE_RESPONSE_STATUS_CODE_ERROR, resp.TerminateResponse[0].StatusCode)
+}
+
+func TestTerminateSessions_ForbiddenSessId_ReturnsPerSessionError(t *testing.T) {
+	srv := newTestActionsServer(t)
+	z := zap.NewNop().Sugar()
+
+	// SessID == 0 is forbidden; non-system username ensures the session passes
+	// the NotSystemSession filter and is returned by GetAllSessions.
+	err := srv.BackgroundStorage.SessionStorage.RefreshSessionList(z, []*gp.GpStatActivity{
+		{SessID: 0, Datname: "appdb", Usename: "alice"},
+	}, false)
+	require.NoError(t, err)
+
+	ctx := context.Background()
+	resp, err := srv.TerminateSessions(ctx, &pbm.TerminateSessionsRequest{
+		Database: "appdb",
+	})
+	require.NoError(t, err)
+	require.NotNil(t, resp)
+	require.Len(t, resp.TerminateResponse, 1)
+	assert.Equal(t, pbm.TerminateResponseStatusCode_TERMINATE_RESPONSE_STATUS_CODE_ERROR, resp.TerminateResponse[0].StatusCode)
+	assert.Contains(t, resp.TerminateResponse[0].StatusText, "forbidden")
+}
+
 func TestMoveQueryToResourceGroup_NilQueryKey(t *testing.T) {
 	srv := actionsServerNoDB(t)
 	ctx := context.Background()

@@ -158,6 +158,10 @@ func (s *ActionsServer) TerminateSessions(ctx context.Context, in *pbm.Terminate
 		return nil, fmt.Errorf("should specify database, username or query id")
 	}
 
+	if s.BackgroundStorage == nil || s.BackgroundStorage.SessionStorage == nil {
+		return nil, fmt.Errorf("session storage is not initialized")
+	}
+
 	s.Logger.Infof("got terminate many sessions request %v", in)
 	start := time.Now()
 	sResp, err := s.BackgroundStorage.SessionStorage.GetAllSessions(false, pbm.RunningQueryType_RQT_LAST)
