@@ -258,3 +258,110 @@ func TestTerminateSession_TerminateFails_ReturnsErrorStatus(t *testing.T) {
 	assert.Equal(t, pbm.TerminateResponseStatusCode_TERMINATE_RESPONSE_STATUS_CODE_ERROR, resp.StatusCode)
 	assert.Equal(t, "fail to terminate session", resp.StatusText)
 }
+
+func TestTerminateSessionForbiddenReason(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name    string
+		session *pbc.SessionState
+		want    string
+	}{
+		{
+			name:    "nil session",
+			session: nil,
+			want:    "session is nil",
+		},
+		{
+			name: "nil session key",
+			session: &pbc.SessionState{
+				SessionKey:  nil,
+				SessionInfo: &pbc.SessionInfo{User: "alice"},
+			},
+			want: "session has no session key",
+		},
+		{
+			name: "zero sess_id",
+			session: &pbc.SessionState{
+				SessionKey:  &pbc.SessionKey{SessId: 0},
+				SessionInfo: &pbc.SessionInfo{User: "alice"},
+			},
+			want: "terminating session with sess_id 0 is forbidden",
+		},
+		{
+			name: "gpadmin user",
+			session: &pbc.SessionState{
+				SessionKey:  &pbc.SessionKey{SessId: 1},
+				SessionInfo: &pbc.SessionInfo{User: "gpadmin"},
+			},
+			want: "terminating gpadmin sessions is forbidden",
+		},
+		{
+			name: "gpadmin case insensitive",
+			session: &pbc.SessionState{
+				SessionKey:  &pbc.SessionKey{SessId: 2},
+				SessionInfo: &pbc.SessionInfo{User: "GpAdmin"},
+			},
+			want: "terminating gpadmin sessions is forbidden",
+		},
+		{
+			name: "allowed",
+			session: &pbc.SessionState{
+				SessionKey:  &pbc.SessionKey{SessId: 3},
+				SessionInfo: &pbc.SessionInfo{User: "alice"},
+			},
+			want: "",
+		},
+		{
+			name: "no SessionInfo still allowed on user check",
+			session: &pbc.SessionState{
+				SessionKey:  &pbc.SessionKey{SessId: 4},
+				SessionInfo: nil,
+			},
+			want: "",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			got := terminateSessionForbiddenReason(tt.session)
+			assert.Equal(t, tt.want, got)
+		})
+	}
+}
+
+func TestTerminateSession_ZeroSessID_ReturnsError(t *testing.T) {
+	srv := actionsServerNoDB(t)
+	ctx := context.Background()
+
+	_, err := srv.TerminateSession(ctx, &pbm.TerminateSessionRequest{
+		SessionKey: &pbc.SessionKey{SessId: 0},
+	})
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "sess_id 0")
+}
+
+func TestTerminateSession_Gpadmin_ReturnsForbiddenStatus(t *testing.T) {
+	srv := newTestActionsServer(t)
+	ctx := context.Background()
+
+	const sessID int32 = 77
+	qKey := &pbc.QueryKey{Ssid: sessID, Tmid: 1, Ccnt: 1}
+	srv.BackgroundStorage.SessionStorage.RegisterNewSessionQuery(nil, false, qKey, nil, 0)
+	require.NoError(t, srv.BackgroundStorage.SessionStorage.UpdateSessionQuery(
+		qKey,
+		&pbc.QueryInfo{UserName: "gpadmin", DatabaseName: "db"},
+		0,
+		nil,
+		false,
+	))
+
+	resp, err := srv.TerminateSession(ctx, &pbm.TerminateSessionRequest{
+		SessionKey: &pbc.SessionKey{SessId: int64(sessID)},
+	})
+	require.NoError(t, err)
+	require.NotNil(t, resp)
+	assert.Equal(t, pbm.TerminateResponseStatusCode_TERMINATE_RESPONSE_STATUS_CODE_ERROR, resp.StatusCode)
+	assert.Equal(t, "terminating gpadmin session is forbidden", resp.StatusText)
+}

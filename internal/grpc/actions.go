@@ -3,6 +3,7 @@ package grpc
 import (
 	"context"
 	"fmt"
+	"strings"
 	"time"
 
 	"google.golang.org/protobuf/types/known/emptypb"
@@ -21,6 +22,23 @@ type ActionsServer struct {
 	Timeout   time.Duration
 
 	BackgroundStorage *master.BackgroundStorage
+}
+
+// terminateSessionForbiddenReason returns a non-empty message if the session must not be terminated.
+func terminateSessionForbiddenReason(session *pbc.SessionState) string {
+	if session == nil {
+		return "session is nil"
+	}
+	if session.SessionKey == nil {
+		return "session has no session key"
+	}
+	if session.SessionKey.SessId == 0 {
+		return "terminating session with sess_id 0 is forbidden"
+	}
+	if session.SessionInfo != nil && strings.EqualFold(strings.TrimSpace(session.SessionInfo.User), "gpadmin") {
+		return "terminating gpadmin sessions is forbidden"
+	}
+	return ""
 }
 
 func (s *ActionsServer) MoveQueryToResourceGroup(ctx context.Context, in *pbm.MoveQueryToResourceGroupRequest) (response *emptypb.Empty, err error) {
@@ -76,12 +94,32 @@ func (s *ActionsServer) TerminateSession(ctx context.Context, in *pbm.TerminateS
 	if in.GetSessionKey() == nil {
 		return nil, fmt.Errorf("cannot cancel empty session")
 	}
+	sessID := in.GetSessionKey().GetSessId()
+	if sessID == 0 {
+		return nil, fmt.Errorf("cannot terminate session with sess_id 0")
+	}
+	if s.BackgroundStorage != nil && s.BackgroundStorage.SessionStorage != nil {
+		if info, ok := s.BackgroundStorage.SessionStorage.GetSession(gp.SessionKey{SessID: int(sessID)}); ok {
+			info.SessionLock.RLock()
+			user := ""
+			if info.SessionData.GpStatInfo != nil {
+				user = info.SessionData.GpStatInfo.Usename
+			}
+			info.SessionLock.RUnlock()
+			if strings.EqualFold(strings.TrimSpace(user), "gpadmin") {
+				return &pbm.TerminateResponse{
+					StatusCode: pbm.TerminateResponseStatusCode_TERMINATE_RESPONSE_STATUS_CODE_ERROR,
+					StatusText: "terminating gpadmin session is forbidden",
+				}, nil
+			}
+		}
+	}
 	start := time.Now()
 	response = &pbm.TerminateResponse{
 		StatusCode: pbm.TerminateResponseStatusCode_TERMINATE_RESPONSE_STATUS_CODE_SUCCESS,
 		StatusText: "",
 	}
-	err = gp.CancelQuery(ctx, int(in.GetSessionKey().SessId), true)
+	err = gp.CancelQuery(ctx, int(sessID), true)
 	if err != nil {
 		s.Logger.Infof("fail to terminate session %v", err)
 		response.StatusCode = pbm.TerminateResponseStatusCode_TERMINATE_RESPONSE_STATUS_CODE_ERROR
@@ -130,6 +168,14 @@ func (s *ActionsServer) TerminateSessions(ctx context.Context, in *pbm.Terminate
 	response = &pbm.TerminateResponses{}
 	for _, session := range sResp.SessionsState {
 		if !sessionMatchesTerminateSessionsRequest(session, in) {
+			continue
+		}
+		if reason := terminateSessionForbiddenReason(session); reason != "" {
+			s.Logger.Infof("skip terminate session: %s", reason)
+			response.TerminateResponse = append(response.TerminateResponse, &pbm.TerminateResponse{
+				StatusCode: pbm.TerminateResponseStatusCode_TERMINATE_RESPONSE_STATUS_CODE_ERROR,
+				StatusText: reason,
+			})
 			continue
 		}
 		startS := time.Now()
