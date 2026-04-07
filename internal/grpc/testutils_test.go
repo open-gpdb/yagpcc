@@ -13,6 +13,7 @@ import (
 	gogrpc "google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/grpc/test/bufconn"
+	"google.golang.org/protobuf/proto"
 
 	pbm "github.com/open-gpdb/yagpcc/api/proto/agent_master"
 	pb "github.com/open-gpdb/yagpcc/api/proto/agent_segment"
@@ -38,16 +39,27 @@ func assertMetricResponseIsOk(t *testing.T, response *pb.MetricResponse) bool {
 
 func assertQueriesInfoResponseEqual(t *testing.T, expected *pb.GetQueriesInfoResponse, actual *pb.GetQueriesInfoResponse) bool {
 	normalize := func(response *pb.GetQueriesInfoResponse) *pb.GetQueriesInfoResponse {
-		sort.Slice(response.QueriesData, func(i, j int) bool {
-			if response.QueriesData[i].QueryKey.Ssid != response.QueriesData[j].QueryKey.Ssid {
-				return response.QueriesData[i].QueryKey.Ssid < response.QueriesData[j].QueryKey.Ssid
+		if response == nil {
+			return nil
+		}
+		out := proto.Clone(response).(*pb.GetQueriesInfoResponse)
+		sort.Slice(out.QueriesData, func(i, j int) bool {
+			if out.QueriesData[i].QueryKey.Ssid != out.QueriesData[j].QueryKey.Ssid {
+				return out.QueriesData[i].QueryKey.Ssid < out.QueriesData[j].QueryKey.Ssid
 			}
-			if response.QueriesData[i].QueryKey.Ccnt != response.QueriesData[j].QueryKey.Ccnt {
-				return response.QueriesData[i].QueryKey.Ccnt < response.QueriesData[j].QueryKey.Ccnt
+			if out.QueriesData[i].QueryKey.Ccnt != out.QueriesData[j].QueryKey.Ccnt {
+				return out.QueriesData[i].QueryKey.Ccnt < out.QueriesData[j].QueryKey.Ccnt
 			}
-			return response.QueriesData[i].SliceId < response.QueriesData[j].SliceId
+			return out.QueriesData[i].SliceId < out.QueriesData[j].SliceId
 		})
-		return response
+		// constructQueryMessage sets QueryKey.Tmid from gp.DiscoveredTmID; other tests in the
+		// same binary can bump that global, so expected fixtures that omit Tmid would flake.
+		for _, qd := range out.QueriesData {
+			if qd.QueryKey != nil {
+				qd.QueryKey.Tmid = 0
+			}
+		}
+		return out
 	}
 
 	return utils.AssertProtoMessagesEqual(t, normalize(expected), normalize(actual))
