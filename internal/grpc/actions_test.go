@@ -2,6 +2,7 @@ package grpc
 
 import (
 	"context"
+	"strings"
 	"testing"
 	"time"
 
@@ -233,6 +234,50 @@ func TestTerminateSessions_ForbiddenSessId_ReturnsPerSessionError(t *testing.T) 
 	require.Len(t, resp.TerminateResponse, 1)
 	assert.Equal(t, pbm.TerminateResponseStatusCode_TERMINATE_RESPONSE_STATUS_CODE_ERROR, resp.TerminateResponse[0].StatusCode)
 	assert.Contains(t, resp.TerminateResponse[0].StatusText, "forbidden")
+}
+
+func TestTerminateSessions_NilSessionStorage_ReturnsError(t *testing.T) {
+	srv := &ActionsServer{
+		Logger:            zap.NewNop().Sugar(),
+		Timeout:           5 * time.Second,
+		BackgroundStorage: &master.BackgroundStorage{},
+	}
+	ctx := context.Background()
+
+	_, err := srv.TerminateSessions(ctx, &pbm.TerminateSessionsRequest{Database: "db"})
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "not initialized")
+}
+
+func TestTerminateSessions_MixedSessions_ReturnsPerSessionResults(t *testing.T) {
+	srv := newTestActionsServer(t)
+	z := zap.NewNop().Sugar()
+
+	// SessID=0 is forbidden; SessID=3 is a regular session that will fail CancelQuery.
+	err := srv.BackgroundStorage.SessionStorage.RefreshSessionList(z, []*gp.GpStatActivity{
+		{SessID: 0, Datname: "appdb", Usename: "alice"},
+		{SessID: 3, Datname: "appdb", Usename: "alice"},
+	}, false)
+	require.NoError(t, err)
+
+	ctx := context.Background()
+	resp, err := srv.TerminateSessions(ctx, &pbm.TerminateSessionsRequest{Database: "appdb"})
+	require.NoError(t, err)
+	require.NotNil(t, resp)
+	require.Len(t, resp.TerminateResponse, 2)
+
+	var hasForbidden, hasCancelError bool
+	for _, r := range resp.TerminateResponse {
+		assert.Equal(t, pbm.TerminateResponseStatusCode_TERMINATE_RESPONSE_STATUS_CODE_ERROR, r.StatusCode)
+		if strings.Contains(r.StatusText, "forbidden") {
+			hasForbidden = true
+		}
+		if strings.Contains(r.StatusText, "fail to terminate session") {
+			hasCancelError = true
+		}
+	}
+	assert.True(t, hasForbidden, "expected a forbidden response for SessID 0")
+	assert.True(t, hasCancelError, "expected a cancel-error response for the regular session")
 }
 
 func TestMoveQueryToResourceGroup_NilQueryKey(t *testing.T) {
