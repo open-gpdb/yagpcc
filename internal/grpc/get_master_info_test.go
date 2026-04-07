@@ -9,7 +9,6 @@ import (
 	"github.com/golang/mock/gomock"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/timestamppb"
 
 	pbm "github.com/open-gpdb/yagpcc/api/proto/agent_master"
@@ -343,7 +342,7 @@ func TestMasterMethods(t *testing.T) {
 
 	t.Run("setup", func(t *testing.T) {
 		startQuery := timestamppb.New(time.Now().Add(time.Duration(-1) * time.Hour))
-		addTopLevel := &pbc.AdditionalQueryInfo{NestedLevel: proto.Int64(0)}
+		addTopLevel := &pbc.AdditionalQueryInfo{NestedLevel: 0}
 		for _, request := range []*pb.SetQueryReq{
 			{
 				QueryStatus: pbc.QueryStatus_QUERY_STATUS_END,

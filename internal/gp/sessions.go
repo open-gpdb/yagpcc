@@ -742,7 +742,7 @@ func (s *SessionsStorage) UpdateSessionQuery(
 	}
 
 	level := -1
-	if addQInfo != nil && addQInfo.NestedLevel != nil {
+	if addQInfo != nil {
 		level = int(addQInfo.GetNestedLevel())
 	}
 
