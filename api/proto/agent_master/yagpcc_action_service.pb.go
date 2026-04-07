@@ -220,6 +220,50 @@ func (x *TerminateResponse) GetStatusText() string {
 	return ""
 }
 
+type TerminateResponses struct {
+	state             protoimpl.MessageState `protogen:"open.v1"`
+	TerminateResponse []*TerminateResponse   `protobuf:"bytes,1,rep,name=terminate_response,json=terminateResponse,proto3" json:"terminate_response,omitempty"`
+	unknownFields     protoimpl.UnknownFields
+	sizeCache         protoimpl.SizeCache
+}
+
+func (x *TerminateResponses) Reset() {
+	*x = TerminateResponses{}
+	mi := &file_api_proto_agent_master_yagpcc_action_service_proto_msgTypes[3]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *TerminateResponses) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*TerminateResponses) ProtoMessage() {}
+
+func (x *TerminateResponses) ProtoReflect() protoreflect.Message {
+	mi := &file_api_proto_agent_master_yagpcc_action_service_proto_msgTypes[3]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use TerminateResponses.ProtoReflect.Descriptor instead.
+func (*TerminateResponses) Descriptor() ([]byte, []int) {
+	return file_api_proto_agent_master_yagpcc_action_service_proto_rawDescGZIP(), []int{3}
+}
+
+func (x *TerminateResponses) GetTerminateResponse() []*TerminateResponse {
+	if x != nil {
+		return x.TerminateResponse
+	}
+	return nil
+}
+
 type TerminateSessionRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	SessionKey    *common.SessionKey     `protobuf:"bytes,1,opt,name=session_key,json=sessionKey,proto3" json:"session_key,omitempty"`
@@ -229,7 +273,7 @@ type TerminateSessionRequest struct {
 
 func (x *TerminateSessionRequest) Reset() {
 	*x = TerminateSessionRequest{}
-	mi := &file_api_proto_agent_master_yagpcc_action_service_proto_msgTypes[3]
+	mi := &file_api_proto_agent_master_yagpcc_action_service_proto_msgTypes[4]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -241,7 +285,7 @@ func (x *TerminateSessionRequest) String() string {
 func (*TerminateSessionRequest) ProtoMessage() {}
 
 func (x *TerminateSessionRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_api_proto_agent_master_yagpcc_action_service_proto_msgTypes[3]
+	mi := &file_api_proto_agent_master_yagpcc_action_service_proto_msgTypes[4]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -254,7 +298,7 @@ func (x *TerminateSessionRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use TerminateSessionRequest.ProtoReflect.Descriptor instead.
 func (*TerminateSessionRequest) Descriptor() ([]byte, []int) {
-	return file_api_proto_agent_master_yagpcc_action_service_proto_rawDescGZIP(), []int{3}
+	return file_api_proto_agent_master_yagpcc_action_service_proto_rawDescGZIP(), []int{4}
 }
 
 func (x *TerminateSessionRequest) GetSessionKey() *common.SessionKey {
@@ -262,6 +306,66 @@ func (x *TerminateSessionRequest) GetSessionKey() *common.SessionKey {
 		return x.SessionKey
 	}
 	return nil
+}
+
+type TerminateSessionsRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Database      string                 `protobuf:"bytes,1,opt,name=database,proto3" json:"database,omitempty"`
+	Username      string                 `protobuf:"bytes,2,opt,name=username,proto3" json:"username,omitempty"`
+	QueryId       uint64                 `protobuf:"varint,3,opt,name=query_id,json=queryId,proto3" json:"query_id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *TerminateSessionsRequest) Reset() {
+	*x = TerminateSessionsRequest{}
+	mi := &file_api_proto_agent_master_yagpcc_action_service_proto_msgTypes[5]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *TerminateSessionsRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*TerminateSessionsRequest) ProtoMessage() {}
+
+func (x *TerminateSessionsRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_api_proto_agent_master_yagpcc_action_service_proto_msgTypes[5]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use TerminateSessionsRequest.ProtoReflect.Descriptor instead.
+func (*TerminateSessionsRequest) Descriptor() ([]byte, []int) {
+	return file_api_proto_agent_master_yagpcc_action_service_proto_rawDescGZIP(), []int{5}
+}
+
+func (x *TerminateSessionsRequest) GetDatabase() string {
+	if x != nil {
+		return x.Database
+	}
+	return ""
+}
+
+func (x *TerminateSessionsRequest) GetUsername() string {
+	if x != nil {
+		return x.Username
+	}
+	return ""
+}
+
+func (x *TerminateSessionsRequest) GetQueryId() uint64 {
+	if x != nil {
+		return x.QueryId
+	}
+	return 0
 }
 
 var File_api_proto_agent_master_yagpcc_action_service_proto protoreflect.FileDescriptor
@@ -278,18 +382,25 @@ const file_api_proto_agent_master_yagpcc_action_service_proto_rawDesc = "" +
 	"\vstatus_code\x18\x01 \x01(\x0e2#.yagpcc.TerminateResponseStatusCodeR\n" +
 	"statusCode\x12\x1f\n" +
 	"\vstatus_text\x18\x02 \x01(\tR\n" +
-	"statusText\"N\n" +
+	"statusText\"^\n" +
+	"\x12TerminateResponses\x12H\n" +
+	"\x12terminate_response\x18\x01 \x03(\v2\x19.yagpcc.TerminateResponseR\x11terminateResponse\"N\n" +
 	"\x17TerminateSessionRequest\x123\n" +
 	"\vsession_key\x18\x01 \x01(\v2\x12.yagpcc.SessionKeyR\n" +
-	"sessionKey*\xa3\x01\n" +
+	"sessionKey\"m\n" +
+	"\x18TerminateSessionsRequest\x12\x1a\n" +
+	"\bdatabase\x18\x01 \x01(\tR\bdatabase\x12\x1a\n" +
+	"\busername\x18\x02 \x01(\tR\busername\x12\x19\n" +
+	"\bquery_id\x18\x03 \x01(\x04R\aqueryId*\xa3\x01\n" +
 	"\x1bTerminateResponseStatusCode\x12.\n" +
 	"*TERMINATE_RESPONSE_STATUS_CODE_UNSPECIFIED\x10\x00\x12*\n" +
 	"&TERMINATE_RESPONSE_STATUS_CODE_SUCCESS\x10\x01\x12(\n" +
-	"$TERMINATE_RESPONSE_STATUS_CODE_ERROR\x10\x022\x88\x02\n" +
+	"$TERMINATE_RESPONSE_STATUS_CODE_ERROR\x10\x022\xdb\x02\n" +
 	"\rActionService\x12[\n" +
 	"\x18MoveQueryToResourceGroup\x12'.yagpcc.MoveQueryToResourceGroupRequest\x1a\x16.google.protobuf.Empty\x12J\n" +
 	"\x0eTerminateQuery\x12\x1d.yagpcc.TerminateQueryRequest\x1a\x19.yagpcc.TerminateResponse\x12N\n" +
-	"\x10TerminateSession\x12\x1f.yagpcc.TerminateSessionRequest\x1a\x19.yagpcc.TerminateResponseBNB\x0eMasterYAGPCCAAZ<github.com/open-gpdb/yagpcc/api/proto/agent_master;greenplumb\x06proto3"
+	"\x10TerminateSession\x12\x1f.yagpcc.TerminateSessionRequest\x1a\x19.yagpcc.TerminateResponse\x12Q\n" +
+	"\x11TerminateSessions\x12 .yagpcc.TerminateSessionsRequest\x1a\x1a.yagpcc.TerminateResponsesBNB\x0eMasterYAGPCCAAZ<github.com/open-gpdb/yagpcc/api/proto/agent_master;greenplumb\x06proto3"
 
 var (
 	file_api_proto_agent_master_yagpcc_action_service_proto_rawDescOnce sync.Once
@@ -304,33 +415,38 @@ func file_api_proto_agent_master_yagpcc_action_service_proto_rawDescGZIP() []byt
 }
 
 var file_api_proto_agent_master_yagpcc_action_service_proto_enumTypes = make([]protoimpl.EnumInfo, 1)
-var file_api_proto_agent_master_yagpcc_action_service_proto_msgTypes = make([]protoimpl.MessageInfo, 4)
+var file_api_proto_agent_master_yagpcc_action_service_proto_msgTypes = make([]protoimpl.MessageInfo, 6)
 var file_api_proto_agent_master_yagpcc_action_service_proto_goTypes = []any{
 	(TerminateResponseStatusCode)(0),        // 0: yagpcc.TerminateResponseStatusCode
 	(*MoveQueryToResourceGroupRequest)(nil), // 1: yagpcc.MoveQueryToResourceGroupRequest
 	(*TerminateQueryRequest)(nil),           // 2: yagpcc.TerminateQueryRequest
 	(*TerminateResponse)(nil),               // 3: yagpcc.TerminateResponse
-	(*TerminateSessionRequest)(nil),         // 4: yagpcc.TerminateSessionRequest
-	(*common.QueryKey)(nil),                 // 5: yagpcc.QueryKey
-	(*common.SessionKey)(nil),               // 6: yagpcc.SessionKey
-	(*emptypb.Empty)(nil),                   // 7: google.protobuf.Empty
+	(*TerminateResponses)(nil),              // 4: yagpcc.TerminateResponses
+	(*TerminateSessionRequest)(nil),         // 5: yagpcc.TerminateSessionRequest
+	(*TerminateSessionsRequest)(nil),        // 6: yagpcc.TerminateSessionsRequest
+	(*common.QueryKey)(nil),                 // 7: yagpcc.QueryKey
+	(*common.SessionKey)(nil),               // 8: yagpcc.SessionKey
+	(*emptypb.Empty)(nil),                   // 9: google.protobuf.Empty
 }
 var file_api_proto_agent_master_yagpcc_action_service_proto_depIdxs = []int32{
-	5, // 0: yagpcc.MoveQueryToResourceGroupRequest.query_key:type_name -> yagpcc.QueryKey
-	5, // 1: yagpcc.TerminateQueryRequest.query_key:type_name -> yagpcc.QueryKey
+	7, // 0: yagpcc.MoveQueryToResourceGroupRequest.query_key:type_name -> yagpcc.QueryKey
+	7, // 1: yagpcc.TerminateQueryRequest.query_key:type_name -> yagpcc.QueryKey
 	0, // 2: yagpcc.TerminateResponse.status_code:type_name -> yagpcc.TerminateResponseStatusCode
-	6, // 3: yagpcc.TerminateSessionRequest.session_key:type_name -> yagpcc.SessionKey
-	1, // 4: yagpcc.ActionService.MoveQueryToResourceGroup:input_type -> yagpcc.MoveQueryToResourceGroupRequest
-	2, // 5: yagpcc.ActionService.TerminateQuery:input_type -> yagpcc.TerminateQueryRequest
-	4, // 6: yagpcc.ActionService.TerminateSession:input_type -> yagpcc.TerminateSessionRequest
-	7, // 7: yagpcc.ActionService.MoveQueryToResourceGroup:output_type -> google.protobuf.Empty
-	3, // 8: yagpcc.ActionService.TerminateQuery:output_type -> yagpcc.TerminateResponse
-	3, // 9: yagpcc.ActionService.TerminateSession:output_type -> yagpcc.TerminateResponse
-	7, // [7:10] is the sub-list for method output_type
-	4, // [4:7] is the sub-list for method input_type
-	4, // [4:4] is the sub-list for extension type_name
-	4, // [4:4] is the sub-list for extension extendee
-	0, // [0:4] is the sub-list for field type_name
+	3, // 3: yagpcc.TerminateResponses.terminate_response:type_name -> yagpcc.TerminateResponse
+	8, // 4: yagpcc.TerminateSessionRequest.session_key:type_name -> yagpcc.SessionKey
+	1, // 5: yagpcc.ActionService.MoveQueryToResourceGroup:input_type -> yagpcc.MoveQueryToResourceGroupRequest
+	2, // 6: yagpcc.ActionService.TerminateQuery:input_type -> yagpcc.TerminateQueryRequest
+	5, // 7: yagpcc.ActionService.TerminateSession:input_type -> yagpcc.TerminateSessionRequest
+	6, // 8: yagpcc.ActionService.TerminateSessions:input_type -> yagpcc.TerminateSessionsRequest
+	9, // 9: yagpcc.ActionService.MoveQueryToResourceGroup:output_type -> google.protobuf.Empty
+	3, // 10: yagpcc.ActionService.TerminateQuery:output_type -> yagpcc.TerminateResponse
+	3, // 11: yagpcc.ActionService.TerminateSession:output_type -> yagpcc.TerminateResponse
+	4, // 12: yagpcc.ActionService.TerminateSessions:output_type -> yagpcc.TerminateResponses
+	9, // [9:13] is the sub-list for method output_type
+	5, // [5:9] is the sub-list for method input_type
+	5, // [5:5] is the sub-list for extension type_name
+	5, // [5:5] is the sub-list for extension extendee
+	0, // [0:5] is the sub-list for field type_name
 }
 
 func init() { file_api_proto_agent_master_yagpcc_action_service_proto_init() }
@@ -344,7 +460,7 @@ func file_api_proto_agent_master_yagpcc_action_service_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_api_proto_agent_master_yagpcc_action_service_proto_rawDesc), len(file_api_proto_agent_master_yagpcc_action_service_proto_rawDesc)),
 			NumEnums:      1,
-			NumMessages:   4,
+			NumMessages:   6,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

@@ -23,6 +23,7 @@ const (
 	ActionService_MoveQueryToResourceGroup_FullMethodName = "/yagpcc.ActionService/MoveQueryToResourceGroup"
 	ActionService_TerminateQuery_FullMethodName           = "/yagpcc.ActionService/TerminateQuery"
 	ActionService_TerminateSession_FullMethodName         = "/yagpcc.ActionService/TerminateSession"
+	ActionService_TerminateSessions_FullMethodName        = "/yagpcc.ActionService/TerminateSessions"
 )
 
 // ActionServiceClient is the client API for ActionService service.
@@ -32,6 +33,7 @@ type ActionServiceClient interface {
 	MoveQueryToResourceGroup(ctx context.Context, in *MoveQueryToResourceGroupRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
 	TerminateQuery(ctx context.Context, in *TerminateQueryRequest, opts ...grpc.CallOption) (*TerminateResponse, error)
 	TerminateSession(ctx context.Context, in *TerminateSessionRequest, opts ...grpc.CallOption) (*TerminateResponse, error)
+	TerminateSessions(ctx context.Context, in *TerminateSessionsRequest, opts ...grpc.CallOption) (*TerminateResponses, error)
 }
 
 type actionServiceClient struct {
@@ -72,6 +74,16 @@ func (c *actionServiceClient) TerminateSession(ctx context.Context, in *Terminat
 	return out, nil
 }
 
+func (c *actionServiceClient) TerminateSessions(ctx context.Context, in *TerminateSessionsRequest, opts ...grpc.CallOption) (*TerminateResponses, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(TerminateResponses)
+	err := c.cc.Invoke(ctx, ActionService_TerminateSessions_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // ActionServiceServer is the server API for ActionService service.
 // All implementations must embed UnimplementedActionServiceServer
 // for forward compatibility.
@@ -79,6 +91,7 @@ type ActionServiceServer interface {
 	MoveQueryToResourceGroup(context.Context, *MoveQueryToResourceGroupRequest) (*emptypb.Empty, error)
 	TerminateQuery(context.Context, *TerminateQueryRequest) (*TerminateResponse, error)
 	TerminateSession(context.Context, *TerminateSessionRequest) (*TerminateResponse, error)
+	TerminateSessions(context.Context, *TerminateSessionsRequest) (*TerminateResponses, error)
 	mustEmbedUnimplementedActionServiceServer()
 }
 
@@ -97,6 +110,9 @@ func (UnimplementedActionServiceServer) TerminateQuery(context.Context, *Termina
 }
 func (UnimplementedActionServiceServer) TerminateSession(context.Context, *TerminateSessionRequest) (*TerminateResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method TerminateSession not implemented")
+}
+func (UnimplementedActionServiceServer) TerminateSessions(context.Context, *TerminateSessionsRequest) (*TerminateResponses, error) {
+	return nil, status.Error(codes.Unimplemented, "method TerminateSessions not implemented")
 }
 func (UnimplementedActionServiceServer) mustEmbedUnimplementedActionServiceServer() {}
 func (UnimplementedActionServiceServer) testEmbeddedByValue()                       {}
@@ -173,6 +189,24 @@ func _ActionService_TerminateSession_Handler(srv interface{}, ctx context.Contex
 	return interceptor(ctx, in, info, handler)
 }
 
+func _ActionService_TerminateSessions_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(TerminateSessionsRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ActionServiceServer).TerminateSessions(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: ActionService_TerminateSessions_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ActionServiceServer).TerminateSessions(ctx, req.(*TerminateSessionsRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // ActionService_ServiceDesc is the grpc.ServiceDesc for ActionService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -191,6 +225,10 @@ var ActionService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "TerminateSession",
 			Handler:    _ActionService_TerminateSession_Handler,
+		},
+		{
+			MethodName: "TerminateSessions",
+			Handler:    _ActionService_TerminateSessions_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

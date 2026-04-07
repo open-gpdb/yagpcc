@@ -13,6 +13,8 @@ service ActionService {
 
     rpc TerminateQuery (TerminateQueryRequest) returns (TerminateResponse);
     rpc TerminateSession (TerminateSessionRequest) returns (TerminateResponse);
+
+    rpc TerminateSessions (TerminateSessionsRequest) returns (TerminateResponses);
 }
 
 message MoveQueryToResourceGroupRequest {
@@ -31,6 +33,11 @@ message TerminateResponse {
     string status_text                        =  2;
 }
 
+message TerminateResponses {
+
+    repeated TerminateResponse terminate_response = 1;
+}
+
 enum TerminateResponseStatusCode {
 
     TERMINATE_RESPONSE_STATUS_CODE_UNSPECIFIED  =  0;
@@ -41,4 +48,12 @@ enum TerminateResponseStatusCode {
 message TerminateSessionRequest {
 
     SessionKey session_key   =  1;
+}
+
+message TerminateSessionsRequest {
+
+    string database  = 1;
+    string username  = 2;
+    uint64 query_id  = 3;
+
 }

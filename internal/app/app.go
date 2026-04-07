@@ -266,7 +266,7 @@ func NewApp(
 		pb.RegisterAgentControlServer(s, &grpc.AgentControlServer{Logger: baseApp.L(), RQStorage: backgroundStorage.RQStorage})
 
 		getMasterInfo := grpc.NewGetMasterInfoServer(config.ClusterID, baseApp.L(), statActivityLister, int(config.MaxOuterMessageSize), backgroundStorage)
-		actionInfo := &grpc.ActionsServer{ClusterID: config.ClusterID, Logger: baseApp.L(), Timeout: 5 * time.Minute}
+		actionInfo := &grpc.ActionsServer{ClusterID: config.ClusterID, Logger: baseApp.L(), Timeout: 5 * time.Minute, BackgroundStorage: backgroundStorage}
 
 		pbm.RegisterGetGPInfoServer(s, getMasterInfo)
 		pbm.RegisterActionServiceServer(s, actionInfo)
