@@ -2,6 +2,7 @@ GIT_REVISION=`git rev-parse --short HEAD`
 YAGPCC_VERSION=`git describe --tags --abbrev=0`
 GOFMT_FILES?=$$(find . -name '*.go' | grep -v .git | grep -v parser | grep -v vendor)
 GOFLAGS=-ldflags=-extldflags=-Wl,-ld_classic
+GINKGO_CLI=github.com/onsi/ginkgo/v2/ginkgo@v2.28.0
 
 ####################### BUILD #######################
 
@@ -23,7 +24,7 @@ build: genproto genbin
 ####################### TESTS #######################
 
 unittest:
-	go test -race ./...
+	go run $(GINKGO_CLI) run --race --github-output ./...
 
 ####################### LINTERS #######################
 
