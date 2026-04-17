@@ -131,7 +131,7 @@ func New(opts ...AppOption) (*App, error) {
 	loggerCfg.Level = zap.NewAtomicLevelAt(a.cfg.Logging.Level)
 	logger, err := loggerCfg.Build()
 	if err != nil {
-		return nil, fmt.Errorf("can't initialize zap logger: %v", err)
+		return nil, fmt.Errorf("can't initialize zap logger: %w", err)
 	}
 
 	a.l = logger.Sugar()

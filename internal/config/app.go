@@ -67,6 +67,7 @@ type LoggingConfig struct {
 
 func DefaultLoggingConfig() LoggingConfig {
 	return LoggingConfig{
+		File:  "stdout",
 		Level: zap.DebugLevel,
 	}
 }
