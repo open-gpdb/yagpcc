@@ -126,10 +126,14 @@ func New(opts ...AppOption) (*App, error) {
 	}
 
 	// Create logger
-	logger, err := zap.NewProduction()
+	loggerCfg := zap.NewProductionConfig()
+	loggerCfg.OutputPaths = []string{a.cfg.Logging.File}
+	loggerCfg.Level = zap.NewAtomicLevelAt(a.cfg.Logging.Level)
+	logger, err := loggerCfg.Build()
 	if err != nil {
 		return nil, fmt.Errorf("can't initialize zap logger: %v", err)
 	}
+
 	a.l = logger.Sugar()
 
 	a.l.Debug("using application config", zap.Any("config", a.cfg))
