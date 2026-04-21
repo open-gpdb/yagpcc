@@ -126,7 +126,7 @@ func TestAggregate(t *testing.T) {
 	assert.Equal(t, okA, true)
 	assert.Equal(t, valA.TotalMetrics.SystemStat.UserTimeSeconds, float64(114))
 	assert.True(t, proto.Equal(valA.AggTimes, &pbc.AggregatedMetrics{Calls: 2, TotalTime: float64(2 * time.Second), MinTime: float64(time.Second), MaxTime: float64(time.Second), MeanTime: float64(time.Second)}))
-	assert.Equal(t, valA.QueryKey.Ssid, int32(0))
+	assert.Equal(t, valA.QueryKey.Ssid, int32(1))
 
 	for i := 0; i < aggStorage.maxQueriesPerUser+20; i++ {
 		testProto := &pbm.TotalQueryData{
@@ -143,7 +143,7 @@ func TestAggregate(t *testing.T) {
 					QueryText:    "Select 1",
 				},
 				QueryKey: &pbc.QueryKey{
-					Ssid: 1,
+					Ssid: int32(i),
 				},
 				TotalQueryMetrics: &pbc.GPMetrics{SystemStat: &pbc.SystemStat{UserTimeSeconds: 57}},
 			},
