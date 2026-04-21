@@ -261,8 +261,10 @@ func (a *AggregatedStorage) AggQuery(qT *pbm.TotalQueryData) error {
 	if err != nil {
 		return err
 	}
-	if aVal.AggTimes.Calls > 1 {
-		aVal.QueryKey = &pbc.QueryKey{}
+	if aVal.AggTimes.Calls > 1 && aVal.QueryKey != nil && qT.QueryStat.QueryKey != nil {
+		if aVal.QueryKey.Ssid != qT.QueryStat.QueryKey.Ssid || aVal.QueryKey.Ccnt != qT.QueryStat.QueryKey.Ccnt {
+			aVal.QueryKey = &pbc.QueryKey{}
+		}
 	}
 	if metrics.YagpccMetrics != nil {
 		metrics.YagpccMetrics.NewAggregatedQueries.Inc()
