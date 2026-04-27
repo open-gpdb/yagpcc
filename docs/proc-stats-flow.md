@@ -21,7 +21,7 @@ gRPC fan-out to segment-host yagpccs, and aggregation back on the master.
 
 The master yagpcc already maintains a background list of every Greenplum
 backend (master + every segment) by polling
-`gp_dist_random('pg_stat_activity') UNION pg_stat_activity` from the
+`gp_dist_random('pg_stat_activity') UNION ALL pg_stat_activity` from the
 Greenplum master.
 
 | Item | Location |
