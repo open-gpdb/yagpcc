@@ -10,6 +10,7 @@ option go_package = "github.com/open-gpdb/yagpcc/api/proto/agent_segment;greenpl
 
 service GetQueryInfo {
     rpc GetMetricQueries (GetQueriesInfoReq) returns (GetQueriesInfoResponse) {}
+    rpc GetPidProcStat (GetPidProcInfoReq) returns (GetPidProcInfoResponse) {}
 }
 
 message QueryData {
@@ -35,3 +36,16 @@ message GetQueriesInfoReq {
     bool clear_sent                         = 4; // clear info after sent query data
 }
 
+message GetPidProcInfoResponse {
+    repeated GpPidProcInfo pid_proc_data = 1;
+}
+
+message SegmentProcess {
+    int64 gp_segment_id   = 1;
+    int64 sess_id         = 2;
+    int64 pid             = 3;
+}
+
+message GetPidProcInfoReq {
+    repeated SegmentProcess segment_process = 1;
+}

@@ -31,6 +31,13 @@ type Session struct {
 	WaitEventType    *string
 }
 
+type SessionPid struct {
+	GpSegmentId int
+	Pid         int
+	SessId      int
+	BackendType string
+}
+
 type SessionLock struct {
 	BlockSessID     int
 	BlockedBySessID int

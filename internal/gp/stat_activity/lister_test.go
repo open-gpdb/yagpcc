@@ -74,11 +74,13 @@ func TestLister_Start_Stop(t *testing.T) {
 
 		sessionsCollectionStopped := make(chan struct{})
 		locksCollectionStopped := make(chan struct{})
+		allSessionsCollectionStopped := make(chan struct{})
 
 		logMock := NewMockLog(ctrl)
 		logMock.EXPECT().Infof("initializing cache")
 		logMock.EXPECT().Infof("background collection for %s started", "stat_activity.Session")
 		logMock.EXPECT().Infof("background collection for %s started", "stat_activity.SessionLock")
+		logMock.EXPECT().Infof("background collection for %s started", "stat_activity.SessionPid")
 		logMock.
 			EXPECT().
 			Infof("background collection for %s stopped", "stat_activity.Session").
@@ -87,6 +89,10 @@ func TestLister_Start_Stop(t *testing.T) {
 			EXPECT().
 			Infof("background collection for %s stopped", "stat_activity.SessionLock").
 			Do(func(string, ...any) { close(locksCollectionStopped) })
+		logMock.
+			EXPECT().
+			Infof("background collection for %s stopped", "stat_activity.SessionPid").
+			Do(func(string, ...any) { close(allSessionsCollectionStopped) })
 
 		dbMock := NewMockDB(ctrl)
 		dbMock.
@@ -95,7 +101,7 @@ func TestLister_Start_Stop(t *testing.T) {
 			DoAndReturn(func(context.Context, string, any) error {
 				return nil
 			}).
-			Times(2)
+			Times(3)
 
 		sut := stat_activity.NewLister(
 			logMock,
@@ -111,6 +117,7 @@ func TestLister_Start_Stop(t *testing.T) {
 		sut.Stop()
 		assertBackgroundOperationCompleted(t, sessionsCollectionStopped, 10*time.Second, "stop sessions collection timed out")
 		assertBackgroundOperationCompleted(t, locksCollectionStopped, 10*time.Second, "stop locks collection timed out")
+		assertBackgroundOperationCompleted(t, allSessionsCollectionStopped, 10*time.Second, "stop all sessions collection timed out")
 	})
 
 	t.Run("start twice", func(t *testing.T) {
@@ -118,11 +125,13 @@ func TestLister_Start_Stop(t *testing.T) {
 
 		sessionsCollectionStopped := make(chan struct{})
 		locksCollectionStopped := make(chan struct{})
+		allSessionsCollectionStopped := make(chan struct{})
 
 		logMock := NewMockLog(ctrl)
 		logMock.EXPECT().Infof("initializing cache")
 		logMock.EXPECT().Infof("background collection for %s started", "stat_activity.Session")
 		logMock.EXPECT().Infof("background collection for %s started", "stat_activity.SessionLock")
+		logMock.EXPECT().Infof("background collection for %s started", "stat_activity.SessionPid")
 		logMock.EXPECT().Warnf("an attempt was made to start a background collection that is already running")
 		logMock.
 			EXPECT().
@@ -132,6 +141,10 @@ func TestLister_Start_Stop(t *testing.T) {
 			EXPECT().
 			Infof("background collection for %s stopped", "stat_activity.SessionLock").
 			Do(func(string, ...any) { close(locksCollectionStopped) })
+		logMock.
+			EXPECT().
+			Infof("background collection for %s stopped", "stat_activity.SessionPid").
+			Do(func(string, ...any) { close(allSessionsCollectionStopped) })
 
 		dbMock := NewMockDB(ctrl)
 		dbMock.
@@ -143,6 +156,10 @@ func TestLister_Start_Stop(t *testing.T) {
 		dbMock.
 			EXPECT().
 			ExecQuery(gomock.Any(), gomock.AssignableToTypeOf(""), gomock.AssignableToTypeOf(&[]stat_activity.SessionLock{})).
+			Return(nil)
+		dbMock.
+			EXPECT().
+			ExecQuery(gomock.Any(), gomock.AssignableToTypeOf(""), gomock.AssignableToTypeOf(&[]stat_activity.SessionPid{})).
 			Return(nil)
 
 		sut := stat_activity.NewLister(
@@ -163,6 +180,7 @@ func TestLister_Start_Stop(t *testing.T) {
 		sut.Stop()
 		assertBackgroundOperationCompleted(t, sessionsCollectionStopped, 10*time.Second, "stop sessions collection timed out")
 		assertBackgroundOperationCompleted(t, locksCollectionStopped, 10*time.Second, "stop locks collection timed out")
+		assertBackgroundOperationCompleted(t, allSessionsCollectionStopped, 10*time.Second, "stop all sessions collection timed out")
 	})
 
 	t.Run("stop twice", func(t *testing.T) {
@@ -170,11 +188,13 @@ func TestLister_Start_Stop(t *testing.T) {
 
 		sessionsCollectionStopped := make(chan struct{})
 		locksCollectionStopped := make(chan struct{})
+		allSessionsCollectionStopped := make(chan struct{})
 
 		logMock := NewMockLog(ctrl)
 		logMock.EXPECT().Infof("initializing cache")
 		logMock.EXPECT().Infof("background collection for %s started", "stat_activity.Session")
 		logMock.EXPECT().Infof("background collection for %s started", "stat_activity.SessionLock")
+		logMock.EXPECT().Infof("background collection for %s started", "stat_activity.SessionPid")
 		logMock.
 			EXPECT().
 			Infof("background collection for %s stopped", "stat_activity.Session").
@@ -183,6 +203,10 @@ func TestLister_Start_Stop(t *testing.T) {
 			EXPECT().
 			Infof("background collection for %s stopped", "stat_activity.SessionLock").
 			Do(func(string, ...any) { close(locksCollectionStopped) })
+		logMock.
+			EXPECT().
+			Infof("background collection for %s stopped", "stat_activity.SessionPid").
+			Do(func(string, ...any) { close(allSessionsCollectionStopped) })
 		logMock.EXPECT().Warnf("an attempt was made to stop a background collection that is not running")
 
 		dbMock := NewMockDB(ctrl)
@@ -195,6 +219,10 @@ func TestLister_Start_Stop(t *testing.T) {
 		dbMock.
 			EXPECT().
 			ExecQuery(gomock.Any(), gomock.AssignableToTypeOf(""), gomock.AssignableToTypeOf(&[]stat_activity.SessionLock{})).
+			Return(nil)
+		dbMock.
+			EXPECT().
+			ExecQuery(gomock.Any(), gomock.AssignableToTypeOf(""), gomock.AssignableToTypeOf(&[]stat_activity.SessionPid{})).
 			Return(nil)
 
 		sut := stat_activity.NewLister(
@@ -211,6 +239,7 @@ func TestLister_Start_Stop(t *testing.T) {
 		sut.Stop()
 		assertBackgroundOperationCompleted(t, sessionsCollectionStopped, 10*time.Second, "stop sessions collection timed out")
 		assertBackgroundOperationCompleted(t, locksCollectionStopped, 10*time.Second, "stop locks collection timed out")
+		assertBackgroundOperationCompleted(t, allSessionsCollectionStopped, 10*time.Second, "stop all sessions collection timed out")
 
 		// repeated stop does nothing
 		sut.Stop()
@@ -235,6 +264,11 @@ func TestLister_List_Positive(t *testing.T) {
 		dbMock.
 			EXPECT().
 			ExecQuery(gomock.Any(), gomock.AssignableToTypeOf(""), gomock.AssignableToTypeOf(&[]stat_activity.SessionLock{})).
+			Return(nil).
+			AnyTimes()
+		dbMock.
+			EXPECT().
+			ExecQuery(gomock.Any(), gomock.AssignableToTypeOf(""), gomock.AssignableToTypeOf(&[]stat_activity.SessionPid{})).
 			Return(nil).
 			AnyTimes()
 
@@ -279,6 +313,11 @@ func TestLister_List_Positive(t *testing.T) {
 				return nil
 			}).
 			AnyTimes()
+		dbMock.
+			EXPECT().
+			ExecQuery(gomock.Any(), gomock.AssignableToTypeOf(""), gomock.AssignableToTypeOf(&[]stat_activity.SessionPid{})).
+			Return(nil).
+			AnyTimes()
 
 		sut := stat_activity.NewLister(
 			logMock,
@@ -319,6 +358,11 @@ func TestLister_List_Positive(t *testing.T) {
 		dbMock.
 			EXPECT().
 			ExecQuery(gomock.Any(), gomock.AssignableToTypeOf(""), gomock.AssignableToTypeOf(&[]stat_activity.SessionLock{})).
+			Return(nil).
+			AnyTimes()
+		dbMock.
+			EXPECT().
+			ExecQuery(gomock.Any(), gomock.AssignableToTypeOf(""), gomock.AssignableToTypeOf(&[]stat_activity.SessionPid{})).
 			Return(nil).
 			AnyTimes()
 
@@ -394,6 +438,11 @@ func TestLister_List_Positive(t *testing.T) {
 				return nil
 			}).
 			AnyTimes()
+		dbMock.
+			EXPECT().
+			ExecQuery(gomock.Any(), gomock.AssignableToTypeOf(""), gomock.AssignableToTypeOf(&[]stat_activity.SessionPid{})).
+			Return(nil).
+			AnyTimes()
 
 		sut := stat_activity.NewLister(
 			logMock,
@@ -462,6 +511,10 @@ func TestLister_List_Positive(t *testing.T) {
 			EXPECT().
 			ExecQuery(gomock.Any(), gomock.AssignableToTypeOf(""), gomock.AssignableToTypeOf(&[]stat_activity.SessionLock{})).
 			Return(nil)
+		dbMock.
+			EXPECT().
+			ExecQuery(gomock.Any(), gomock.AssignableToTypeOf(""), gomock.AssignableToTypeOf(&[]stat_activity.SessionPid{})).
+			Return(nil)
 		// background collection
 		dbMock.
 			EXPECT().
@@ -496,6 +549,11 @@ func TestLister_List_Positive(t *testing.T) {
 
 				return nil
 			}).
+			AnyTimes()
+		dbMock.
+			EXPECT().
+			ExecQuery(gomock.Any(), gomock.AssignableToTypeOf(""), gomock.AssignableToTypeOf(&[]stat_activity.SessionPid{})).
+			Return(nil).
 			AnyTimes()
 
 		sut := stat_activity.NewLister(
@@ -574,6 +632,10 @@ func TestLister_List_Positive(t *testing.T) {
 			EXPECT().
 			ExecQuery(gomock.Any(), gomock.AssignableToTypeOf(""), gomock.AssignableToTypeOf(&[]stat_activity.SessionLock{})).
 			Return(nil)
+		dbMock.
+			EXPECT().
+			ExecQuery(gomock.Any(), gomock.AssignableToTypeOf(""), gomock.AssignableToTypeOf(&[]stat_activity.SessionPid{})).
+			Return(nil)
 		// background collection
 		dbMock.
 			EXPECT().
@@ -605,6 +667,11 @@ func TestLister_List_Positive(t *testing.T) {
 
 				return fmt.Errorf("test error")
 			}).
+			AnyTimes()
+		dbMock.
+			EXPECT().
+			ExecQuery(gomock.Any(), gomock.AssignableToTypeOf(""), gomock.AssignableToTypeOf(&[]stat_activity.SessionPid{})).
+			Return(nil).
 			AnyTimes()
 
 		sut := stat_activity.NewLister(
@@ -695,6 +762,10 @@ func TestLister_List_Negative(t *testing.T) {
 			EXPECT().
 			ExecQuery(gomock.Any(), gomock.AssignableToTypeOf(""), gomock.AssignableToTypeOf(&[]stat_activity.SessionLock{})).
 			Return(nil)
+		dbMock.
+			EXPECT().
+			ExecQuery(gomock.Any(), gomock.AssignableToTypeOf(""), gomock.AssignableToTypeOf(&[]stat_activity.SessionPid{})).
+			Return(nil)
 		// background collection
 		dbMock.
 			EXPECT().
@@ -713,6 +784,11 @@ func TestLister_List_Negative(t *testing.T) {
 		dbMock.
 			EXPECT().
 			ExecQuery(gomock.Any(), gomock.AssignableToTypeOf(""), gomock.AssignableToTypeOf(&[]stat_activity.SessionLock{})).
+			Return(nil).
+			AnyTimes()
+		dbMock.
+			EXPECT().
+			ExecQuery(gomock.Any(), gomock.AssignableToTypeOf(""), gomock.AssignableToTypeOf(&[]stat_activity.SessionPid{})).
 			Return(nil).
 			AnyTimes()
 
@@ -735,6 +811,319 @@ func TestLister_List_Negative(t *testing.T) {
 		assert.Nil(t, actual)
 
 		sut.Stop()
+	})
+}
+
+func TestLister_ListAllSessions_Negative(t *testing.T) {
+	t.Run("collection was not started", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+
+		sut := stat_activity.NewLister(
+			NewMockLog(ctrl),
+			NewMockDB(ctrl),
+		)
+
+		actual, err := sut.ListAllSessions(context.Background())
+
+		assert.EqualError(t, err, "background collection was not started")
+		assert.Nil(t, actual)
+	})
+
+	t.Run("stale read due to all sessions db errors", func(t *testing.T) {
+		cacheTTL := 10 * time.Millisecond
+
+		ctrl := gomock.NewController(t)
+
+		allSessionsCollectedTimes := 0
+		allSessionsCollected := make(chan struct{})
+
+		logMock := NewMockLog(ctrl)
+		logMock.EXPECT().Infof("initializing cache")
+		logMock.EXPECT().Infof("background collection for %s started", gomock.Any()).AnyTimes()
+		logMock.EXPECT().Infof("background collection for %s stopped", gomock.Any()).AnyTimes()
+		logMock.
+			EXPECT().
+			Warnf("error during background collection %s: %s", "stat_activity.SessionPid", "error executing query: test error").
+			AnyTimes()
+
+		dbMock := NewMockDB(ctrl)
+		// immediate collection: sessions
+		dbMock.
+			EXPECT().
+			ExecQuery(gomock.Any(), gomock.AssignableToTypeOf(""), gomock.AssignableToTypeOf(&[]stat_activity.Session{})).
+			Return(nil)
+		// immediate collection: locks
+		dbMock.
+			EXPECT().
+			ExecQuery(gomock.Any(), gomock.AssignableToTypeOf(""), gomock.AssignableToTypeOf(&[]stat_activity.SessionLock{})).
+			Return(nil)
+		// immediate collection: all sessions
+		dbMock.
+			EXPECT().
+			ExecQuery(gomock.Any(), gomock.AssignableToTypeOf(""), gomock.AssignableToTypeOf(&[]stat_activity.SessionPid{})).
+			Return(nil)
+		// background collection: sessions (always succeed)
+		dbMock.
+			EXPECT().
+			ExecQuery(gomock.Any(), gomock.AssignableToTypeOf(""), gomock.AssignableToTypeOf(&[]stat_activity.Session{})).
+			Return(nil).
+			AnyTimes()
+		// background collection: locks (always succeed)
+		dbMock.
+			EXPECT().
+			ExecQuery(gomock.Any(), gomock.AssignableToTypeOf(""), gomock.AssignableToTypeOf(&[]stat_activity.SessionLock{})).
+			Return(nil).
+			AnyTimes()
+		// background collection: all sessions (fail with staleness)
+		dbMock.
+			EXPECT().
+			ExecQuery(gomock.Any(), gomock.AssignableToTypeOf(""), gomock.AssignableToTypeOf(&[]stat_activity.SessionPid{})).
+			DoAndReturn(func(context.Context, string, any) error {
+				// to simulate staleness
+				time.Sleep(2 * cacheTTL)
+				if allSessionsCollectedTimes == 0 {
+					close(allSessionsCollected)
+				}
+				allSessionsCollectedTimes++
+
+				return fmt.Errorf("test error")
+			}).
+			AnyTimes()
+
+		sut := stat_activity.NewLister(
+			logMock,
+			dbMock,
+			stat_activity.WithBackgroundSessionsCollectionInterval(1*time.Hour),
+			stat_activity.WithBackgroundLocksCollectionInterval(1*time.Hour),
+			stat_activity.WithBackgroundAllSessionsCollectionInterval(1*time.Millisecond),
+			stat_activity.WithBackgroundAllSessionsCacheTTL(cacheTTL),
+		)
+
+		err := sut.Start(context.Background())
+		assert.NoError(t, err)
+
+		assertBackgroundOperationCompleted(t, allSessionsCollected, 10*time.Second, "all sessions collection operation timed out")
+
+		actual, err := sut.ListAllSessions(context.Background())
+
+		assert.EqualError(t, err, "error reading sessions: cached value is stale")
+		assert.Nil(t, actual)
+
+		sut.Stop()
+	})
+}
+
+func TestLister_ListAllSessions_Positive(t *testing.T) {
+	t.Run("empty all sessions", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+
+		logMock := NewMockLog(ctrl)
+		logMock.EXPECT().Infof("initializing cache")
+		logMock.EXPECT().Infof("background collection for %s started", gomock.Any()).AnyTimes()
+		logMock.EXPECT().Infof("background collection for %s stopped", gomock.Any()).AnyTimes()
+
+		dbMock := NewMockDB(ctrl)
+		dbMock.
+			EXPECT().
+			ExecQuery(gomock.Any(), gomock.AssignableToTypeOf(""), gomock.Any()).
+			Return(nil).
+			AnyTimes()
+
+		sut := stat_activity.NewLister(
+			logMock,
+			dbMock,
+		)
+
+		err := sut.Start(context.Background())
+		assert.NoError(t, err)
+
+		actual, err := sut.ListAllSessions(context.Background())
+
+		assert.NoError(t, err)
+		assert.Empty(t, actual)
+
+		sut.Stop()
+	})
+
+	t.Run("non empty all sessions", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+
+		logMock := NewMockLog(ctrl)
+		logMock.EXPECT().Infof("initializing cache")
+		logMock.EXPECT().Infof("background collection for %s started", gomock.Any()).AnyTimes()
+		logMock.EXPECT().Infof("background collection for %s stopped", gomock.Any()).AnyTimes()
+
+		dbMock := NewMockDB(ctrl)
+		// sessions
+		dbMock.
+			EXPECT().
+			ExecQuery(gomock.Any(), gomock.AssignableToTypeOf(""), gomock.AssignableToTypeOf(&[]stat_activity.Session{})).
+			Return(nil).
+			AnyTimes()
+		// locks
+		dbMock.
+			EXPECT().
+			ExecQuery(gomock.Any(), gomock.AssignableToTypeOf(""), gomock.AssignableToTypeOf(&[]stat_activity.SessionLock{})).
+			Return(nil).
+			AnyTimes()
+		// all sessions
+		dbMock.
+			EXPECT().
+			ExecQuery(gomock.Any(), gomock.AssignableToTypeOf(""), gomock.AssignableToTypeOf(&[]stat_activity.SessionPid{})).
+			DoAndReturn(func(_ context.Context, _ string, destination *[]stat_activity.SessionPid) error {
+				*destination = []stat_activity.SessionPid{
+					{GpSegmentId: 0, Pid: 100, SessId: 1, BackendType: "client backend"},
+					{GpSegmentId: 1, Pid: 200, SessId: 1, BackendType: "client backend"},
+					{GpSegmentId: 0, Pid: 300, SessId: 2, BackendType: "client backend"},
+				}
+				return nil
+			}).
+			AnyTimes()
+
+		sut := stat_activity.NewLister(
+			logMock,
+			dbMock,
+		)
+
+		err := sut.Start(context.Background())
+		assert.NoError(t, err)
+
+		actual, err := sut.ListAllSessions(context.Background())
+
+		assert.NoError(t, err)
+		assert.ElementsMatch(
+			t,
+			[]stat_activity.SessionPid{
+				{GpSegmentId: 0, Pid: 100, SessId: 1, BackendType: "client backend"},
+				{GpSegmentId: 1, Pid: 200, SessId: 1, BackendType: "client backend"},
+				{GpSegmentId: 0, Pid: 300, SessId: 2, BackendType: "client backend"},
+			},
+			actual,
+		)
+
+		sut.Stop()
+	})
+
+	t.Run("list all sessions from background collected", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+
+		allSessionsCollected := make(chan struct{})
+		allSessionsCollectedTimes := 0
+
+		logMock := NewMockLog(ctrl)
+		logMock.EXPECT().Infof("initializing cache")
+		logMock.EXPECT().Infof("background collection for %s started", gomock.Any()).AnyTimes()
+		logMock.EXPECT().Infof("background collection for %s stopped", gomock.Any()).AnyTimes()
+
+		dbMock := NewMockDB(ctrl)
+		// immediate collection: sessions
+		dbMock.
+			EXPECT().
+			ExecQuery(gomock.Any(), gomock.AssignableToTypeOf(""), gomock.AssignableToTypeOf(&[]stat_activity.Session{})).
+			Return(nil)
+		// immediate collection: locks
+		dbMock.
+			EXPECT().
+			ExecQuery(gomock.Any(), gomock.AssignableToTypeOf(""), gomock.AssignableToTypeOf(&[]stat_activity.SessionLock{})).
+			Return(nil)
+		// immediate collection: all sessions (empty)
+		dbMock.
+			EXPECT().
+			ExecQuery(gomock.Any(), gomock.AssignableToTypeOf(""), gomock.AssignableToTypeOf(&[]stat_activity.SessionPid{})).
+			Return(nil)
+		// background collection: sessions
+		dbMock.
+			EXPECT().
+			ExecQuery(gomock.Any(), gomock.AssignableToTypeOf(""), gomock.AssignableToTypeOf(&[]stat_activity.Session{})).
+			Return(nil).
+			AnyTimes()
+		// background collection: locks
+		dbMock.
+			EXPECT().
+			ExecQuery(gomock.Any(), gomock.AssignableToTypeOf(""), gomock.AssignableToTypeOf(&[]stat_activity.SessionLock{})).
+			Return(nil).
+			AnyTimes()
+		// background collection: all sessions (returns data)
+		dbMock.
+			EXPECT().
+			ExecQuery(gomock.Any(), gomock.AssignableToTypeOf(""), gomock.AssignableToTypeOf(&[]stat_activity.SessionPid{})).
+			DoAndReturn(func(_ context.Context, _ string, destination *[]stat_activity.SessionPid) error {
+				*destination = []stat_activity.SessionPid{
+					{GpSegmentId: 0, Pid: 100, SessId: 1, BackendType: "client backend"},
+					{GpSegmentId: 1, Pid: 200, SessId: 1, BackendType: "client backend"},
+				}
+
+				if allSessionsCollectedTimes == 1 {
+					close(allSessionsCollected)
+				}
+				allSessionsCollectedTimes++
+
+				return nil
+			}).
+			AnyTimes()
+
+		sut := stat_activity.NewLister(
+			logMock,
+			dbMock,
+			stat_activity.WithBackgroundSessionsCollectionInterval(1*time.Hour),
+			stat_activity.WithBackgroundLocksCollectionInterval(1*time.Hour),
+			stat_activity.WithBackgroundAllSessionsCollectionInterval(1*time.Millisecond),
+		)
+
+		err := sut.Start(context.Background())
+		assert.NoError(t, err)
+
+		assertBackgroundOperationCompleted(t, allSessionsCollected, 10*time.Second, "all sessions collection operation timed out")
+
+		actual, err := sut.ListAllSessions(context.Background())
+
+		assert.NoError(t, err)
+		assert.ElementsMatch(
+			t,
+			[]stat_activity.SessionPid{
+				{GpSegmentId: 0, Pid: 100, SessId: 1, BackendType: "client backend"},
+				{GpSegmentId: 1, Pid: 200, SessId: 1, BackendType: "client backend"},
+			},
+			actual,
+		)
+
+		sut.Stop()
+	})
+}
+
+func TestLister_Start_AllSessions_Negative(t *testing.T) {
+	t.Run("error initializing all sessions cache", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+
+		logMock := NewMockLog(ctrl)
+		logMock.EXPECT().Infof("initializing cache")
+
+		dbMock := NewMockDB(ctrl)
+		// sessions succeed
+		dbMock.
+			EXPECT().
+			ExecQuery(gomock.Any(), gomock.AssignableToTypeOf(""), gomock.AssignableToTypeOf(&[]stat_activity.Session{})).
+			Return(nil)
+		// locks succeed
+		dbMock.
+			EXPECT().
+			ExecQuery(gomock.Any(), gomock.AssignableToTypeOf(""), gomock.AssignableToTypeOf(&[]stat_activity.SessionLock{})).
+			Return(nil)
+		// all sessions fail
+		dbMock.
+			EXPECT().
+			ExecQuery(gomock.Any(), gomock.AssignableToTypeOf(""), gomock.AssignableToTypeOf(&[]stat_activity.SessionPid{})).
+			Return(fmt.Errorf("test error"))
+
+		sut := stat_activity.NewLister(
+			logMock,
+			dbMock,
+			stat_activity.WithBackgroundSessionsCollectionInterval(1*time.Hour),
+			stat_activity.WithBackgroundLocksCollectionInterval(1*time.Hour),
+		)
+
+		err := sut.Start(context.Background())
+		assert.EqualError(t, err, "error initializing all sessions cache: error executing query: test error")
 	})
 }
 
