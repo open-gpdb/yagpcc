@@ -602,31 +602,31 @@ message ProcStat {
     int32 tpgid = 8;
 
     // The kernel flags word of the process.
-    uint32 flags = 9;
+    int32 flags = 9;
 
     // The number of minor faults the process has made which have not required
     // loading a memory page from disk.
-    uint32 min_flt = 10;
+    int32 min_flt = 10;
 
     // The number of minor faults that the process's waited-for children have
     // made.
-    uint32 cmin_flt = 11;
+    int32 cmin_flt = 11;
 
     // The number of major faults the process has made which have required
     // loading a memory page from disk.
-    uint32 maj_flt = 12;
+    int32 maj_flt = 12;
 
     // The number of major faults that the process's waited-for children have
     // made.
-    uint32 cmaj_flt = 13;
+    int32 cmaj_flt = 13;
 
     // Amount of time that this process has been scheduled in user mode,
     // measured in clock ticks.
-    uint32 utime = 14;
+    int32 utime = 14;
 
     // Amount of time that this process has been scheduled in kernel mode,
     // measured in clock ticks.
-    uint32 stime = 15;
+    int32 stime = 15;
 
     // Amount of time that this process's waited-for children have been
     // scheduled in user mode, measured in clock ticks.
@@ -649,38 +649,38 @@ message ProcStat {
 
     // The time the process started after system boot, the value is expressed
     // in clock ticks.
-    uint64 starttime = 21;
+    int64 starttime = 21;
 
     // Virtual memory size in bytes.
-    uint32 vsize = 22;
+    int32 vsize = 22;
 
     // Resident set size in pages.
     int32 rss = 23;
 
     // Soft limit in bytes on the rss of the process.
-    uint64 rss_limit = 24;
+    int64 rss_limit = 24;
 
     // The address above which program text can run.
-    uint64 start_code = 25;
+    int64 start_code = 25;
 
     // The address below which program text can run.
-    uint64 end_code = 26;
+    int64 end_code = 26;
 
     // The address of the start (i.e., bottom) of the stack.
-    uint64 start_stack = 27;
+    int64 start_stack = 27;
 
     // CPU number last executed on.
-    uint32 processor = 28;
+    int32 processor = 28;
 
     // Real-time scheduling priority, a number in the range 1 to 99 for processes
     // scheduled under a real-time policy, or 0, for non-real-time processes.
-    uint32 rt_priority = 29;
+    int32 rt_priority = 29;
 
     // Scheduling policy.
-    uint32 policy = 30;
+    int32 policy = 30;
 
     // Aggregated block I/O delays, measured in clock ticks (centiseconds).
-    uint64 delay_acct_blk_io_ticks = 31;
+    int64 delay_acct_blk_io_ticks = 31;
 
     // Guest time of the process (time spent running a virtual CPU for a guest
     // operating system), measured in clock ticks.
@@ -704,88 +704,121 @@ message ProcStatus {
     int32 tgid = 3;
 
     // List of Pid namespace.
-    repeated uint64 ns_pids = 4;
+    repeated int64 ns_pids = 4;
 
     // Peak virtual memory size.
-    uint64 vm_peak = 5;
+    int64 vm_peak = 5;
 
     // Virtual memory size.
-    uint64 vm_size = 6;
+    int64 vm_size = 6;
 
     // Locked memory size.
-    uint64 vm_lck = 7;
+    int64 vm_lck = 7;
 
     // Pinned memory size.
-    uint64 vm_pin = 8;
+    int64 vm_pin = 8;
 
     // Peak resident set size.
-    uint64 vm_hwm = 9;
+    int64 vm_hwm = 9;
 
     // Resident set size (sum of RssAnon RssFile and RssShmem).
-    uint64 vm_rss = 10;
+    int64 vm_rss = 10;
 
     // Size of resident anonymous memory.
-    uint64 rss_anon = 11;
+    int64 rss_anon = 11;
 
     // Size of resident file mappings.
-    uint64 rss_file = 12;
+    int64 rss_file = 12;
 
     // Size of resident shared memory.
-    uint64 rss_shmem = 13;
+    int64 rss_shmem = 13;
 
     // Size of data segments.
-    uint64 vm_data = 14;
+    int64 vm_data = 14;
 
     // Size of stack segments.
-    uint64 vm_stk = 15;
+    int64 vm_stk = 15;
 
     // Size of text segments.
-    uint64 vm_exe = 16;
+    int64 vm_exe = 16;
 
     // Shared library code size.
-    uint64 vm_lib = 17;
+    int64 vm_lib = 17;
 
     // Page table entries size.
-    uint64 vm_pte = 18;
+    int64 vm_pte = 18;
 
     // Size of second-level page tables.
-    uint64 vm_pmd = 19;
+    int64 vm_pmd = 19;
 
     // Swapped-out virtual memory size by anonymous private.
-    uint64 vm_swap = 20;
+    int64 vm_swap = 20;
 
     // Size of hugetlb memory portions.
-    uint64 hugetlb_pages = 21;
+    int64 hugetlb_pages = 21;
 
     // Number of voluntary context switches.
-    uint64 voluntary_ctxt_switches = 22;
+    int64 voluntary_ctxt_switches = 22;
 
     // Number of involuntary context switches.
-    uint64 non_voluntary_ctxt_switches = 23;
+    int64 non_voluntary_ctxt_switches = 23;
 
     // UIDs of the process (Real, effective, saved set, and filesystem UIDs).
-    repeated uint64 uids = 24;
+    repeated int64 uids = 24;
 
     // GIDs of the process (Real, effective, saved set, and filesystem GIDs).
-    repeated uint64 gids = 25;
+    repeated int64 gids = 25;
 
     // CpusAllowedList: List of cpu cores processes are allowed to run on.
-    repeated uint64 cpus_allowed_list = 26;
+    repeated int64 cpus_allowed_list = 26;
 
     // CapInh is the bitmap of inheritable capabilities.
-    uint64 cap_inh = 27;
+    int64 cap_inh = 27;
 
     // CapPrm is the bitmap of permitted capabilities.
-    uint64 cap_prm = 28;
+    int64 cap_prm = 28;
 
     // CapEff is the bitmap of effective capabilities.
-    uint64 cap_eff = 29;
+    int64 cap_eff = 29;
 
     // CapBnd is the bitmap of bounding capabilities.
-    uint64 cap_bnd = 30;
+    int64 cap_bnd = 30;
 
     // CapAmb is the bitmap of ambient capabilities.
-    uint64 cap_amb = 31;
+    int64 cap_amb = 31;
+}
+
+// ProcIO models /proc/<pid>/io counters: cumulative byte and syscall counts
+// for the lifetime of the process. Master computes per-tick deltas from
+// these values; spec at:
+//   https://www.kernel.org/doc/Documentation/filesystems/proc.rst
+// (and https://pkg.go.dev/github.com/prometheus/procfs#ProcIO).
+message ProcIO {
+    // Bytes read by the process via read-like syscalls (returned to
+    // userspace), including bytes served from the page cache. Counter.
+    int64 rchar = 1;
+
+    // Bytes written by the process via write-like syscalls (accepted from
+    // userspace), regardless of whether they have been flushed. Counter.
+    int64 wchar = 2;
+
+    // Number of read-like syscalls invoked by the process. Counter.
+    int64 syscr = 3;
+
+    // Number of write-like syscalls invoked by the process. Counter.
+    int64 syscw = 4;
+
+    // Bytes the storage layer actually fetched on behalf of the process
+    // (i.e. reads that missed the page cache). Counter.
+    int64 read_bytes = 5;
+
+    // Bytes the storage layer was asked to write on behalf of the process.
+    // Counter.
+    int64 write_bytes = 6;
+
+    // Bytes that were accounted as written but were never persisted (e.g.
+    // truncated before flush). Counter.
+    int64 cancelled_write_bytes = 7;
 }
 
 message GpPidProcInfo {
@@ -797,7 +830,8 @@ message GpPidProcInfo {
     // actual data
     string cmdline         = 4;
     ProcStat proc_stat     = 5;
-    ProcStatus proc_status = 6; 
+    ProcStatus proc_status = 6;
+    ProcIO proc_io         = 7;
 }
 
 message AggregatedMetrics {

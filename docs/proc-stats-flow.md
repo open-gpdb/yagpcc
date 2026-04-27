@@ -81,8 +81,41 @@ message GetPidProcInfoResponse {
 `GpPidProcInfo` (defined in
 [api/proto/common/yagpcc_metrics.proto](../api/proto/common/yagpcc_metrics.proto))
 carries the primary key (`gp_segment_id`, `sess_id`, `pid`), the process
-`cmdline`, and the parsed `ProcStat` (from `/proc/<pid>/stat`) and
-`ProcStatus` (from `/proc/<pid>/status`).
+`cmdline`, and the parsed `ProcStat` (from `/proc/<pid>/stat`),
+`ProcStatus` (from `/proc/<pid>/status`), and `ProcIO` (from
+`/proc/<pid>/io`):
+
+```
+message GpPidProcInfo {
+    int64       gp_segment_id = 1;
+    int64       sess_id       = 2;
+    int64       pid           = 3;
+    string      cmdline       = 4;
+    ProcStat    proc_stat     = 5;
+    ProcStatus  proc_status   = 6;
+    ProcIO      proc_io       = 7;
+}
+
+message ProcIO {
+    int64 rchar                  = 1;  // bytes read via read-like syscalls
+    int64 wchar                  = 2;  // bytes written via write-like syscalls
+    int64 syscr                  = 3;  // read syscall count
+    int64 syscw                  = 4;  // write syscall count
+    int64 read_bytes             = 5;  // bytes fetched from storage
+    int64 write_bytes            = 6;  // bytes sent to storage
+    int64 cancelled_write_bytes  = 7;  // writes never persisted
+}
+```
+
+All `ProcIO` fields are cumulative kernel counters, so the master
+computes per-tick **deltas** to derive `read_bytes/sec`,
+`write_bytes/sec`, etc. The numeric fields in `ProcStat`, `ProcStatus`,
+and `ProcIO` are intentionally **signed** (`int32` / `int64` rather than
+the `uint*` types used by `prometheus/procfs`) so the same layout can
+also carry deltas (where a negative value is a legitimate signal of
+counter reset / PID reuse) without needing a parallel signed-delta
+schema. Counter values themselves never exceed `2^63` for any realistic
+process lifetime, so the conversion is lossless.
 
 ### 1.3 Segment side (stateless)
 
@@ -98,12 +131,17 @@ The segment-host yagpcc keeps **no local state** for proc-stats. On every
    alone.
 4. Returns the assembled `[]GpPidProcInfo`.
 
-`/proc/<pid>/io` deltas (`read_bytes`, `write_bytes`, `rchar`, `wchar`,
-`syscr`, `syscw`) are surfaced through the `SystemStat` portion of
-`GPMetrics` already documented in
-[API.md → SystemStat (procfs)](./API.md#systemstat-procfs); the new RPC
-exposes the **raw** counters for these PIDs in `ProcStat` /
-`ProcStatus`, so the master can compute deltas itself.
+Note that `/proc/<pid>/io` counters (`read_bytes`, `write_bytes`,
+`rchar`, `wchar`, `syscr`, `syscw`, `cancelled_write_bytes`) are also
+surfaced through the `SystemStat` portion of the hook-collected
+`GPMetrics` documented in
+[API.md → SystemStat (procfs)](./API.md#systemstat-procfs). That path
+delivers data only when the `yagp-hooks-collector` extension is loaded
+in Greenplum and only for queries it can hook. `GetPidProcStat` is the
+authoritative path for per-tick procfs sampling and works for every
+backend in `pg_stat_activity` (including system processes that
+`yagp-hooks-collector` never sees), so the master uses `ProcIO` raw
+counters from this RPC and computes deltas itself.
 
 ### 1.4 Master aggregation (right-now per query, cluster-wide)
 
