@@ -400,7 +400,7 @@ func newBackgroundSessions(log log, db db, makeOperationLatencyHandler func(stri
 func newBackgroundAllSessions(log log, db db, makeOperationLatencyHandler func(string) latencyHandler) *background[SessionPid] {
 	const (
 		operationCollect   = "background_collection_all_sessions"
-		operationStaleRead = "stale_read_sessions"
+		operationStaleRead = "stale_read_all_sessions"
 
 		defaultCollectionInterval = 60 * time.Second
 		defaultCollectionTimeout  = 300 * time.Second
