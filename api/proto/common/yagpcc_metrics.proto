@@ -574,7 +574,7 @@ message SpillInfo {
 
 // ProcStat provides status information about the process,
 // read from /proc/[pid]/stat.
-// See https://pkg.go.dev/github.com/prometheus/procfs@v0.20.1#ProcStat
+// See https://pkg.go.dev/github.com/prometheus/procfs#ProcStat
 message ProcStat {
     // The process ID.
     int32 pid = 1;
