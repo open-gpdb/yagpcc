@@ -54,7 +54,7 @@ func (l *Lister) ListAllSessions(context.Context) ([]SessionPid, error) {
 
 	sessions, err := l.allSessions.readStale()
 	if err != nil {
-		return nil, fmt.Errorf("error reading sessions: %w", err)
+		return nil, fmt.Errorf("error reading all sessions: %w", err)
 	}
 
 	return sessions, nil
