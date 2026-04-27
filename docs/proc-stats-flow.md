@@ -43,12 +43,15 @@ topology that the master pulls from `gp_segment_configuration` (see
 
 ### 1.2 Per-host fan-out (master → segment-host yagpcc, gRPC)
 
-The master groups the latest `[]SessionPid` by the segment-host that owns
-each `gp_segment_id` and issues one `GetPidProcStat` call per host,
-re-using the `segChan` puller machinery in
-[internal/master/background.go](../internal/master/background.go).
-The new call sits side-by-side with the existing `GetMetricQueries` call
-in `processSegment`.
+As a proposed follow-up wiring step, the master would group the latest
+`[]SessionPid` by the segment-host that owns each `gp_segment_id` and
+issue one `GetPidProcStat` call per host, re-using the existing
+`segChan` puller machinery in
+[internal/master/background.go](../internal/master/background.go)).
+Concretely, this still needs to be implemented in the master background
+processing path: `processSegment` currently calls `GetMetricQueries`, and
+the planned `GetPidProcStat` request/response handling would be added
+alongside that existing RPC as follow-up implementation work.
 
 Request and response messages are already defined:
 
