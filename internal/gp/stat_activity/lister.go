@@ -302,18 +302,18 @@ func gp6SessionsQuery() string {
 func gp6AllSessionsQuery() string {
 	return `
 select
-  pg_catalog.gp_execution_segment() as gp_segment_id,
+  pg_catalog.gp_execution_segment() as GpSegmentId,
   pid,
-  sess_id,
-  '' as backend_type
+  sess_id as SessId,
+  '' as BackendType
 from
   gp_dist_random('pg_stat_activity')
 union all
 select
-  pg_catalog.gp_execution_segment() as gp_segment_id,
+  pg_catalog.gp_execution_segment() as GpSegmentId,
   pid,
-  sess_id,
-  '' as backend_type
+  sess_id as SessId,
+  '' as BackendType
 from
   pg_stat_activity;
 		`
@@ -355,18 +355,18 @@ func cloudberrySessionsQuery() string {
 func cloudberryAllSessionsQuery() string {
 	return `
 select
-  pg_catalog.gp_execution_segment() as gp_segment_id,
+  pg_catalog.gp_execution_segment() as GpSegmentId,
   pid,
-  sess_id,
-  backend_type
+  sess_id as SessId,
+  backend_type as BackendType
 from
   gp_dist_random('pg_stat_activity')
 union all
 select
-  pg_catalog.gp_execution_segment() as gp_segment_id,
+  pg_catalog.gp_execution_segment() as GpSegmentId,
   pid,
-  sess_id,
-  backend_type
+  sess_id as SessId,
+  backend_type as BackendType
 from
   pg_stat_activity;
 		`

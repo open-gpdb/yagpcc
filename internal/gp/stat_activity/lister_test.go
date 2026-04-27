@@ -906,7 +906,7 @@ func TestLister_ListAllSessions_Negative(t *testing.T) {
 
 		actual, err := sut.ListAllSessions(context.Background())
 
-		assert.EqualError(t, err, "error reading sessions: cached value is stale")
+		assert.EqualError(t, err, "error reading all sessions: cached value is stale")
 		assert.Nil(t, actual)
 
 		sut.Stop()
