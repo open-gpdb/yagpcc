@@ -15,6 +15,7 @@
 | [**Service architecture**](docs/service-architecture.md) | Services, roles, interfaces (UDS, TCP, libpq), and data flow. |
 | [Architecture overview](docs/architecture.md) | High-level design and system diagram (with Mermaid). |
 | [API description](docs/API.md) | gRPC API reference (GetGPInfo, ActionService, messages, metrics). |
+| [Per-process resource statistics](docs/proc-stats-flow.md) | Procfs (`GetPidProcStat`) data flow per running query and proposed master-only 5/15/30-minute top-style averages (per-session and cluster-wide rollup). |
 
 ## Building
 
