@@ -403,8 +403,8 @@ func newBackgroundAllSessions(log log, db db, makeOperationLatencyHandler func(s
 		operationStaleRead = "stale_read_sessions"
 
 		defaultCollectionInterval = 60 * time.Second
-		defaultCollectionTimeout  = 120 * time.Second
-		defaultCacheTTL           = 120 * time.Second
+		defaultCollectionTimeout  = 300 * time.Second
+		defaultCacheTTL           = 600 * time.Second
 	)
 
 	return &background[SessionPid]{
