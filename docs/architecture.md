@@ -18,7 +18,7 @@ To get a complete picture, data must be aggregated. That is done by **yagpcc on 
 2. **Master-host yagpcc** periodically pulls from **yagpcc on each Segment host** over gRPC (**GetQueryInfo** / **GetMetricQueries**) and gets up-to-date execution statistics.
 3. **Master-host yagpcc** merges data from Segments with local statistics from the Master, builds aggregates, and keeps them in memory.
 
-The resulting aggregated statistics from Master-host yagpcc can be exposed to users in different ways (see [Real-time statistics](./real-time-stats-flow.md) and [Historical statistics](./historical-stats-flow.md)).
+The resulting aggregated statistics from Master-host yagpcc can be exposed to users in different ways (see [Real-time statistics](./real-time-stats-flow.md), [Historical statistics](./historical-stats-flow.md), and [Per-process resource statistics](./proc-stats-flow.md) for cluster-wide procfs aggregation and 5/15/30-minute top-style averages).
 
 The diagram below shows this flow for a cluster with one Master host and two Segment hosts, each with two Segments. Arrows show the flow of statistics data (which may differ from the actual call direction).
 

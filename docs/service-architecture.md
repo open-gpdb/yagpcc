@@ -74,6 +74,8 @@ Used to discover where to pull segment data from.
 | **RPC** | **GetMetricQueries**: master sends optional filters (query keys, time range); segment returns **GetQueriesInfoResponse** (e.g. `QueryData` with metrics). |
 | **Direction** | Master yagpcc → segment yagpcc (pull). |
 | **Frequency** | Configured by `segment_pull_rate_sec` and `segment_pull_threads` on the master. |
+| **RPC** | **GetPidProcStat**: master sends a `GetPidProcInfoReq` listing `(gp_segment_id, sess_id, pid)` triples discovered via `gp_dist_random('pg_stat_activity')` on the Greenplum master; segment-host yagpcc reads `/proc/<pid>/{stat,status,io,cmdline}` and returns `GetPidProcInfoResponse` containing `GpPidProcInfo` per live process. Stateless on the segment. |
+| **Aggregation** | Master sums deltas across segments per running query (cluster-wide CPU/RSS/IO right now) and feeds 5/15/30-minute EMAs per session and a single cluster-wide rollup. See [Per-process resource statistics](./proc-stats-flow.md). |
 
 Master aggregates this with its own stored data to form a cluster-wide view.
 
@@ -99,9 +101,10 @@ Greenplum (Master + Segments)
                     → [UDS gRPC SetQueryInfo] → local yagpcc (segment or master)
 
 Master-host yagpcc
-    ← [libpq] Greenplum Master (topology)
-    ← [TCP gRPC GetQueryInfo] Segment-host yagpcc instances
-    → [in-memory merge & aggregate]
+    ← [libpq] Greenplum Master (topology + gp_dist_random pg_stat_activity for PIDs)
+    ← [TCP gRPC GetQueryInfo.GetMetricQueries] Segment-host yagpcc instances
+    ← [TCP gRPC GetQueryInfo.GetPidProcStat] Segment-host yagpcc instances (procfs per PID)
+    → [in-memory merge, EMA 5/15/30-min, aggregate]
     → [TCP gRPC GetGPInfo / ActionService] External consumers
 ```
 
@@ -121,4 +124,5 @@ Master-host yagpcc
 
 - [Architecture overview](architecture.md) — High-level diagram and flow (including Mermaid).
 - [API description](API.md) — GetGPInfo and ActionService RPCs, messages, and metrics.
+- [Per-process resource statistics](proc-stats-flow.md) — Procfs (`GetPidProcStat`) data flow and 5/15/30-minute top-style averages.
 - [README](../README.md) — Build, configuration, and run.
