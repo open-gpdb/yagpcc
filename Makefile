@@ -5,7 +5,7 @@ GOFMT_FILES?=$$(find . -name '*.go' | grep -v .git | grep -v parser | grep -v ve
 UNAME_S := $(shell uname -s)
 
 ifeq ($(UNAME_S),Darwin)
-	GOFLAGS := -ldflags=-extldflags=-Wl,-ld_classic
+	GOFLAGS := -ldflags=-extldflags=-Wl
 else
 	GOFLAGS :=
 endif
