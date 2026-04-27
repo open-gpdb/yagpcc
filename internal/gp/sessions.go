@@ -585,6 +585,10 @@ func (s *SessionsStorage) RefreshSessionList(l *zap.SugaredLogger, newList []*Gp
 		sKey := SessionKey{
 			SessID: valN.SessID,
 		}
+		// in cloudberry system background processes all have the same sess_id == -1, so it's better to use -pid as session key
+		if valN.SessID == -1 {
+			sKey.SessID = -valN.Pid
+		}
 		refreshedSessID[sKey] = true
 		s.mx.RLock()
 		valS, okS := s.sessMap[sKey]

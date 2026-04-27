@@ -186,6 +186,73 @@ func TestRefreshSessionList(t *testing.T) {
 	assert.Equal(t, valS.SessionData.GpStatInfo.Pid, 12)
 }
 
+// TestRefreshSessionListNegativeSessID verifies that in cloudberry, where multiple
+// system background processes share sess_id == -1, each backend gets its own
+// session entry keyed by -pid instead of all collapsing onto a single SessID=-1
+// entry (and thrashing through clearDeletedSessions on every refresh).
+func TestRefreshSessionListNegativeSessID(t *testing.T) {
+	file, err := os.Create("trace.log")
+	require.NoError(t, err)
+	zLogger := utils.DualLog(true, file)
+	s := NewSessionsStorage(nil)
+
+	// One real client backend + three cloudberry system processes
+	// all reporting sess_id == -1 but with distinct pids.
+	activityList1 := []*GpStatActivity{
+		{DatID: 1, Datname: "test", Pid: 100, SessID: 42, TmID: 100},
+		{DatID: 1, Datname: "test", Pid: 19702, SessID: -1, TmID: 100}, // background writer
+		{DatID: 1, Datname: "test", Pid: 19703, SessID: -1, TmID: 100}, // walwriter
+		{DatID: 1, Datname: "test", Pid: 19705, SessID: -1, TmID: 100}, // archiver
+	}
+
+	require.NoError(t, s.RefreshSessionList(zLogger, activityList1, true))
+	assert.Equal(t, 4, len(s.sessMap), "every -1 session must get its own -pid key")
+
+	// real session is keyed by sess_id
+	if valS, okS := s.sessMap[SessionKey{SessID: 42}]; assert.True(t, okS) {
+		assert.Equal(t, 100, valS.SessionData.GpStatInfo.Pid)
+	}
+
+	// system processes are keyed by -pid
+	for _, pid := range []int{19702, 19703, 19705} {
+		valS, okS := s.sessMap[SessionKey{SessID: -pid}]
+		if assert.Truef(t, okS, "expected entry for system process pid=%d at key SessID=%d", pid, -pid) {
+			assert.Equal(t, -1, valS.SessionData.GpStatInfo.SessID)
+			assert.Equal(t, pid, valS.SessionData.GpStatInfo.Pid)
+		}
+	}
+	// nothing must be stored under the literal SessID=-1
+	_, okS := s.sessMap[SessionKey{SessID: -1}]
+	assert.False(t, okS, "no entry must collide on the literal SessID=-1 key")
+
+	// A second refresh with the SAME system processes must keep them
+	// (i.e. clearDeletedSessions must not thrash entries because the
+	// refresh-key derivation matches the insert-key derivation).
+	require.NoError(t, s.RefreshSessionList(zLogger, activityList1, true))
+	assert.Equal(t, 4, len(s.sessMap), "stable refresh must not delete and recreate -pid entries")
+
+	// Drop one system process (pid=19703 / walwriter) and verify only that
+	// entry is removed, the other -pid entries are preserved, and the
+	// remaining sessions are still keyed by -pid.
+	activityList2 := []*GpStatActivity{
+		{DatID: 1, Datname: "test", Pid: 100, SessID: 42, TmID: 100},
+		{DatID: 1, Datname: "test", Pid: 19702, SessID: -1, TmID: 100},
+		{DatID: 1, Datname: "test", Pid: 19705, SessID: -1, TmID: 100},
+	}
+
+	require.NoError(t, s.RefreshSessionList(zLogger, activityList2, true))
+	assert.Equal(t, 3, len(s.sessMap))
+
+	_, okS = s.sessMap[SessionKey{SessID: -19703}]
+	assert.False(t, okS, "removed system process must be evicted by clearDeletedSessions")
+	_, okS = s.sessMap[SessionKey{SessID: -19702}]
+	assert.True(t, okS)
+	_, okS = s.sessMap[SessionKey{SessID: -19705}]
+	assert.True(t, okS)
+	_, okS = s.sessMap[SessionKey{SessID: 42}]
+	assert.True(t, okS)
+}
+
 func TestRegisterNewSessionQuery(t *testing.T) {
 	file, err := os.Create("trace.log")
 	require.NoError(t, err)
