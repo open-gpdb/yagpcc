@@ -6,6 +6,7 @@ require (
 	github.com/afritzler/protoequal v0.1.10
 	github.com/gofrs/flock v0.13.0
 	github.com/golang/mock v1.6.0
+	github.com/golang/protobuf v1.5.4
 	github.com/heetch/confita v0.11.0
 	github.com/jackc/pgx/v4 v4.18.3
 	github.com/jmoiron/sqlx v1.4.0
