@@ -139,7 +139,7 @@ func NewLister(log log, db db, opts ...Option) *Lister {
 }
 
 func (l *Lister) SetModernSessionLister(ctx context.Context) error {
-	return l.setCustomSessionLister(ctx, cloudberrySessionsQuery())
+	return l.setCustomSessionLister(ctx, cloudberrySessionsQuery(), cloudberryAllSessionsQuery())
 }
 
 func (l *Lister) SetCloudberrySessionLister(ctx context.Context) error {
@@ -147,7 +147,7 @@ func (l *Lister) SetCloudberrySessionLister(ctx context.Context) error {
 }
 
 func (l *Lister) SetGP6SessionLister(ctx context.Context) error {
-	return l.setCustomSessionLister(ctx, gp6SessionsQuery())
+	return l.setCustomSessionLister(ctx, gp6SessionsQuery(), gp6AllSessionsQuery())
 }
 
 func getMetricsLatencyHandler() *prometheus.HistogramVec {
@@ -185,7 +185,7 @@ func getMetricsLatencyHandler() *prometheus.HistogramVec {
 	return savedMetricsLatencyHandler
 }
 
-func (l *Lister) setCustomSessionLister(ctx context.Context, query string) error {
+func (l *Lister) setCustomSessionLister(ctx context.Context, masterQuery string, allSessionsQuery string) error {
 	needStart := false
 	if l.backgroundCtx != nil {
 		// need stop and start again
@@ -194,7 +194,8 @@ func (l *Lister) setCustomSessionLister(ctx context.Context, query string) error
 
 	}
 	l.mx.Lock()
-	WithCustomBackgroundSessionsQuery(query)(l)
+	WithCustomBackgroundSessionsQuery(masterQuery)(l)
+	WithCustomAllSessionsQuery(allSessionsQuery)(l)
 	l.mx.Unlock()
 
 	if needStart {
@@ -244,6 +245,12 @@ func WithBackgroundAllSessionsCacheTTL(ttl time.Duration) Option {
 func WithCustomBackgroundSessionsQuery(query string) Option {
 	return func(l *Lister) {
 		l.backgroundSessions.query = query
+	}
+}
+
+func WithCustomAllSessionsQuery(query string) Option {
+	return func(l *Lister) {
+		l.allSessions.query = query
 	}
 }
 
