@@ -8,7 +8,7 @@ import (
 	"github.com/open-gpdb/yagpcc/internal/gp"
 )
 
-type statActivityLister interface {
+type statActivityLister interface { //nolint:unused // used by go:generate mockgen
 	Start(ctx context.Context) error
 	Stop()
 	List(ctx context.Context) ([]*gp.GpStatActivity, error)

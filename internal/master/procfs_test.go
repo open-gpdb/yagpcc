@@ -106,7 +106,7 @@ func dialBufconn(t *testing.T, lis *bufconn.Listener) *grpc.ClientConn {
 		grpc.WithTransportCredentials(insecure.NewCredentials()),
 	)
 	require.NoError(t, err)
-	t.Cleanup(func() { conn.Close() })
+	t.Cleanup(func() { _ = conn.Close() })
 	return conn
 }
 
