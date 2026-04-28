@@ -53,7 +53,7 @@ func processProcfsRequests(ctx context.Context, hostname string, portn uint32, g
 	for _, req := range reqs {
 		select {
 		case <-ctx.Done():
-			return nil
+			return ctx.Err()
 		default:
 			msgReq.SegmentProcess = append(msgReq.SegmentProcess, &pb.SegmentProcess{
 				GpSegmentId: int64(req.GpSegmentId),
