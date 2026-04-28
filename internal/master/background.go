@@ -3,7 +3,6 @@ package master
 import (
 	"context"
 	"fmt"
-	"net"
 	"os"
 	"sort"
 	"sync"
@@ -11,8 +10,6 @@ import (
 
 	"golang.org/x/sync/errgroup"
 	"google.golang.org/grpc"
-	"google.golang.org/grpc/connectivity"
-	"google.golang.org/grpc/credentials/insecure"
 
 	pbm "github.com/open-gpdb/yagpcc/api/proto/agent_master"
 	pb "github.com/open-gpdb/yagpcc/api/proto/agent_segment"
@@ -38,65 +35,22 @@ type (
 	segmentMap map[string]*segmentAddr
 
 	BackgroundStorage struct {
-		l              *zap.SugaredLogger
-		SessionStorage *gp.SessionsStorage
-		AggStorage     *storage.AggregatedStorage
-		RQStorage      *storage.RunningQueriesStorage
+		l                  *zap.SugaredLogger
+		SessionStorage     *gp.SessionsStorage
+		AggStorage         *storage.AggregatedStorage
+		RQStorage          *storage.RunningQueriesStorage
+		StatActivityLister statActivityLister
 	}
 )
 
 var (
-	segChan           chan segmentAddr
-	segConnections    map[string]*grpc.ClientConn = make(map[string]*grpc.ClientConn)
-	segConnectionLock sync.Mutex
-	segCount          int
-	segCountLock      sync.Mutex
+	segChan      chan segmentAddr
+	segCount     int
+	segCountLock sync.Mutex
 )
 
 func getSegAddr(hostname string, portn uint32) string {
 	return fmt.Sprintf("%s:%d", hostname, portn)
-}
-
-func getGrpcClientConnection(ctx context.Context, hostname string, portn uint32, segConnectTimeoutSec float64) (*grpc.ClientConn, error) {
-	var err error
-	segConnectionLock.Lock()
-	defer segConnectionLock.Unlock()
-	conn, ok := segConnections[hostname]
-	if ok {
-		if conn.GetState() == connectivity.Ready {
-			return conn, nil
-		}
-	}
-	connectTimeout := time.Second * time.Duration(segConnectTimeoutSec)
-	if portn > 0 {
-		conn, err = grpc.NewClient(
-			getSegAddr(hostname, portn),
-			grpc.WithTransportCredentials(insecure.NewCredentials()),
-			grpc.WithConnectParams(grpc.ConnectParams{
-				MinConnectTimeout: connectTimeout,
-			}),
-		)
-		if err != nil {
-			return nil, err
-		}
-	} else {
-		conn, err = grpc.NewClient(
-			hostname,
-			grpc.WithTransportCredentials(insecure.NewCredentials()),
-			grpc.WithContextDialer(func(ctx context.Context, addr string) (net.Conn, error) {
-				var d net.Dialer
-				return d.DialContext(ctx, "unix", addr)
-			}),
-			grpc.WithConnectParams(grpc.ConnectParams{
-				MinConnectTimeout: connectTimeout,
-			}),
-		)
-		if err != nil {
-			return nil, err
-		}
-	}
-	segConnections[hostname] = conn
-	return conn, nil
 }
 
 func (bs *BackgroundStorage) SendSegmentRefreshMessages(ctx context.Context, pullRateSec float64, configCacheDurability time.Duration, portn uint32, customSegmentList *config.SegmentList) error {
@@ -358,10 +312,9 @@ func queryCompleted(qKey *storage.QueryKey, qVal *storage.RunningQuery, segmentG
 
 func (bs *BackgroundStorage) TryRefreshSessionsFromGP(
 	ctx context.Context,
-	statActivityLister statActivityLister,
 	clearDeletedSessions bool,
 ) error {
-	newSesList, err := statActivityLister.List(ctx)
+	newSesList, err := bs.StatActivityLister.List(ctx)
 	if err != nil {
 		return fmt.Errorf("error getting sessions: %w", err)
 	}
@@ -458,10 +411,7 @@ func (bs *BackgroundStorage) ClearCompletedQueries(ctx context.Context,
 	return nil
 }
 
-func (bs *BackgroundStorage) RefreshSessions(ctx context.Context,
-	statActivityLister statActivityLister,
-	sessionRefreshInterval time.Duration,
-	clearDeletedSessions bool) error {
+func (bs *BackgroundStorage) RefreshSessions(ctx context.Context, sessionRefreshInterval time.Duration, clearDeletedSessions bool) error {
 	for {
 		currTime := time.Now()
 		nextTime := currTime.Truncate(sessionRefreshInterval).Add(sessionRefreshInterval)
@@ -471,7 +421,7 @@ func (bs *BackgroundStorage) RefreshSessions(ctx context.Context,
 			return fmt.Errorf("done context with %v", ctx.Err())
 		default:
 			bs.l.Info("Refresh session List")
-			err := bs.TryRefreshSessionsFromGP(ctx, statActivityLister, clearDeletedSessions)
+			err := bs.TryRefreshSessionsFromGP(ctx, clearDeletedSessions)
 			if err != nil {
 				bs.l.Errorf("fail to refresh session list %v", err)
 				return err
@@ -528,12 +478,13 @@ func InitConnection(ctx context.Context, l *zap.SugaredLogger, cfg *config.Confi
 	return nil
 }
 
-func NewBackgroundStorage(l *zap.SugaredLogger, sessionStorage *gp.SessionsStorage, rqStorage *storage.RunningQueriesStorage, aggStorage *storage.AggregatedStorage) *BackgroundStorage {
+func NewBackgroundStorage(l *zap.SugaredLogger, sessionStorage *gp.SessionsStorage, rqStorage *storage.RunningQueriesStorage, aggStorage *storage.AggregatedStorage, sActivityLister statActivityLister) *BackgroundStorage {
 	return &BackgroundStorage{
-		l:              l,
-		SessionStorage: sessionStorage,
-		AggStorage:     aggStorage,
-		RQStorage:      rqStorage,
+		l:                  l,
+		SessionStorage:     sessionStorage,
+		AggStorage:         aggStorage,
+		RQStorage:          rqStorage,
+		StatActivityLister: sActivityLister,
 	}
 }
 
@@ -541,7 +492,6 @@ func InitBG(
 	ctx context.Context,
 	l *zap.SugaredLogger,
 	masterSentinel masterSentinel,
-	statActivityLister statActivityLister,
 	cfg *config.Config,
 	backgroundStorage *BackgroundStorage,
 ) error {
@@ -568,7 +518,7 @@ func InitBG(
 		return nil
 	})
 
-	if err = statActivityLister.Start(ctx); err != nil {
+	if err = backgroundStorage.StatActivityLister.Start(ctx); err != nil {
 		return fmt.Errorf("error starting stat activity lister")
 	}
 
@@ -602,7 +552,7 @@ func InitBG(
 	},
 	)
 	errG.Go(func() error {
-		err := backgroundStorage.RefreshSessions(ctxI, statActivityLister, cfg.SessionRefreshInterval, cfg.ClearDeletedSessions)
+		err := backgroundStorage.RefreshSessions(ctxI, cfg.SessionRefreshInterval, cfg.ClearDeletedSessions)
 		l.Errorf("got %v refresh session and queries", err)
 		return err
 	},
@@ -615,7 +565,7 @@ func InitBG(
 	)
 	err = errG.Wait()
 	if err != nil {
-		statActivityLister.Stop()
+		backgroundStorage.StatActivityLister.Stop()
 		l.Errorf("Fail in background precesses - done work with %v", err)
 		return err
 	}

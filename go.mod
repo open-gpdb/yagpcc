@@ -4,6 +4,7 @@ go 1.25.5
 
 require (
 	github.com/afritzler/protoequal v0.1.10
+	github.com/alitto/pond v1.9.2
 	github.com/gofrs/flock v0.13.0
 	github.com/golang/mock v1.6.0
 	github.com/golang/protobuf v1.5.4

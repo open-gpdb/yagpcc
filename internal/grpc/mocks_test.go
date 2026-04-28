@@ -10,6 +10,7 @@ import (
 
 	gomock "github.com/golang/mock/gomock"
 	gp "github.com/open-gpdb/yagpcc/internal/gp"
+	"github.com/open-gpdb/yagpcc/internal/gp/stat_activity"
 )
 
 // MockStatActivityLister is a mock of statActivityLister interface
@@ -74,4 +75,19 @@ func (m *MockStatActivityLister) List(ctx context.Context) ([]*gp.GpStatActivity
 func (mr *MockStatActivityListerMockRecorder) List(ctx interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "List", reflect.TypeOf((*MockStatActivityLister)(nil).List), ctx)
+}
+
+// ListAllSessions mocks base method
+func (m *MockStatActivityLister) ListAllSessions(ctx context.Context) ([]stat_activity.SessionPid, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "ListAllSessions", ctx)
+	ret0, _ := ret[0].([]stat_activity.SessionPid)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// ListAllSessions indicates an expected call of ListAllSessions
+func (mr *MockStatActivityListerMockRecorder) ListAllSessions(ctx interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListAllSessions", reflect.TypeOf((*MockStatActivityLister)(nil).ListAllSessions), ctx)
 }
