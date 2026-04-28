@@ -2,6 +2,7 @@ package master
 
 import (
 	"context"
+	"fmt"
 	"time"
 
 	"google.golang.org/grpc"
@@ -16,7 +17,6 @@ import (
 
 const (
 	JobsPerQuery = 100
-	maxMsgSize   = 4 * 1024 * 1024
 )
 
 type (
@@ -42,7 +42,7 @@ func getJobsMap(sessions []stat_activity.SessionPid) hostJobMap {
 	return hostJobMap
 }
 
-func processProcfsRequests(ctx context.Context, hostname string, portn uint32, gatherTimeout time.Duration, reqs []stat_activity.SessionPid) error {
+func processProcfsRequests(ctx context.Context, hostname string, portn uint32, gatherTimeout time.Duration, maxMsgSize int, reqs []stat_activity.SessionPid) error {
 	grpcConn, err := getGrpcClientConnection(ctx, hostname, portn, gatherTimeout.Seconds())
 	if err != nil {
 		return err
@@ -73,7 +73,10 @@ func processProcfsRequests(ctx context.Context, hostname string, portn uint32, g
 	return nil
 }
 
-func (bs *BackgroundStorage) GatherProcfsStat(ctx context.Context, nPullers int, portn uint32, gatherTimeout time.Duration) error {
+func (bs *BackgroundStorage) GatherProcfsStat(ctx context.Context, nPullers int, portn uint32, gatherTimeout time.Duration, maxMsgSize int) error {
+	if nPullers <= 0 {
+		return fmt.Errorf("nPullers must be greater than 0, got %d", nPullers)
+	}
 	bs.l.Debug("GatherProcfsStat")
 	sessions, err := bs.StatActivityLister.ListAllSessions(ctx)
 	if err != nil {
@@ -90,33 +93,25 @@ func (bs *BackgroundStorage) GatherProcfsStat(ctx context.Context, nPullers int,
 	group, ctxG := pool.GroupContext(ctxT)
 
 	for hostname, processes := range hostJobMap {
-		jobHostname := hostname
-		jobProcesses := make([]stat_activity.SessionPid, 0)
-		for _, process := range processes {
 		host := hostname
-		jobProcesses := make([]stat_activity.SessionPid, 0)
+		jobProcesses := make([]stat_activity.SessionPid, 0, JobsPerQuery)
 		for _, process := range processes {
 			jobProcesses = append(jobProcesses, process)
-			if len(jobProcesses) > JobsPerQuery {
-				batch := append([]stat_activity.SessionPid(nil), jobProcesses...)
+			if len(jobProcesses) == JobsPerQuery {
+				batch := jobProcesses
 				group.Submit(func() error {
-					err := processProcfsRequests(ctxG, host, portn, gatherTimeout, batch)
-					return err
-				},
-				)
-				jobProcesses = make([]stat_activity.SessionPid, 0)
+					return processProcfsRequests(ctxG, host, portn, gatherTimeout, maxMsgSize, batch)
+				})
+				jobProcesses = make([]stat_activity.SessionPid, 0, JobsPerQuery)
 			}
 		}
 		if len(jobProcesses) > 0 {
-			batch := append([]stat_activity.SessionPid(nil), jobProcesses...)
+			batch := jobProcesses
 			group.Submit(func() error {
-				err := processProcfsRequests(ctxG, host, portn, gatherTimeout, batch)
-				return err
-			},
-			)
+				return processProcfsRequests(ctxG, host, portn, gatherTimeout, maxMsgSize, batch)
+			})
 		}
 	}
 
-	err = group.Wait()
-	return err
+	return group.Wait()
 }

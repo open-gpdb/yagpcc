@@ -79,9 +79,9 @@ func (s *failingProcStatServer) GetMetricQueries(context.Context, *pb.GetQueries
 	return &pb.GetQueriesInfoResponse{}, nil
 }
 
-// setupBufconnServer starts a gRPC server on a bufconn listener and returns
-// the listener. The caller must register services on the returned server before
-// calling this, or pass a pre-configured server.
+// setupBufconnServer creates a gRPC server on a bufconn listener, registers
+// the provided GetQueryInfo service implementation, starts serving, and
+// returns the listener.
 func setupBufconnServer(t *testing.T, srv pb.GetQueryInfoServer) *bufconn.Listener {
 	t.Helper()
 	lis := bufconn.Listen(1024 * 1024)
@@ -201,7 +201,7 @@ func TestProcessProcfsRequests_Success(t *testing.T) {
 	}
 
 	ctx := context.Background()
-	err := processProcfsRequests(ctx, hostname, 0, 5*time.Second, reqs)
+	err := processProcfsRequests(ctx, hostname, 0, 5*time.Second, 4*1024*1024, reqs)
 	require.NoError(t, err)
 	called, lastReq := fakeSrv.snapshot()
 	assert.True(t, called, "expected GetPidProcStat to be called")
@@ -240,7 +240,7 @@ func TestProcessProcfsRequests_GrpcError(t *testing.T) {
 	}
 
 	ctx := context.Background()
-	err := processProcfsRequests(ctx, hostname, 0, 5*time.Second, reqs)
+	err := processProcfsRequests(ctx, hostname, 0, 5*time.Second, 4*1024*1024, reqs)
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "simulated gRPC error")
 }
@@ -269,7 +269,7 @@ func TestProcessProcfsRequests_CancelledContext(t *testing.T) {
 
 	// With a cancelled context, processProcfsRequests should skip building
 	// the request body (due to select on ctx.Done()) and return nil.
-	err := processProcfsRequests(ctx, hostname, 0, 5*time.Second, reqs)
+	err := processProcfsRequests(ctx, hostname, 0, 5*time.Second, 4*1024*1024, reqs)
 	// The function returns nil when context is cancelled during request building,
 	// but may return an error from the gRPC call if the request was already built.
 	// Either outcome is acceptable with a cancelled context.
@@ -294,7 +294,7 @@ func TestProcessProcfsRequests_EmptyRequests(t *testing.T) {
 	})
 
 	ctx := context.Background()
-	err := processProcfsRequests(ctx, hostname, 0, 5*time.Second, nil)
+	err := processProcfsRequests(ctx, hostname, 0, 5*time.Second, 4*1024*1024, nil)
 	require.NoError(t, err)
 	called, lastReq := fakeSrv.snapshot()
 	assert.True(t, called, "GetPidProcStat should still be called with empty segment list")
@@ -314,7 +314,7 @@ func TestGatherProcfsStat_ListAllSessionsError(t *testing.T) {
 		StatActivityLister: mock,
 	}
 
-	err := bs.GatherProcfsStat(context.Background(), 2, 50051, 5*time.Second)
+	err := bs.GatherProcfsStat(context.Background(), 2, 50051, 5*time.Second, 4*1024*1024)
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "db connection failed")
 	assert.True(t, mock.listCalled)
@@ -329,7 +329,7 @@ func TestGatherProcfsStat_EmptySessions(t *testing.T) {
 		StatActivityLister: mock,
 	}
 
-	err := bs.GatherProcfsStat(context.Background(), 2, 50051, 5*time.Second)
+	err := bs.GatherProcfsStat(context.Background(), 2, 50051, 5*time.Second, 4*1024*1024)
 	require.NoError(t, err)
 	assert.True(t, mock.listCalled)
 }
@@ -366,7 +366,7 @@ func TestGatherProcfsStat_WithSessions(t *testing.T) {
 		StatActivityLister: mock,
 	}
 
-	err := bs.GatherProcfsStat(context.Background(), 2, 0, 5*time.Second)
+	err := bs.GatherProcfsStat(context.Background(), 2, 0, 5*time.Second, 4*1024*1024)
 	require.NoError(t, err)
 	assert.True(t, mock.listCalled)
 }
@@ -387,7 +387,7 @@ func TestGatherProcfsStat_ContextCancelled(t *testing.T) {
 
 	// With a cancelled context, the timeout context creation will produce
 	// an already-done context, so the pool tasks should handle it gracefully.
-	err := bs.GatherProcfsStat(ctx, 2, 50051, 5*time.Second)
+	err := bs.GatherProcfsStat(ctx, 2, 50051, 5*time.Second, 4*1024*1024)
 	// The error may be nil (if tasks detect cancellation early) or non-nil
 	// (if the gRPC call fails due to cancelled context). Both are acceptable.
 	_ = err
@@ -421,7 +421,7 @@ func TestGatherProcfsStat_GrpcFailure(t *testing.T) {
 		StatActivityLister: mock,
 	}
 
-	err := bs.GatherProcfsStat(context.Background(), 2, 0, 5*time.Second)
+	err := bs.GatherProcfsStat(context.Background(), 2, 0, 5*time.Second, 4*1024*1024)
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "simulated gRPC error")
 }
@@ -463,7 +463,7 @@ func TestGatherProcfsStat_ManySessionsBatching(t *testing.T) {
 		StatActivityLister: mock,
 	}
 
-	err := bs.GatherProcfsStat(context.Background(), 4, 0, 10*time.Second)
+	err := bs.GatherProcfsStat(context.Background(), 4, 0, 10*time.Second, 4*1024*1024)
 	require.NoError(t, err)
 	assert.True(t, mock.listCalled)
 	// The fake server should have been called (at least once for the batches)
@@ -477,5 +477,19 @@ func TestGatherProcfsStat_ManySessionsBatching(t *testing.T) {
 
 func TestConstants(t *testing.T) {
 	assert.Equal(t, 100, JobsPerQuery)
-	assert.Equal(t, 4*1024*1024, maxMsgSize)
+}
+
+func TestGatherProcfsStat_InvalidNPullers(t *testing.T) {
+	mock := &mockStatActivityLister{}
+	bs := &BackgroundStorage{
+		l:                  newTestLogger(),
+		StatActivityLister: mock,
+	}
+
+	for _, n := range []int{0, -1, -100} {
+		err := bs.GatherProcfsStat(context.Background(), n, 50051, 5*time.Second, 4*1024*1024)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "nPullers must be greater than 0")
+		assert.False(t, mock.listCalled, "ListAllSessions should not be called for invalid nPullers")
+	}
 }
