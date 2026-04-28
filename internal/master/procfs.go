@@ -93,23 +93,28 @@ func (bs *BackgroundStorage) GatherProcfsStat(ctx context.Context, nPullers int,
 		jobHostname := hostname
 		jobProcesses := make([]stat_activity.SessionPid, 0)
 		for _, process := range processes {
+		host := hostname
+		jobProcesses := make([]stat_activity.SessionPid, 0)
+		for _, process := range processes {
 			jobProcesses = append(jobProcesses, process)
 			if len(jobProcesses) > JobsPerQuery {
 				batch := append([]stat_activity.SessionPid(nil), jobProcesses...)
 				group.Submit(func() error {
-					err := processProcfsRequests(ctxG, jobHostname, portn, gatherTimeout, batch)
+					err := processProcfsRequests(ctxG, host, portn, gatherTimeout, batch)
 					return err
 				},
 				)
 				jobProcesses = make([]stat_activity.SessionPid, 0)
 			}
 		}
-		batch := append([]stat_activity.SessionPid(nil), jobProcesses...)
-		group.Submit(func() error {
-			err := processProcfsRequests(ctxG, jobHostname, portn, gatherTimeout, batch)
-			return err
-		},
-		)
+		if len(jobProcesses) > 0 {
+			batch := append([]stat_activity.SessionPid(nil), jobProcesses...)
+			group.Submit(func() error {
+				err := processProcfsRequests(ctxG, host, portn, gatherTimeout, batch)
+				return err
+			},
+			)
+		}
 	}
 
 	err = group.Wait()
