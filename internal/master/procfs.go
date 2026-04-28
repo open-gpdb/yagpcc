@@ -97,8 +97,8 @@ func (bs *BackgroundStorage) GatherProcfsStat(ctx context.Context, nPullers int,
 		jobProcesses := make([]stat_activity.SessionPid, 0, JobsPerQuery)
 		for _, process := range processes {
 			jobProcesses = append(jobProcesses, process)
-			if len(jobProcesses) == JobsPerQuery {
-				batch := jobProcesses
+			if len(jobProcesses) >= JobsPerQuery {
+				batch := append([]stat_activity.SessionPid(nil), jobProcesses...)
 				group.Submit(func() error {
 					return processProcfsRequests(ctxG, host, portn, gatherTimeout, maxMsgSize, batch)
 				})
@@ -106,7 +106,7 @@ func (bs *BackgroundStorage) GatherProcfsStat(ctx context.Context, nPullers int,
 			}
 		}
 		if len(jobProcesses) > 0 {
-			batch := jobProcesses
+			batch := append([]stat_activity.SessionPid(nil), jobProcesses...)
 			group.Submit(func() error {
 				return processProcfsRequests(ctxG, host, portn, gatherTimeout, maxMsgSize, batch)
 			})
