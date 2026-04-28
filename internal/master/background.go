@@ -518,8 +518,11 @@ func InitBG(
 		return nil
 	})
 
+	if backgroundStorage.StatActivityLister == nil {
+		return fmt.Errorf("stat activity lister is nil")
+	}
 	if err = backgroundStorage.StatActivityLister.Start(ctx); err != nil {
-		return fmt.Errorf("error starting stat activity lister")
+		return fmt.Errorf("error starting stat activity lister: %w", err)
 	}
 
 	errG.Go(func() error {
