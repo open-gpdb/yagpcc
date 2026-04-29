@@ -52,7 +52,7 @@ func (s *GetQueryInfoServer) GetPidProcStat(ctx context.Context, in *pb.GetPidPr
 	}
 
 	if metrics.YagpccMetrics != nil {
-		metrics.YagpccMetrics.HandleLatencies.With(map[string]string{"method": "GetMetricQueries"}).Observe(time.Since(start).Seconds())
+		metrics.YagpccMetrics.HandleLatencies.With(map[string]string{"method": "GpPidProcInfo"}).Observe(time.Since(start).Seconds())
 	}
 
 	if nErrors > 0 && len(pidResponse.PidProcData) == 0 {
