@@ -23,7 +23,7 @@ type GetQueryInfoServer struct {
 	RQStorage      *storage.RunningQueriesStorage
 }
 
-func (s *GetQueryInfoServer) GpPidProcInfo(ctx context.Context, in *pb.GetPidProcInfoReq) (*pb.GetPidProcInfoResponse, error) {
+func (s *GetQueryInfoServer) GetPidProcStat(ctx context.Context, in *pb.GetPidProcInfoReq) (*pb.GetPidProcInfoResponse, error) {
 	s.Logger.Debugf("got get pid info request %v", in)
 	start := time.Now()
 

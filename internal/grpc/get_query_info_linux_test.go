@@ -15,7 +15,7 @@ func TestGpPidProcInfo_CurrentProcess(t *testing.T) {
 	server := newTestGetQueryInfoServer(t)
 	pid := int64(os.Getpid())
 
-	resp, err := server.GpPidProcInfo(context.Background(), &pb.GetPidProcInfoReq{
+	resp, err := server.GetPidProcStat(context.Background(), &pb.GetPidProcInfoReq{
 		SegmentProcess: []*pb.SegmentProcess{
 			{GpSegmentId: 7, SessId: 42, Pid: pid},
 		},
@@ -46,7 +46,7 @@ func TestGpPidProcInfo_MixExistingAndNonExistentPids(t *testing.T) {
 	server := newTestGetQueryInfoServer(t)
 	pid := int64(os.Getpid())
 
-	resp, err := server.GpPidProcInfo(context.Background(), &pb.GetPidProcInfoReq{
+	resp, err := server.GetPidProcStat(context.Background(), &pb.GetPidProcInfoReq{
 		SegmentProcess: []*pb.SegmentProcess{
 			{GpSegmentId: 0, SessId: 10, Pid: 4194305000000}, // non-existent
 			{GpSegmentId: 1, SessId: 20, Pid: pid},           // current process

@@ -343,7 +343,7 @@ func newTestGetQueryInfoServer(t *testing.T) *grpc.GetQueryInfoServer {
 func TestGpPidProcInfo_NilRequest(t *testing.T) {
 	server := newTestGetQueryInfoServer(t)
 
-	resp, err := server.GpPidProcInfo(context.Background(), nil)
+	resp, err := server.GetPidProcStat(context.Background(), nil)
 
 	require.NoError(t, err)
 	require.NotNil(t, resp)
@@ -353,7 +353,7 @@ func TestGpPidProcInfo_NilRequest(t *testing.T) {
 func TestGpPidProcInfo_EmptySegmentProcess(t *testing.T) {
 	server := newTestGetQueryInfoServer(t)
 
-	resp, err := server.GpPidProcInfo(context.Background(), &pb.GetPidProcInfoReq{
+	resp, err := server.GetPidProcStat(context.Background(), &pb.GetPidProcInfoReq{
 		SegmentProcess: []*pb.SegmentProcess{},
 	})
 
@@ -365,7 +365,7 @@ func TestGpPidProcInfo_EmptySegmentProcess(t *testing.T) {
 func TestGpPidProcInfo_NilSegmentProcess(t *testing.T) {
 	server := newTestGetQueryInfoServer(t)
 
-	resp, err := server.GpPidProcInfo(context.Background(), &pb.GetPidProcInfoReq{
+	resp, err := server.GetPidProcStat(context.Background(), &pb.GetPidProcInfoReq{
 		SegmentProcess: nil,
 	})
 
@@ -378,7 +378,7 @@ func TestGpPidProcInfo_NonExistentPids(t *testing.T) {
 	server := newTestGetQueryInfoServer(t)
 
 	// PIDs that are guaranteed not to exist.
-	resp, err := server.GpPidProcInfo(context.Background(), &pb.GetPidProcInfoReq{
+	resp, err := server.GetPidProcStat(context.Background(), &pb.GetPidProcInfoReq{
 		SegmentProcess: []*pb.SegmentProcess{
 			{GpSegmentId: 1, SessId: 10, Pid: 4194305000000},
 			{GpSegmentId: 2, SessId: 20, Pid: 4194305000001},
@@ -396,7 +396,7 @@ func TestGpPidProcInfo_MultipleSegmentProcesses(t *testing.T) {
 	server := newTestGetQueryInfoServer(t)
 
 	// Multiple non-existent PIDs — all should be skipped.
-	resp, err := server.GpPidProcInfo(context.Background(), &pb.GetPidProcInfoReq{
+	resp, err := server.GetPidProcStat(context.Background(), &pb.GetPidProcInfoReq{
 		SegmentProcess: []*pb.SegmentProcess{
 			{GpSegmentId: 0, SessId: 100, Pid: 4194305000000},
 			{GpSegmentId: 1, SessId: 200, Pid: 4194305000001},
