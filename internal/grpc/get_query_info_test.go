@@ -331,8 +331,11 @@ func TestDeleteCompleted(t *testing.T) {
 // newTestGetQueryInfoServer creates a GetQueryInfoServer with a logger suitable for tests.
 func newTestGetQueryInfoServer(t *testing.T) *grpc.GetQueryInfoServer {
 	t.Helper()
-	file, err := os.Create("trace.log")
+	file, err := os.CreateTemp(t.TempDir(), "trace-*.log")
 	require.NoError(t, err)
+	t.Cleanup(func() {
+		_ = file.Close()
+	})
 	zLogger := utils.DualLog(true, file)
 	return &grpc.GetQueryInfoServer{
 		Logger:         zLogger,
