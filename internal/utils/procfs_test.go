@@ -2,6 +2,9 @@ package utils
 
 import (
 	"errors"
+	"fmt"
+	"os"
+	"syscall"
 	"testing"
 
 	"github.com/prometheus/procfs"
@@ -15,11 +18,11 @@ func TestIsProcessGone(t *testing.T) {
 	})
 
 	t.Run("no such process", func(t *testing.T) {
-		assert.True(t, isProcessGone(errors.New("open /proc/999999/stat: no such process")))
+		assert.True(t, isProcessGone(fmt.Errorf("open /proc/999999/stat: %w", syscall.ESRCH)))
 	})
 
 	t.Run("no such file or directory", func(t *testing.T) {
-		assert.True(t, isProcessGone(errors.New("open /proc/999999/stat: no such file or directory")))
+		assert.True(t, isProcessGone(fmt.Errorf("open /proc/999999/stat: %w", os.ErrNotExist)))
 	})
 
 	t.Run("other error", func(t *testing.T) {
@@ -85,7 +88,7 @@ func TestConvertProcStat(t *testing.T) {
 	assert.Equal(t, int32(0), result.Nice)
 	assert.Equal(t, int32(4), result.NumThreads)
 	assert.Equal(t, int64(123456789), result.Starttime)
-	assert.Equal(t, int32(1048576), result.Vsize)
+	assert.Equal(t, int64(1048576), result.Vsize)
 	assert.Equal(t, int32(256), result.Rss)
 	assert.Equal(t, int64(-1), result.RssLimit)
 	assert.Equal(t, int32(3), result.Processor)

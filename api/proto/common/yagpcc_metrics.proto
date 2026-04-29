@@ -652,7 +652,7 @@ message ProcStat {
     int64 starttime = 21;
 
     // Virtual memory size in bytes.
-    int32 vsize = 22;
+    int64 vsize = 22;
 
     // Resident set size in pages.
     int32 rss = 23;

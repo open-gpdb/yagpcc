@@ -1641,7 +1641,7 @@ type ProcStat struct {
 	// in clock ticks.
 	Starttime int64 `protobuf:"varint,21,opt,name=starttime,proto3" json:"starttime,omitempty"`
 	// Virtual memory size in bytes.
-	Vsize int32 `protobuf:"varint,22,opt,name=vsize,proto3" json:"vsize,omitempty"`
+	Vsize int64 `protobuf:"varint,22,opt,name=vsize,proto3" json:"vsize,omitempty"`
 	// Resident set size in pages.
 	Rss int32 `protobuf:"varint,23,opt,name=rss,proto3" json:"rss,omitempty"`
 	// Soft limit in bytes on the rss of the process.
@@ -1847,7 +1847,7 @@ func (x *ProcStat) GetStarttime() int64 {
 	return 0
 }
 
-func (x *ProcStat) GetVsize() int32 {
+func (x *ProcStat) GetVsize() int64 {
 	if x != nil {
 		return x.Vsize
 	}
@@ -2696,7 +2696,7 @@ const file_api_proto_common_yagpcc_metrics_proto_rawDesc = "" +
 	"\vnum_threads\x18\x14 \x01(\x05R\n" +
 	"numThreads\x12\x1c\n" +
 	"\tstarttime\x18\x15 \x01(\x03R\tstarttime\x12\x14\n" +
-	"\x05vsize\x18\x16 \x01(\x05R\x05vsize\x12\x10\n" +
+	"\x05vsize\x18\x16 \x01(\x03R\x05vsize\x12\x10\n" +
 	"\x03rss\x18\x17 \x01(\x05R\x03rss\x12\x1b\n" +
 	"\trss_limit\x18\x18 \x01(\x03R\brssLimit\x12\x1d\n" +
 	"\n" +

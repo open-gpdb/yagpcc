@@ -1,7 +1,10 @@
 package utils
 
 import (
+	"errors"
+	"os"
 	"strings"
+	"syscall"
 
 	"github.com/prometheus/procfs"
 
@@ -94,14 +97,9 @@ func GetPidProcInfo(pid int, gpSegmentID, sessID int64) (*pb.GpPidProcInfo, erro
 }
 
 // isProcessGone returns true when the error indicates the target PID
-// no longer exists (ENOENT / ESRCH or the procfs "not found" wrapper).
+// no longer exists (ENOENT / ESRCH or errors wrapping them).
 func isProcessGone(err error) bool {
-	if err == nil {
-		return false
-	}
-	msg := err.Error()
-	return strings.Contains(msg, "no such process") ||
-		strings.Contains(msg, "no such file or directory")
+	return errors.Is(err, os.ErrNotExist) || errors.Is(err, syscall.ESRCH)
 }
 
 // convertProcStat maps prometheus/procfs.ProcStat → protobuf ProcStat.
@@ -128,7 +126,7 @@ func convertProcStat(s *procfs.ProcStat) *pb.ProcStat {
 		Nice:                int32(s.Nice),
 		NumThreads:          int32(s.NumThreads),
 		Starttime:           int64(s.Starttime),
-		Vsize:               int32(s.VSize),
+		Vsize:               int64(s.VSize),
 		Rss:                 int32(s.RSS),
 		RssLimit:            int64(s.RSSLimit),
 		Processor:           int32(s.Processor),
