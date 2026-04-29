@@ -49,10 +49,6 @@ var (
 	segCountLock sync.Mutex
 )
 
-func getSegAddr(hostname string, portn uint32) string {
-	return fmt.Sprintf("%s:%d", hostname, portn)
-}
-
 func (bs *BackgroundStorage) SendSegmentRefreshMessages(ctx context.Context, pullRateSec float64, configCacheDurability time.Duration, portn uint32, customSegmentList *config.SegmentList) error {
 
 	durationBetweenLoop := time.Second * time.Duration(pullRateSec)

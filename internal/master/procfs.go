@@ -5,50 +5,54 @@ import (
 	"fmt"
 	"time"
 
+	"golang.org/x/sync/errgroup"
+
 	"google.golang.org/grpc"
 
 	"github.com/open-gpdb/yagpcc/internal/gp/stat_activity"
 	"github.com/open-gpdb/yagpcc/internal/storage"
 
-	"github.com/alitto/pond"
-
 	pb "github.com/open-gpdb/yagpcc/api/proto/agent_segment"
 )
 
 const (
-	JobsPerQuery = 100
+	jobsPerQuery = 1000
 )
 
 type (
 	hostJobMap = map[string][]stat_activity.SessionPid
 )
 
-func getJobsMap(sessions []stat_activity.SessionPid) hostJobMap {
-	hostJobMap := make(hostJobMap)
+func (bs *BackgroundStorage) getJobsMap(sessions []stat_activity.SessionPid) hostJobMap {
+	hostJobs := make(hostJobMap)
 	// make work for each host
 	for _, process := range sessions {
 		segHost := storage.GetHostnameForSegindex(int32(process.GpSegmentId))
-		jobList, ok := hostJobMap[segHost]
+		jobList, ok := hostJobs[segHost]
 		if !ok {
-			jobList = make([]stat_activity.SessionPid, 0)
+			jobList = make([]stat_activity.SessionPid, 0, 10)
 		}
 		jobList = append(jobList, stat_activity.SessionPid{
 			GpSegmentId: process.GpSegmentId,
 			Pid:         process.Pid,
 			SessId:      process.SessId,
 		})
-		hostJobMap[segHost] = jobList
+		hostJobs[segHost] = jobList
 	}
-	return hostJobMap
+	return hostJobs
 }
 
-func processProcfsRequests(ctx context.Context, hostname string, portn uint32, gatherTimeout time.Duration, maxMsgSize int, reqs []stat_activity.SessionPid) error {
+func (bs *BackgroundStorage) processProcfsRequests(ctx context.Context, hostname string, portn uint32, gatherTimeout time.Duration, maxMsgSize int, reqs []stat_activity.SessionPid) error {
 	grpcConn, err := getGrpcClientConnection(ctx, hostname, portn, gatherTimeout.Seconds())
 	if err != nil {
-		return err
+		return fmt.Errorf("grpc client connection error: %v", err)
 	}
+	cGet := pb.NewGetQueryInfoClient(grpcConn)
+	ctxTimeout, ctxCancel := context.WithTimeout(ctx, gatherTimeout)
+	defer ctxCancel()
+	maxSizeOption := grpc.MaxCallRecvMsgSize(maxMsgSize)
 	msgReq := &pb.GetPidProcInfoReq{
-		SegmentProcess: make([]*pb.SegmentProcess, 0),
+		SegmentProcess: make([]*pb.SegmentProcess, 0, 10),
 	}
 	for _, req := range reqs {
 		select {
@@ -60,15 +64,21 @@ func processProcfsRequests(ctx context.Context, hostname string, portn uint32, g
 				Pid:         int64(req.Pid),
 				SessId:      int64(req.SessId),
 			})
+			if len(msgReq.SegmentProcess) >= jobsPerQuery {
+				_, errGet := cGet.GetPidProcStat(ctxTimeout, msgReq, maxSizeOption)
+				if errGet != nil {
+					return fmt.Errorf("grpc get pid proc stat error: %v", errGet)
+				}
+				msgReq.SegmentProcess = make([]*pb.SegmentProcess, 0, 10)
+			}
 		}
 	}
-	cGet := pb.NewGetQueryInfoClient(grpcConn)
-	ctxTimeout, ctxCancel := context.WithTimeout(ctx, gatherTimeout)
-	defer ctxCancel()
-	maxSizeOption := grpc.MaxCallRecvMsgSize(maxMsgSize)
-	_, errGet := cGet.GetPidProcStat(ctxTimeout, msgReq, maxSizeOption)
-	if errGet != nil {
-		return errGet
+	if len(msgReq.SegmentProcess) > 0 {
+		_, errGet := cGet.GetPidProcStat(ctxTimeout, msgReq, maxSizeOption)
+		if errGet != nil {
+			return fmt.Errorf("grpc get pid proc stat error: %v", errGet)
+		}
+
 	}
 	return nil
 }
@@ -80,38 +90,20 @@ func (bs *BackgroundStorage) GatherProcfsStat(ctx context.Context, nPullers int,
 	bs.l.Debug("GatherProcfsStat")
 	sessions, err := bs.statActivityLister.ListAllSessions(ctx)
 	if err != nil {
-		return err
+		return fmt.Errorf("error listing sessions pids: %v", err)
 	}
-	hostJobMap := getJobsMap(sessions)
-
-	pool := pond.New(nPullers, nPullers*2)
-	defer pool.StopAndWait()
+	hostJobs := bs.getJobsMap(sessions)
 
 	ctxT, ctxTC := context.WithTimeout(ctx, gatherTimeout)
 	defer ctxTC()
 
-	group, ctxG := pool.GroupContext(ctxT)
+	g, ctxG := errgroup.WithContext(ctxT)
 
-	for hostname, processes := range hostJobMap {
-		host := hostname
-		jobProcesses := make([]stat_activity.SessionPid, 0, JobsPerQuery)
-		for _, process := range processes {
-			jobProcesses = append(jobProcesses, process)
-			if len(jobProcesses) >= JobsPerQuery {
-				batch := append([]stat_activity.SessionPid(nil), jobProcesses...)
-				group.Submit(func() error {
-					return processProcfsRequests(ctxG, host, portn, gatherTimeout, maxMsgSize, batch)
-				})
-				jobProcesses = make([]stat_activity.SessionPid, 0, JobsPerQuery)
-			}
-		}
-		if len(jobProcesses) > 0 {
-			batch := append([]stat_activity.SessionPid(nil), jobProcesses...)
-			group.Submit(func() error {
-				return processProcfsRequests(ctxG, host, portn, gatherTimeout, maxMsgSize, batch)
-			})
-		}
+	for hostname, procfsProcesses := range hostJobs {
+		g.Go(func() error {
+			return bs.processProcfsRequests(ctxG, hostname, portn, gatherTimeout, maxMsgSize, procfsProcesses)
+		})
 	}
 
-	return group.Wait()
+	return g.Wait()
 }

@@ -3,6 +3,7 @@ package master
 import (
 	"context"
 	"net"
+	"strconv"
 	"sync"
 	"time"
 
@@ -12,7 +13,7 @@ import (
 )
 
 var (
-	segConnections    map[string]*grpc.ClientConn = make(map[string]*grpc.ClientConn)
+	segConnections    = make(map[string]*grpc.ClientConn)
 	segConnectionLock sync.Mutex
 )
 
@@ -29,15 +30,12 @@ func getGrpcClientConnection(ctx context.Context, hostname string, portn uint32,
 	connectTimeout := time.Second * time.Duration(segConnectTimeoutSec)
 	if portn > 0 {
 		conn, err = grpc.NewClient(
-			getSegAddr(hostname, portn),
+			net.JoinHostPort(hostname, strconv.FormatUint(uint64(portn), 10)),
 			grpc.WithTransportCredentials(insecure.NewCredentials()),
 			grpc.WithConnectParams(grpc.ConnectParams{
 				MinConnectTimeout: connectTimeout,
 			}),
 		)
-		if err != nil {
-			return nil, err
-		}
 	} else {
 		conn, err = grpc.NewClient(
 			hostname,
@@ -50,9 +48,9 @@ func getGrpcClientConnection(ctx context.Context, hostname string, portn uint32,
 				MinConnectTimeout: connectTimeout,
 			}),
 		)
-		if err != nil {
-			return nil, err
-		}
+	}
+	if err != nil {
+		return nil, err
 	}
 	segConnections[hostname] = conn
 	return conn, nil

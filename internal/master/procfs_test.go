@@ -122,11 +122,12 @@ func newTestLogger() *zap.SugaredLogger {
 // ============================================================
 
 func TestGetJobsMap_EmptyInput(t *testing.T) {
-	result := getJobsMap(nil)
+	bs := &BackgroundStorage{l: newTestLogger()}
+	result := bs.getJobsMap(nil)
 	assert.NotNil(t, result)
 	assert.Empty(t, result)
 
-	result2 := getJobsMap([]stat_activity.SessionPid{})
+	result2 := bs.getJobsMap([]stat_activity.SessionPid{})
 	assert.NotNil(t, result2)
 	assert.Empty(t, result2)
 }
@@ -139,7 +140,8 @@ func TestGetJobsMap_SingleHost(t *testing.T) {
 		{GpSegmentId: 10, Pid: 200, SessId: 2},
 	}
 
-	result := getJobsMap(sessions)
+	bs := &BackgroundStorage{l: newTestLogger()}
+	result := bs.getJobsMap(sessions)
 
 	// The map should contain an entry for "host-a"
 	_, exists := result["host-a"]
@@ -156,7 +158,8 @@ func TestGetJobsMap_MultipleHosts(t *testing.T) {
 		{GpSegmentId: 20, Pid: 300, SessId: 3},
 	}
 
-	result := getJobsMap(sessions)
+	bs := &BackgroundStorage{l: newTestLogger()}
+	result := bs.getJobsMap(sessions)
 
 	// Should have entries for both hosts
 	assert.Contains(t, result, "host-b")
@@ -170,7 +173,8 @@ func TestGetJobsMap_UnknownSegindex(t *testing.T) {
 		{GpSegmentId: 9999, Pid: 100, SessId: 1},
 	}
 
-	result := getJobsMap(sessions)
+	bs := &BackgroundStorage{l: newTestLogger()}
+	result := bs.getJobsMap(sessions)
 	_, exists := result["9999"]
 	assert.True(t, exists, "expected key '9999' for unknown segindex")
 }
@@ -200,8 +204,9 @@ func TestProcessProcfsRequests_Success(t *testing.T) {
 		{GpSegmentId: 2, Pid: 200, SessId: 20},
 	}
 
+	bs := &BackgroundStorage{l: newTestLogger()}
 	ctx := context.Background()
-	err := processProcfsRequests(ctx, hostname, 0, 5*time.Second, 4*1024*1024, reqs)
+	err := bs.processProcfsRequests(ctx, hostname, 0, 5*time.Second, 4*1024*1024, reqs)
 	require.NoError(t, err)
 	called, lastReq := fakeSrv.snapshot()
 	assert.True(t, called, "expected GetPidProcStat to be called")
@@ -239,8 +244,9 @@ func TestProcessProcfsRequests_GrpcError(t *testing.T) {
 		{GpSegmentId: 1, Pid: 100, SessId: 10},
 	}
 
+	bs := &BackgroundStorage{l: newTestLogger()}
 	ctx := context.Background()
-	err := processProcfsRequests(ctx, hostname, 0, 5*time.Second, 4*1024*1024, reqs)
+	err := bs.processProcfsRequests(ctx, hostname, 0, 5*time.Second, 4*1024*1024, reqs)
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "simulated gRPC error")
 }
@@ -269,7 +275,8 @@ func TestProcessProcfsRequests_CancelledContext(t *testing.T) {
 
 	// With a cancelled context, processProcfsRequests should skip building
 	// the request body (due to select on ctx.Done()) and return nil.
-	err := processProcfsRequests(ctx, hostname, 0, 5*time.Second, 4*1024*1024, reqs)
+	bs := &BackgroundStorage{l: newTestLogger()}
+	err := bs.processProcfsRequests(ctx, hostname, 0, 5*time.Second, 4*1024*1024, reqs)
 	// The function returns nil when context is cancelled during request building,
 	// but may return an error from the gRPC call if the request was already built.
 	// Either outcome is acceptable with a cancelled context.
@@ -293,12 +300,12 @@ func TestProcessProcfsRequests_EmptyRequests(t *testing.T) {
 		segConnectionLock.Unlock()
 	})
 
+	bs := &BackgroundStorage{l: newTestLogger()}
 	ctx := context.Background()
-	err := processProcfsRequests(ctx, hostname, 0, 5*time.Second, 4*1024*1024, nil)
+	err := bs.processProcfsRequests(ctx, hostname, 0, 5*time.Second, 4*1024*1024, nil)
 	require.NoError(t, err)
-	called, lastReq := fakeSrv.snapshot()
-	assert.True(t, called, "GetPidProcStat should still be called with empty segment list")
-	assert.Empty(t, lastReq.SegmentProcess)
+	called, _ := fakeSrv.snapshot()
+	assert.False(t, called, "GetPidProcStat should not be called with empty segment list")
 }
 
 // ============================================================
@@ -446,8 +453,8 @@ func TestGatherProcfsStat_ManySessionsBatching(t *testing.T) {
 	})
 
 	// Create JobsPerQuery + 5 sessions to trigger at least 2 batches
-	sessions := make([]stat_activity.SessionPid, 0, JobsPerQuery+5)
-	for i := 0; i < JobsPerQuery+5; i++ {
+	sessions := make([]stat_activity.SessionPid, 0, jobsPerQuery+5)
+	for i := 0; i < jobsPerQuery+5; i++ {
 		sessions = append(sessions, stat_activity.SessionPid{
 			GpSegmentId: 60,
 			Pid:         100 + i,
@@ -476,7 +483,7 @@ func TestGatherProcfsStat_ManySessionsBatching(t *testing.T) {
 // ============================================================
 
 func TestConstants(t *testing.T) {
-	assert.Equal(t, 100, JobsPerQuery)
+	assert.Equal(t, 1000, jobsPerQuery)
 }
 
 func TestGatherProcfsStat_InvalidNPullers(t *testing.T) {
