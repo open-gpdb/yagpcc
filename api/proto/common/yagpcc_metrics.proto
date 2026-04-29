@@ -655,7 +655,7 @@ message ProcStat {
     int64 vsize = 22;
 
     // Resident set size in pages.
-    int32 rss = 23;
+    int64 rss = 23;
 
     // Soft limit in bytes on the rss of the process.
     int64 rss_limit = 24;

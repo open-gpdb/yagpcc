@@ -89,7 +89,7 @@ func TestConvertProcStat(t *testing.T) {
 	assert.Equal(t, int32(4), result.NumThreads)
 	assert.Equal(t, int64(123456789), result.Starttime)
 	assert.Equal(t, int64(1048576), result.Vsize)
-	assert.Equal(t, int32(256), result.Rss)
+	assert.Equal(t, int64(256), result.Rss)
 	assert.Equal(t, int64(-1), result.RssLimit)
 	assert.Equal(t, int32(3), result.Processor)
 	assert.Equal(t, int32(0), result.RtPriority)

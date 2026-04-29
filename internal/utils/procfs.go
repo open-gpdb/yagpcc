@@ -127,7 +127,7 @@ func convertProcStat(s *procfs.ProcStat) *pb.ProcStat {
 		NumThreads:          int32(s.NumThreads),
 		Starttime:           int64(s.Starttime),
 		Vsize:               int64(s.VSize),
-		Rss:                 int32(s.RSS),
+		Rss:                 int64(s.RSS),
 		RssLimit:            int64(s.RSSLimit),
 		Processor:           int32(s.Processor),
 		RtPriority:          int32(s.RTPriority),
