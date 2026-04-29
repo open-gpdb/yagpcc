@@ -23,6 +23,46 @@ type GetQueryInfoServer struct {
 	RQStorage      *storage.RunningQueriesStorage
 }
 
+func (s *GetQueryInfoServer) GpPidProcInfo(ctx context.Context, in *pb.GetPidProcInfoReq) (*pb.GetPidProcInfoResponse, error) {
+	s.Logger.Debugf("got get pid info request %v", in)
+	start := time.Now()
+
+	pidResponse := &pb.GetPidProcInfoResponse{}
+	nErrors := 0
+	lastError := error(nil)
+
+	if in != nil && in.SegmentProcess != nil {
+		for _, segProcess := range in.SegmentProcess {
+			pidStat, err := utils.GetPidProcInfo(int(segProcess.Pid), segProcess.GpSegmentId, segProcess.SessId)
+			if err != nil {
+				s.Logger.Debugf("got error while getting pid info %v for %v", err, segProcess)
+				nErrors++
+				lastError = err
+				continue
+			}
+			if pidStat != nil {
+
+				pidResponse.PidProcData = append(pidResponse.PidProcData, pidStat)
+			}
+		}
+	}
+
+	if lastError != nil {
+		s.Logger.Infof("got %v errors in pid request, the last error is %v", nErrors, lastError)
+	}
+
+	if metrics.YagpccMetrics != nil {
+		metrics.YagpccMetrics.HandleLatencies.With(map[string]string{"method": "GetMetricQueries"}).Observe(time.Since(start).Seconds())
+	}
+
+	if nErrors > 0 && len(pidResponse.PidProcData) == 0 {
+		// something got totally wrong
+		return nil, lastError
+	}
+
+	return pidResponse, nil
+}
+
 func (s *GetQueryInfoServer) GetMetricQueries(ctx context.Context, in *pb.GetQueriesInfoReq) (*pb.GetQueriesInfoResponse, error) {
 	s.Logger.Debugf("got get data request %v", in)
 	start := time.Now()

@@ -829,9 +829,10 @@ message GpPidProcInfo {
 
     // actual data
     string cmdline         = 4;
-    ProcStat proc_stat     = 5;
-    ProcStatus proc_status = 6;
-    ProcIO proc_io         = 7;
+    string state           = 5;
+    ProcStat proc_stat     = 6;
+    ProcStatus proc_status = 7;
+    ProcIO proc_io         = 8;
 }
 
 message AggregatedMetrics {
