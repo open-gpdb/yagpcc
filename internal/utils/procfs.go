@@ -2,6 +2,7 @@ package utils
 
 import (
 	"errors"
+	"math"
 	"os"
 	"strings"
 	"syscall"
@@ -56,8 +57,13 @@ func ParseCmdLineSessionStatus(cmdline string) string {
 //
 // If the process does not exist (or disappears mid-read) the function
 // returns (nil, nil) so the caller can simply skip vanished PIDs.
-func GetPidProcInfo(pid int, gpSegmentID, sessID int64) (*pb.GpPidProcInfo, error) {
-	proc, err := procfs.NewProc(pid)
+func GetPidProcInfo(pid int64, gpSegmentID, sessID int64) (*pb.GpPidProcInfo, error) {
+	// Validate that the PID fits in the platform-native int required by procfs.
+	// Out-of-range values cannot correspond to a real process; treat as gone.
+	if pid < 0 || pid > math.MaxInt {
+		return nil, nil
+	}
+	proc, err := procfs.NewProc(int(pid))
 	if err != nil {
 		if isProcessGone(err) {
 			return nil, nil
@@ -68,7 +74,7 @@ func GetPidProcInfo(pid int, gpSegmentID, sessID int64) (*pb.GpPidProcInfo, erro
 	info := &pb.GpPidProcInfo{
 		GpSegmentId: gpSegmentID,
 		SessId:      sessID,
-		Pid:         int64(pid),
+		Pid:         pid,
 	}
 
 	// /proc/<pid>/cmdline

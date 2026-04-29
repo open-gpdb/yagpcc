@@ -9,7 +9,7 @@ import (
 )
 
 func TestGetPidProcInfo_CurrentProcess(t *testing.T) {
-	pid := os.Getpid()
+	pid := int64(os.Getpid())
 	info, err := GetPidProcInfo(pid, 7, 42)
 
 	require.NoError(t, err)
@@ -17,7 +17,7 @@ func TestGetPidProcInfo_CurrentProcess(t *testing.T) {
 
 	assert.Equal(t, int64(7), info.GpSegmentId)
 	assert.Equal(t, int64(42), info.SessId)
-	assert.Equal(t, int64(pid), info.Pid)
+	assert.Equal(t, pid, info.Pid)
 	assert.NotEmpty(t, info.Cmdline)
 
 	require.NotNil(t, info.ProcStat)
