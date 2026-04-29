@@ -78,7 +78,7 @@ func (bs *BackgroundStorage) GatherProcfsStat(ctx context.Context, nPullers int,
 		return fmt.Errorf("nPullers must be greater than 0, got %d", nPullers)
 	}
 	bs.l.Debug("GatherProcfsStat")
-	sessions, err := bs.StatActivityLister.ListAllSessions(ctx)
+	sessions, err := bs.statActivityLister.ListAllSessions(ctx)
 	if err != nil {
 		return err
 	}

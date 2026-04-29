@@ -39,7 +39,7 @@ type (
 		SessionStorage     *gp.SessionsStorage
 		AggStorage         *storage.AggregatedStorage
 		RQStorage          *storage.RunningQueriesStorage
-		StatActivityLister statActivityLister
+		statActivityLister statActivityLister
 	}
 )
 
@@ -314,7 +314,7 @@ func (bs *BackgroundStorage) TryRefreshSessionsFromGP(
 	ctx context.Context,
 	clearDeletedSessions bool,
 ) error {
-	newSesList, err := bs.StatActivityLister.List(ctx)
+	newSesList, err := bs.statActivityLister.List(ctx)
 	if err != nil {
 		return fmt.Errorf("error getting sessions: %w", err)
 	}
@@ -484,7 +484,7 @@ func NewBackgroundStorage(l *zap.SugaredLogger, sessionStorage *gp.SessionsStora
 		SessionStorage:     sessionStorage,
 		AggStorage:         aggStorage,
 		RQStorage:          rqStorage,
-		StatActivityLister: sActivityLister,
+		statActivityLister: sActivityLister,
 	}
 }
 
@@ -518,10 +518,10 @@ func InitBG(
 		return nil
 	})
 
-	if backgroundStorage.StatActivityLister == nil {
+	if backgroundStorage.statActivityLister == nil {
 		return fmt.Errorf("stat activity lister is nil")
 	}
-	if err = backgroundStorage.StatActivityLister.Start(ctx); err != nil {
+	if err = backgroundStorage.statActivityLister.Start(ctx); err != nil {
 		return fmt.Errorf("error starting stat activity lister: %w", err)
 	}
 
@@ -568,7 +568,7 @@ func InitBG(
 	)
 	err = errG.Wait()
 	if err != nil {
-		backgroundStorage.StatActivityLister.Stop()
+		backgroundStorage.statActivityLister.Stop()
 		l.Errorf("Fail in background precesses - done work with %v", err)
 		return err
 	}

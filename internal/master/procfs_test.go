@@ -311,7 +311,7 @@ func TestGatherProcfsStat_ListAllSessionsError(t *testing.T) {
 	}
 	bs := &BackgroundStorage{
 		l:                  newTestLogger(),
-		StatActivityLister: mock,
+		statActivityLister: mock,
 	}
 
 	err := bs.GatherProcfsStat(context.Background(), 2, 50051, 5*time.Second, 4*1024*1024)
@@ -326,7 +326,7 @@ func TestGatherProcfsStat_EmptySessions(t *testing.T) {
 	}
 	bs := &BackgroundStorage{
 		l:                  newTestLogger(),
-		StatActivityLister: mock,
+		statActivityLister: mock,
 	}
 
 	err := bs.GatherProcfsStat(context.Background(), 2, 50051, 5*time.Second, 4*1024*1024)
@@ -363,7 +363,7 @@ func TestGatherProcfsStat_WithSessions(t *testing.T) {
 	}
 	bs := &BackgroundStorage{
 		l:                  newTestLogger(),
-		StatActivityLister: mock,
+		statActivityLister: mock,
 	}
 
 	err := bs.GatherProcfsStat(context.Background(), 2, 0, 5*time.Second, 4*1024*1024)
@@ -379,7 +379,7 @@ func TestGatherProcfsStat_ContextCancelled(t *testing.T) {
 	}
 	bs := &BackgroundStorage{
 		l:                  newTestLogger(),
-		StatActivityLister: mock,
+		statActivityLister: mock,
 	}
 
 	ctx, cancel := context.WithCancel(context.Background())
@@ -418,7 +418,7 @@ func TestGatherProcfsStat_GrpcFailure(t *testing.T) {
 	}
 	bs := &BackgroundStorage{
 		l:                  newTestLogger(),
-		StatActivityLister: mock,
+		statActivityLister: mock,
 	}
 
 	err := bs.GatherProcfsStat(context.Background(), 2, 0, 5*time.Second, 4*1024*1024)
@@ -460,7 +460,7 @@ func TestGatherProcfsStat_ManySessionsBatching(t *testing.T) {
 	}
 	bs := &BackgroundStorage{
 		l:                  newTestLogger(),
-		StatActivityLister: mock,
+		statActivityLister: mock,
 	}
 
 	err := bs.GatherProcfsStat(context.Background(), 4, 0, 10*time.Second, 4*1024*1024)
@@ -483,7 +483,7 @@ func TestGatherProcfsStat_InvalidNPullers(t *testing.T) {
 	mock := &mockStatActivityLister{}
 	bs := &BackgroundStorage{
 		l:                  newTestLogger(),
-		StatActivityLister: mock,
+		statActivityLister: mock,
 	}
 
 	for _, n := range []int{0, -1, -100} {
