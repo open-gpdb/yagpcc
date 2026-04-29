@@ -283,3 +283,21 @@ func TestGetPidProcInfo_NonExistentPid(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Nil(t, info)
 }
+
+func TestGetPidProcInfo_OutOfRangePid(t *testing.T) {
+	// Negative and zero PIDs cannot correspond to real processes; expect (nil, nil).
+	tests := []struct {
+		name string
+		pid  int64
+	}{
+		{"negative", -1},
+		{"zero", 0},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			info, err := GetPidProcInfo(tt.pid, 1, 100)
+			assert.NoError(t, err)
+			assert.Nil(t, info)
+		})
+	}
+}
