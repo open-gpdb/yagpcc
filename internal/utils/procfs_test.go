@@ -300,15 +300,15 @@ func TestParseCmdLineSessionStatus(t *testing.T) {
 }
 
 func TestGetPidProcInfo_NonExistentPid(t *testing.T) {
-	// PID 0 is the kernel scheduler and cannot be read via procfs.NewProc
-	// on most systems; a very large PID is guaranteed not to exist.
+	// A very large PID is guaranteed not to exist.
 	info, err := GetPidProcInfo(4194305000000, 1, 100)
-	assert.NoError(t, err)
+	assert.ErrorIs(t, err, ErrProcessNotFound)
 	assert.Nil(t, info)
 }
 
 func TestGetPidProcInfo_OutOfRangePid(t *testing.T) {
-	// Negative and zero PIDs cannot correspond to real processes; expect (nil, nil).
+	// Negative and zero PIDs cannot correspond to real processes;
+	// expect ErrProcessNotFound.
 	tests := []struct {
 		name string
 		pid  int64
@@ -319,7 +319,7 @@ func TestGetPidProcInfo_OutOfRangePid(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			info, err := GetPidProcInfo(tt.pid, 1, 100)
-			assert.NoError(t, err)
+			assert.ErrorIs(t, err, ErrProcessNotFound)
 			assert.Nil(t, info)
 		})
 	}

@@ -2,6 +2,7 @@ package utils
 
 import (
 	"errors"
+	"fmt"
 	"math"
 	"os"
 	"strings"
@@ -11,6 +12,12 @@ import (
 
 	pb "github.com/open-gpdb/yagpcc/api/proto/common"
 )
+
+// ErrProcessNotFound is returned by GetPidProcInfo when the target PID does
+// not exist, has already exited, or falls outside the valid PID range.
+// Callers should check for this error with errors.Is and handle it
+// accordingly (e.g. skip the PID, log at debug level, increment a counter).
+var ErrProcessNotFound = errors.New("process not found")
 
 // ParseCmdLineSessionStatus extracts the session status from a
 // PostgreSQL/Greenplum backend process cmdline string (as seen in `ps` output
@@ -49,28 +56,29 @@ func ParseCmdLineSessionStatus(cmdline string) string {
 	return status
 }
 
-// GetPidProcInfo reads /proc/<pid>/{stat,status,cmdline} via procfs and
+// GetPidProcInfo reads /proc/<pid>/{stat,status,cmdline,io} via procfs and
 // returns a populated GpPidProcInfo protobuf message.
 // gpSegmentID and sessID are pass-through identifiers written into the
 // returned message so the caller can correlate the result with a
 // Greenplum backend.
 //
 // If the process does not exist (or disappears mid-read) the function
-// returns (nil, nil) so the caller can simply skip vanished PIDs.
+// returns an error wrapping ErrProcessNotFound. Callers should use
+// errors.Is(err, ErrProcessNotFound) to distinguish vanished PIDs from
+// unexpected failures.
 func GetPidProcInfo(pid int64, gpSegmentID, sessID int64) (*pb.GpPidProcInfo, error) {
 	// Guard against int64 values that cannot be represented as a platform-native
 	// int (required by procfs.NewProc). On 32-bit systems int is 32 bits wide, so
 	// an int64 PID larger than math.MaxInt would overflow on conversion. PIDs
 	// outside the valid range (1 … math.MaxInt) cannot correspond to a real OS
-	// process, so treat them as non-existent rather than returning a confusing
-	// error.
+	// process.
 	if pid <= 0 || pid > math.MaxInt {
-		return nil, nil
+		return nil, fmt.Errorf("pid %d out of valid range: %w", pid, ErrProcessNotFound)
 	}
 	proc, err := procfs.NewProc(int(pid))
 	if err != nil {
 		if isProcessGone(err) {
-			return nil, nil
+			return nil, fmt.Errorf("pid %d: %w", pid, ErrProcessNotFound)
 		}
 		return nil, err
 	}

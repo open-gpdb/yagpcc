@@ -2,6 +2,7 @@ package grpc
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"time"
 
@@ -35,15 +36,16 @@ func (s *GetQueryInfoServer) GetPidProcStat(ctx context.Context, in *pb.GetPidPr
 		for _, segProcess := range in.SegmentProcess {
 			pidStat, err := utils.GetPidProcInfo(segProcess.Pid, segProcess.GpSegmentId, segProcess.SessId)
 			if err != nil {
+				if errors.Is(err, utils.ErrProcessNotFound) {
+					s.Logger.Debugf("pid %d not found: %v", segProcess.Pid, err)
+					continue
+				}
 				s.Logger.Debugf("got error while getting pid info %v for %v", err, segProcess)
 				nErrors++
 				lastError = err
 				continue
 			}
-			if pidStat != nil {
-
-				pidResponse.PidProcData = append(pidResponse.PidProcData, pidStat)
-			}
+			pidResponse.PidProcData = append(pidResponse.PidProcData, pidStat)
 		}
 	}
 

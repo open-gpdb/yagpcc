@@ -388,7 +388,7 @@ func TestGpPidProcInfo_NonExistentPids(t *testing.T) {
 		},
 	})
 
-	// Non-existent PIDs return (nil, nil) from GetPidProcInfo and are
+	// Non-existent PIDs return ErrProcessNotFound from GetPidProcInfo and are
 	// skipped (not appended), so the response should be empty.
 	require.NoError(t, err)
 	require.NotNil(t, resp)
