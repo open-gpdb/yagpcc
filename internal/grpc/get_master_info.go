@@ -24,20 +24,18 @@ import (
 
 type GetMasterInfoServer struct {
 	pbm.UnimplementedGetGPInfoServer
-	clusterID          string
-	logger             *zap.SugaredLogger
-	statActivityLister statActivityLister
-	maxMessageSize     int
-	backgroundStorage  *master.BackgroundStorage
+	clusterID         string
+	logger            *zap.SugaredLogger
+	maxMessageSize    int
+	backgroundStorage *master.BackgroundStorage
 }
 
-func NewGetMasterInfoServer(clusterID string, logger *zap.SugaredLogger, statActivityLister statActivityLister, maxMessageSize int, backgroundStorage *master.BackgroundStorage) *GetMasterInfoServer {
+func NewGetMasterInfoServer(clusterID string, logger *zap.SugaredLogger, maxMessageSize int, backgroundStorage *master.BackgroundStorage) *GetMasterInfoServer {
 	return &GetMasterInfoServer{
-		clusterID:          clusterID,
-		logger:             logger,
-		statActivityLister: statActivityLister,
-		maxMessageSize:     maxMessageSize,
-		backgroundStorage:  backgroundStorage,
+		clusterID:         clusterID,
+		logger:            logger,
+		maxMessageSize:    maxMessageSize,
+		backgroundStorage: backgroundStorage,
 	}
 }
 
@@ -2557,7 +2555,7 @@ func (s *GetMasterInfoServer) GetGPSessions(ctx context.Context, in *pbm.GetGPSe
 		queryType = pbm.RunningQueryType_RQT_TOP
 	}
 	// refresh list of sessions
-	err := s.backgroundStorage.TryRefreshSessionsFromGP(ctx, s.statActivityLister, true)
+	err := s.backgroundStorage.TryRefreshSessionsFromGP(ctx, true)
 	if err != nil {
 		s.logger.Errorf("error while refreshing session list: %v", err)
 	}

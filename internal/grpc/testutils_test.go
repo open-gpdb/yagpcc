@@ -8,8 +8,8 @@ import (
 	"sort"
 	"testing"
 
-	"github.com/golang/mock/gomock"
 	"github.com/stretchr/testify/require"
+	"go.uber.org/mock/gomock"
 	gogrpc "google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/grpc/test/bufconn"
@@ -65,7 +65,7 @@ func assertQueriesInfoResponseEqual(t *testing.T, expected *pb.GetQueriesInfoRes
 	return utils.AssertProtoMessagesEqual(t, normalize(expected), normalize(actual))
 }
 
-func setupGRPCDialer(t *testing.T, sessionMocker *MockStatActivityLister, backgroundStorage *master.BackgroundStorage) func(context.Context, string) (net.Conn, error) {
+func setupGRPCDialer(t *testing.T, backgroundStorage *master.BackgroundStorage) func(context.Context, string) (net.Conn, error) {
 
 	cfg, err := config.DefaultConfig()
 	require.NoError(t, err, "error getting default config")
@@ -88,7 +88,7 @@ func setupGRPCDialer(t *testing.T, sessionMocker *MockStatActivityLister, backgr
 	pb.RegisterSetQueryInfoServer(server, &grpc.SetQueryInfoServer{Logger: zLogger, UpdateSessionMetrics: true, RQStorage: backgroundStorage.RQStorage, SessionsStorage: backgroundStorage.SessionStorage})
 	pb.RegisterGetQueryInfoServer(server, &grpc.GetQueryInfoServer{Logger: zLogger, MaxMessageSize: 100 * 1024 * 1024, RQStorage: backgroundStorage.RQStorage})
 	pb.RegisterAgentControlServer(server, &grpc.AgentControlServer{Logger: zLogger, RQStorage: backgroundStorage.RQStorage})
-	pbm.RegisterGetGPInfoServer(server, grpc.NewGetMasterInfoServer("test", zLogger, sessionMocker, 100*1024*1024, backgroundStorage))
+	pbm.RegisterGetGPInfoServer(server, grpc.NewGetMasterInfoServer("test", zLogger, 100*1024*1024, backgroundStorage))
 
 	go func() {
 		if err := server.Serve(listener); err != nil {
@@ -129,6 +129,7 @@ func setupGRPCClientSet(t *testing.T, sessionMocker *MockStatActivityLister) (*g
 		ctrl := gomock.NewController(t)
 		sessionMocker = NewMockStatActivityLister(ctrl)
 		sessionMocker.EXPECT().List(gomock.Any()).AnyTimes()
+		sessionMocker.EXPECT().ListAllSessions(gomock.Any()).AnyTimes()
 	}
 
 	file, err := os.Create("trace.log")
@@ -137,11 +138,11 @@ func setupGRPCClientSet(t *testing.T, sessionMocker *MockStatActivityLister) (*g
 	rqStorage := storage.NewRunningQueriesStorage()
 	sessStorage := gp.NewSessionsStorage(rqStorage)
 	aggStorage := storage.NewAggregatedStorage(zLogger)
-	backgroundStorage := master.NewBackgroundStorage(zLogger, sessStorage, rqStorage, aggStorage)
+	backgroundStorage := master.NewBackgroundStorage(zLogger, sessStorage, rqStorage, aggStorage, sessionMocker)
 
 	conn, err := gogrpc.NewClient(
 		"localhost",
-		gogrpc.WithContextDialer(setupGRPCDialer(t, sessionMocker, backgroundStorage)),
+		gogrpc.WithContextDialer(setupGRPCDialer(t, backgroundStorage)),
 		gogrpc.WithTransportCredentials(insecure.NewCredentials()),
 	)
 

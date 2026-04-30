@@ -265,7 +265,7 @@ func NewApp(
 		pb.RegisterGetQueryInfoServer(s, &grpc.GetQueryInfoServer{Logger: baseApp.L(), MaxMessageSize: int(config.MaxOuterMessageSize), RQStorage: backgroundStorage.RQStorage})
 		pb.RegisterAgentControlServer(s, &grpc.AgentControlServer{Logger: baseApp.L(), RQStorage: backgroundStorage.RQStorage})
 
-		getMasterInfo := grpc.NewGetMasterInfoServer(config.ClusterID, baseApp.L(), statActivityLister, int(config.MaxOuterMessageSize), backgroundStorage)
+		getMasterInfo := grpc.NewGetMasterInfoServer(config.ClusterID, baseApp.L(), int(config.MaxOuterMessageSize), backgroundStorage)
 		actionInfo := &grpc.ActionsServer{ClusterID: config.ClusterID, Logger: baseApp.L(), Timeout: 5 * time.Minute, BackgroundStorage: backgroundStorage}
 
 		pbm.RegisterGetGPInfoServer(s, getMasterInfo)
@@ -382,12 +382,12 @@ func Run(ctx context.Context, configFile string) error {
 	metrics.YagpccMetrics.ExecutingQueryLatencies.AssignQueryGetter(rqStorage.GetQueriesStartTime)
 	aggStorage := storage.NewConfiguredAggregatedStorage(logger, cfg)
 	sessionsStorage := gp.NewSessionsStorage(rqStorage)
-	backgroundStorage := master.NewBackgroundStorage(logger, sessionsStorage, rqStorage, aggStorage)
 
 	masterConnection := gp.NewConnection(baseApp.L(), &cfg.MasterConnection, nil)
 
 	masterSentinel := master_sentinel.NewSentinel(baseApp.L(), masterConnection)
 	statActivityLister := stat_activity.NewLister(baseApp.L(), masterConnection)
+	backgroundStorage := master.NewBackgroundStorage(logger, sessionsStorage, rqStorage, aggStorage, statActivityLister)
 
 	agentApp, err := NewApp(baseApp, cfg, statActivityLister, backgroundStorage)
 	if err != nil {
@@ -515,7 +515,7 @@ func Run(ctx context.Context, configFile string) error {
 			logger.Infof("Starting master background tasks")
 			ctxC, ctxF := context.WithCancel(ctx)
 			defer ctxF()
-			err = master.InitBG(ctxC, logger, masterSentinel, statActivityLister, cfg, backgroundStorage)
+			err = master.InitBG(ctxC, logger, masterSentinel, cfg, backgroundStorage)
 			if err != nil {
 				logger.Fatal(err.Error())
 				return err

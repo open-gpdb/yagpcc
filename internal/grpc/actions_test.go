@@ -23,7 +23,7 @@ func newTestActionsServer(t *testing.T) *ActionsServer {
 	rq := storage.NewRunningQueriesStorage()
 	sessStorage := gp.NewSessionsStorage(rq)
 	agg := storage.NewAggregatedStorage(z)
-	bg := master.NewBackgroundStorage(z, sessStorage, rq, agg)
+	bg := master.NewBackgroundStorage(z, sessStorage, rq, agg, nil)
 	return &ActionsServer{
 		Logger:            z,
 		Timeout:           5 * time.Second,

@@ -30,7 +30,7 @@ func TestParallelSetGet(t *testing.T) {
 	rqStorage := storage.NewRunningQueriesStorage()
 	aggStorage := storage.NewAggregatedStorage(zLogger)
 	sessStorage := gp.NewSessionsStorage(rqStorage)
-	backgroundStorage := master.NewBackgroundStorage(zLogger, sessStorage, rqStorage, aggStorage)
+	backgroundStorage := master.NewBackgroundStorage(zLogger, sessStorage, rqStorage, aggStorage, nil)
 
 	tests := []struct {
 		name      string
@@ -48,7 +48,7 @@ func TestParallelSetGet(t *testing.T) {
 		{name: "test Get Queries", isSet: false, paramName: "ALL", ssid: 1, value: 1, cnt: 80, sleep: 0.01},
 		{name: "test Get Query1", isSet: false, paramName: "QUERY", ssid: 1, value: 1, cnt: 10000, sleep: 0},
 	}
-	dial := setupGRPCDialer(t, nil, backgroundStorage)
+	dial := setupGRPCDialer(t, backgroundStorage)
 
 	ctx := context.Background()
 	connectTimeout := 5 * time.Second
