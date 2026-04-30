@@ -75,6 +75,14 @@ func GetPidProcInfo(pid int64, gpSegmentID, sessID int64) (*pb.GpPidProcInfo, er
 		return nil, err
 	}
 
+	return getProcInfo(proc, pid, gpSegmentID, sessID)
+}
+
+// getProcInfo reads /proc/<pid>/{stat,status,cmdline,io} from the given
+// procfs.Proc handle and returns a populated GpPidProcInfo protobuf message.
+// It is separated from GetPidProcInfo to allow testing with a fake procfs
+// directory.
+func getProcInfo(proc procfs.Proc, pid, gpSegmentID, sessID int64) (*pb.GpPidProcInfo, error) {
 	info := &pb.GpPidProcInfo{
 		GpSegmentId: gpSegmentID,
 		SessId:      sessID,
