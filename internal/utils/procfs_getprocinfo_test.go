@@ -133,22 +133,22 @@ func TestGetProcInfo_AllFiles(t *testing.T) {
 
 	// ProcStat populated.
 	require.NotNil(t, info.ProcStat)
-	assert.Equal(t, int32(pid), info.ProcStat.Pid)
+	assert.Equal(t, int64(pid), info.ProcStat.Pid)
 	assert.Equal(t, "postgres", info.ProcStat.Comm)
 	assert.Equal(t, "S", info.ProcStat.State)
-	assert.Equal(t, int32(1), info.ProcStat.Ppid)
+	assert.Equal(t, int64(1), info.ProcStat.Ppid)
 	assert.Equal(t, int32(4), info.ProcStat.NumThreads)
 	assert.Equal(t, int64(123456789), info.ProcStat.Starttime)
 	assert.Equal(t, int64(1048576), info.ProcStat.Vsize)
 	assert.Equal(t, int64(256), info.ProcStat.Rss)
-	assert.Equal(t, int32(500), info.ProcStat.Utime)
-	assert.Equal(t, int32(200), info.ProcStat.Stime)
+	assert.Equal(t, int64(500), info.ProcStat.Utime)
+	assert.Equal(t, int64(200), info.ProcStat.Stime)
 	assert.Equal(t, int32(3), info.ProcStat.Processor)
 	assert.Equal(t, int64(100), info.ProcStat.DelayAcctBlkIoTicks)
 
 	// ProcStatus populated.
 	require.NotNil(t, info.ProcStatus)
-	assert.Equal(t, int32(pid), info.ProcStatus.Pid)
+	assert.Equal(t, int64(pid), info.ProcStatus.Pid)
 	assert.Equal(t, "postgres", info.ProcStatus.Name)
 	assert.Equal(t, int32(pid), info.ProcStatus.Tgid)
 	assert.Equal(t, int64(2048*1024), info.ProcStatus.VmPeak)
@@ -242,9 +242,9 @@ func TestGetProcInfo_MissingCmdline(t *testing.T) {
 
 	// Other fields should still be populated.
 	require.NotNil(t, info.ProcStat)
-	assert.Equal(t, int32(pid), info.ProcStat.Pid)
+	assert.Equal(t, int64(pid), info.ProcStat.Pid)
 	require.NotNil(t, info.ProcStatus)
-	assert.Equal(t, int32(pid), info.ProcStatus.Pid)
+	assert.Equal(t, int64(pid), info.ProcStatus.Pid)
 	require.NotNil(t, info.ProcIo)
 }
 

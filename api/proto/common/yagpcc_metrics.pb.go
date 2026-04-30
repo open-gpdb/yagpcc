@@ -1587,13 +1587,13 @@ func (x *SpillInfo) GetTotalBytes() int64 {
 type ProcStat struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
 	// The process ID.
-	Pid int32 `protobuf:"varint,1,opt,name=pid,proto3" json:"pid,omitempty"`
+	Pid int64 `protobuf:"varint,1,opt,name=pid,proto3" json:"pid,omitempty"`
 	// The filename of the executable.
 	Comm string `protobuf:"bytes,2,opt,name=comm,proto3" json:"comm,omitempty"`
 	// The process state.
 	State string `protobuf:"bytes,3,opt,name=state,proto3" json:"state,omitempty"`
 	// The PID of the parent of this process.
-	Ppid int32 `protobuf:"varint,4,opt,name=ppid,proto3" json:"ppid,omitempty"`
+	Ppid int64 `protobuf:"varint,4,opt,name=ppid,proto3" json:"ppid,omitempty"`
 	// The process group ID of the process.
 	Pgrp int32 `protobuf:"varint,5,opt,name=pgrp,proto3" json:"pgrp,omitempty"`
 	// The session ID of the process.
@@ -1607,28 +1607,28 @@ type ProcStat struct {
 	Flags int32 `protobuf:"varint,9,opt,name=flags,proto3" json:"flags,omitempty"`
 	// The number of minor faults the process has made which have not required
 	// loading a memory page from disk.
-	MinFlt int32 `protobuf:"varint,10,opt,name=min_flt,json=minFlt,proto3" json:"min_flt,omitempty"`
+	MinFlt int64 `protobuf:"varint,10,opt,name=min_flt,json=minFlt,proto3" json:"min_flt,omitempty"`
 	// The number of minor faults that the process's waited-for children have
 	// made.
-	CminFlt int32 `protobuf:"varint,11,opt,name=cmin_flt,json=cminFlt,proto3" json:"cmin_flt,omitempty"`
+	CminFlt int64 `protobuf:"varint,11,opt,name=cmin_flt,json=cminFlt,proto3" json:"cmin_flt,omitempty"`
 	// The number of major faults the process has made which have required
 	// loading a memory page from disk.
-	MajFlt int32 `protobuf:"varint,12,opt,name=maj_flt,json=majFlt,proto3" json:"maj_flt,omitempty"`
+	MajFlt int64 `protobuf:"varint,12,opt,name=maj_flt,json=majFlt,proto3" json:"maj_flt,omitempty"`
 	// The number of major faults that the process's waited-for children have
 	// made.
-	CmajFlt int32 `protobuf:"varint,13,opt,name=cmaj_flt,json=cmajFlt,proto3" json:"cmaj_flt,omitempty"`
+	CmajFlt int64 `protobuf:"varint,13,opt,name=cmaj_flt,json=cmajFlt,proto3" json:"cmaj_flt,omitempty"`
 	// Amount of time that this process has been scheduled in user mode,
 	// measured in clock ticks.
-	Utime int32 `protobuf:"varint,14,opt,name=utime,proto3" json:"utime,omitempty"`
+	Utime int64 `protobuf:"varint,14,opt,name=utime,proto3" json:"utime,omitempty"`
 	// Amount of time that this process has been scheduled in kernel mode,
 	// measured in clock ticks.
-	Stime int32 `protobuf:"varint,15,opt,name=stime,proto3" json:"stime,omitempty"`
+	Stime int64 `protobuf:"varint,15,opt,name=stime,proto3" json:"stime,omitempty"`
 	// Amount of time that this process's waited-for children have been
 	// scheduled in user mode, measured in clock ticks.
-	Cutime int32 `protobuf:"varint,16,opt,name=cutime,proto3" json:"cutime,omitempty"`
+	Cutime int64 `protobuf:"varint,16,opt,name=cutime,proto3" json:"cutime,omitempty"`
 	// Amount of time that this process's waited-for children have been
 	// scheduled in kernel mode, measured in clock ticks.
-	Cstime int32 `protobuf:"varint,17,opt,name=cstime,proto3" json:"cstime,omitempty"`
+	Cstime int64 `protobuf:"varint,17,opt,name=cstime,proto3" json:"cstime,omitempty"`
 	// For processes running a real-time scheduling policy, this is the negated
 	// scheduling priority, minus one.
 	Priority int32 `protobuf:"varint,18,opt,name=priority,proto3" json:"priority,omitempty"`
@@ -1663,9 +1663,9 @@ type ProcStat struct {
 	DelayAcctBlkIoTicks int64 `protobuf:"varint,31,opt,name=delay_acct_blk_io_ticks,json=delayAcctBlkIoTicks,proto3" json:"delay_acct_blk_io_ticks,omitempty"`
 	// Guest time of the process (time spent running a virtual CPU for a guest
 	// operating system), measured in clock ticks.
-	GuestTime int32 `protobuf:"varint,32,opt,name=guest_time,json=guestTime,proto3" json:"guest_time,omitempty"`
+	GuestTime int64 `protobuf:"varint,32,opt,name=guest_time,json=guestTime,proto3" json:"guest_time,omitempty"`
 	// Guest time of the process's children, measured in clock ticks.
-	CguestTime    int32 `protobuf:"varint,33,opt,name=cguest_time,json=cguestTime,proto3" json:"cguest_time,omitempty"`
+	CguestTime    int64 `protobuf:"varint,33,opt,name=cguest_time,json=cguestTime,proto3" json:"cguest_time,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -1700,7 +1700,7 @@ func (*ProcStat) Descriptor() ([]byte, []int) {
 	return file_api_proto_common_yagpcc_metrics_proto_rawDescGZIP(), []int{11}
 }
 
-func (x *ProcStat) GetPid() int32 {
+func (x *ProcStat) GetPid() int64 {
 	if x != nil {
 		return x.Pid
 	}
@@ -1721,7 +1721,7 @@ func (x *ProcStat) GetState() string {
 	return ""
 }
 
-func (x *ProcStat) GetPpid() int32 {
+func (x *ProcStat) GetPpid() int64 {
 	if x != nil {
 		return x.Ppid
 	}
@@ -1763,56 +1763,56 @@ func (x *ProcStat) GetFlags() int32 {
 	return 0
 }
 
-func (x *ProcStat) GetMinFlt() int32 {
+func (x *ProcStat) GetMinFlt() int64 {
 	if x != nil {
 		return x.MinFlt
 	}
 	return 0
 }
 
-func (x *ProcStat) GetCminFlt() int32 {
+func (x *ProcStat) GetCminFlt() int64 {
 	if x != nil {
 		return x.CminFlt
 	}
 	return 0
 }
 
-func (x *ProcStat) GetMajFlt() int32 {
+func (x *ProcStat) GetMajFlt() int64 {
 	if x != nil {
 		return x.MajFlt
 	}
 	return 0
 }
 
-func (x *ProcStat) GetCmajFlt() int32 {
+func (x *ProcStat) GetCmajFlt() int64 {
 	if x != nil {
 		return x.CmajFlt
 	}
 	return 0
 }
 
-func (x *ProcStat) GetUtime() int32 {
+func (x *ProcStat) GetUtime() int64 {
 	if x != nil {
 		return x.Utime
 	}
 	return 0
 }
 
-func (x *ProcStat) GetStime() int32 {
+func (x *ProcStat) GetStime() int64 {
 	if x != nil {
 		return x.Stime
 	}
 	return 0
 }
 
-func (x *ProcStat) GetCutime() int32 {
+func (x *ProcStat) GetCutime() int64 {
 	if x != nil {
 		return x.Cutime
 	}
 	return 0
 }
 
-func (x *ProcStat) GetCstime() int32 {
+func (x *ProcStat) GetCstime() int64 {
 	if x != nil {
 		return x.Cstime
 	}
@@ -1917,14 +1917,14 @@ func (x *ProcStat) GetDelayAcctBlkIoTicks() int64 {
 	return 0
 }
 
-func (x *ProcStat) GetGuestTime() int32 {
+func (x *ProcStat) GetGuestTime() int64 {
 	if x != nil {
 		return x.GuestTime
 	}
 	return 0
 }
 
-func (x *ProcStat) GetCguestTime() int32 {
+func (x *ProcStat) GetCguestTime() int64 {
 	if x != nil {
 		return x.CguestTime
 	}
@@ -1937,7 +1937,7 @@ func (x *ProcStat) GetCguestTime() int32 {
 type ProcStatus struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
 	// The process ID.
-	Pid int32 `protobuf:"varint,1,opt,name=pid,proto3" json:"pid,omitempty"`
+	Pid int64 `protobuf:"varint,1,opt,name=pid,proto3" json:"pid,omitempty"`
 	// The process name.
 	Name string `protobuf:"bytes,2,opt,name=name,proto3" json:"name,omitempty"`
 	// Thread group ID.
@@ -2032,7 +2032,7 @@ func (*ProcStatus) Descriptor() ([]byte, []int) {
 	return file_api_proto_common_yagpcc_metrics_proto_rawDescGZIP(), []int{12}
 }
 
-func (x *ProcStatus) GetPid() int32 {
+func (x *ProcStatus) GetPid() int64 {
 	if x != nil {
 		return x.Pid
 	}
@@ -2673,24 +2673,24 @@ const file_api_proto_common_yagpcc_metrics_proto_rawDesc = "" +
 	"totalBytes\x18\x02 \x01(\x03R\n" +
 	"totalBytes\"\xe6\x06\n" +
 	"\bProcStat\x12\x10\n" +
-	"\x03pid\x18\x01 \x01(\x05R\x03pid\x12\x12\n" +
+	"\x03pid\x18\x01 \x01(\x03R\x03pid\x12\x12\n" +
 	"\x04comm\x18\x02 \x01(\tR\x04comm\x12\x14\n" +
 	"\x05state\x18\x03 \x01(\tR\x05state\x12\x12\n" +
-	"\x04ppid\x18\x04 \x01(\x05R\x04ppid\x12\x12\n" +
+	"\x04ppid\x18\x04 \x01(\x03R\x04ppid\x12\x12\n" +
 	"\x04pgrp\x18\x05 \x01(\x05R\x04pgrp\x12\x18\n" +
 	"\asession\x18\x06 \x01(\x05R\asession\x12\x10\n" +
 	"\x03tty\x18\a \x01(\x05R\x03tty\x12\x14\n" +
 	"\x05tpgid\x18\b \x01(\x05R\x05tpgid\x12\x14\n" +
 	"\x05flags\x18\t \x01(\x05R\x05flags\x12\x17\n" +
 	"\amin_flt\x18\n" +
-	" \x01(\x05R\x06minFlt\x12\x19\n" +
-	"\bcmin_flt\x18\v \x01(\x05R\acminFlt\x12\x17\n" +
-	"\amaj_flt\x18\f \x01(\x05R\x06majFlt\x12\x19\n" +
-	"\bcmaj_flt\x18\r \x01(\x05R\acmajFlt\x12\x14\n" +
-	"\x05utime\x18\x0e \x01(\x05R\x05utime\x12\x14\n" +
-	"\x05stime\x18\x0f \x01(\x05R\x05stime\x12\x16\n" +
-	"\x06cutime\x18\x10 \x01(\x05R\x06cutime\x12\x16\n" +
-	"\x06cstime\x18\x11 \x01(\x05R\x06cstime\x12\x1a\n" +
+	" \x01(\x03R\x06minFlt\x12\x19\n" +
+	"\bcmin_flt\x18\v \x01(\x03R\acminFlt\x12\x17\n" +
+	"\amaj_flt\x18\f \x01(\x03R\x06majFlt\x12\x19\n" +
+	"\bcmaj_flt\x18\r \x01(\x03R\acmajFlt\x12\x14\n" +
+	"\x05utime\x18\x0e \x01(\x03R\x05utime\x12\x14\n" +
+	"\x05stime\x18\x0f \x01(\x03R\x05stime\x12\x16\n" +
+	"\x06cutime\x18\x10 \x01(\x03R\x06cutime\x12\x16\n" +
+	"\x06cstime\x18\x11 \x01(\x03R\x06cstime\x12\x1a\n" +
 	"\bpriority\x18\x12 \x01(\x05R\bpriority\x12\x12\n" +
 	"\x04nice\x18\x13 \x01(\x05R\x04nice\x12\x1f\n" +
 	"\vnum_threads\x18\x14 \x01(\x05R\n" +
@@ -2710,12 +2710,12 @@ const file_api_proto_common_yagpcc_metrics_proto_rawDesc = "" +
 	"\x06policy\x18\x1e \x01(\x05R\x06policy\x124\n" +
 	"\x17delay_acct_blk_io_ticks\x18\x1f \x01(\x03R\x13delayAcctBlkIoTicks\x12\x1d\n" +
 	"\n" +
-	"guest_time\x18  \x01(\x05R\tguestTime\x12\x1f\n" +
-	"\vcguest_time\x18! \x01(\x05R\n" +
+	"guest_time\x18  \x01(\x03R\tguestTime\x12\x1f\n" +
+	"\vcguest_time\x18! \x01(\x03R\n" +
 	"cguestTime\"\xd2\x06\n" +
 	"\n" +
 	"ProcStatus\x12\x10\n" +
-	"\x03pid\x18\x01 \x01(\x05R\x03pid\x12\x12\n" +
+	"\x03pid\x18\x01 \x01(\x03R\x03pid\x12\x12\n" +
 	"\x04name\x18\x02 \x01(\tR\x04name\x12\x12\n" +
 	"\x04tgid\x18\x03 \x01(\x05R\x04tgid\x12\x17\n" +
 	"\ans_pids\x18\x04 \x03(\x03R\x06nsPids\x12\x17\n" +

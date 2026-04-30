@@ -218,7 +218,7 @@ func TestRegisterProcfsStat_SingleEntry(t *testing.T) {
 	require.True(t, ok)
 	assert.Equal(t, "SELECT 1", stat.Cmdline)
 	assert.Equal(t, "R", stat.State)
-	assert.Equal(t, int32(10), stat.ProcStat.Utime)
+	assert.Equal(t, int64(10), stat.ProcStat.Utime)
 	assert.Equal(t, int64(1024), stat.ProcStatus.VmRss)
 	assert.Equal(t, int64(512), stat.ProcIO.ReadBytes)
 }

@@ -37,7 +37,7 @@ func GroupAggMetrics(dest *pbc.AggregatedMetrics, queryDuration time.Duration) e
 	return nil
 }
 
-func UpdateIntermediateKey(intermediateResults map[MapAggregateKey]uint64, mapKey MapAggregateKey, value uint64) {
+func UpdateIntermediateKey[T int | uint64 | int64](intermediateResults map[MapAggregateKey]T, mapKey MapAggregateKey, value T) {
 	valMap, ok := intermediateResults[mapKey]
 	if !ok {
 		intermediateResults[mapKey] = value

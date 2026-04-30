@@ -138,23 +138,23 @@ func isProcessGone(err error) bool {
 // convertProcStat maps prometheus/procfs.ProcStat → protobuf ProcStat.
 func convertProcStat(s *procfs.ProcStat) *pb.ProcStat {
 	return &pb.ProcStat{
-		Pid:                 int32(s.PID),
+		Pid:                 int64(s.PID),
 		Comm:                s.Comm,
 		State:               s.State,
-		Ppid:                int32(s.PPID),
+		Ppid:                int64(s.PPID),
 		Pgrp:                int32(s.PGRP),
 		Session:             int32(s.Session),
 		Tty:                 int32(s.TTY),
 		Tpgid:               int32(s.TPGID),
 		Flags:               int32(s.Flags),
-		MinFlt:              int32(s.MinFlt),
-		CminFlt:             int32(s.CMinFlt),
-		MajFlt:              int32(s.MajFlt),
-		CmajFlt:             int32(s.CMajFlt),
-		Utime:               int32(s.UTime),
-		Stime:               int32(s.STime),
-		Cutime:              int32(s.CUTime),
-		Cstime:              int32(s.CSTime),
+		MinFlt:              int64(s.MinFlt),
+		CminFlt:             int64(s.CMinFlt),
+		MajFlt:              int64(s.MajFlt),
+		CmajFlt:             int64(s.CMajFlt),
+		Utime:               int64(s.UTime),
+		Stime:               int64(s.STime),
+		Cutime:              int64(s.CUTime),
+		Cstime:              int64(s.CSTime),
 		Priority:            int32(s.Priority),
 		Nice:                int32(s.Nice),
 		NumThreads:          int32(s.NumThreads),
@@ -166,15 +166,15 @@ func convertProcStat(s *procfs.ProcStat) *pb.ProcStat {
 		RtPriority:          int32(s.RTPriority),
 		Policy:              int32(s.Policy),
 		DelayAcctBlkIoTicks: int64(s.DelayAcctBlkIOTicks),
-		GuestTime:           int32(s.GuestTime),
-		CguestTime:          int32(s.CGuestTime),
+		GuestTime:           int64(s.GuestTime),
+		CguestTime:          int64(s.CGuestTime),
 	}
 }
 
 // convertProcStatus maps prometheus/procfs.ProcStatus → protobuf ProcStatus.
 func convertProcStatus(s *procfs.ProcStatus) *pb.ProcStatus {
 	return &pb.ProcStatus{
-		Pid:                      int32(s.PID),
+		Pid:                      int64(s.PID),
 		Name:                     s.Name,
 		Tgid:                     int32(s.TGID),
 		NsPids:                   uint64SliceToInt64(s.NSpids),
