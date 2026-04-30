@@ -4,18 +4,18 @@ go 1.25.5
 
 require (
 	github.com/afritzler/protoequal v0.1.10
-	github.com/alitto/pond v1.9.2
 	github.com/gofrs/flock v0.13.0
 	github.com/golang/mock v1.6.0
-	github.com/golang/protobuf v1.5.4
 	github.com/heetch/confita v0.11.0
 	github.com/jackc/pgx/v4 v4.18.3
 	github.com/jmoiron/sqlx v1.4.0
 	github.com/onsi/ginkgo/v2 v2.28.0
 	github.com/onsi/gomega v1.39.1
 	github.com/prometheus/client_golang v1.23.2
+	github.com/prometheus/procfs v0.16.1
 	github.com/spf13/pflag v1.0.10
 	github.com/stretchr/testify v1.11.1
+	go.uber.org/mock v0.6.0
 	go.uber.org/zap v1.27.1
 	golang.org/x/exp v0.0.0-20260218203240-3dfff04db8fa
 	golang.org/x/sync v0.19.0
@@ -46,8 +46,6 @@ require (
 	github.com/pmezard/go-difflib v1.0.0 // indirect
 	github.com/prometheus/client_model v0.6.2 // indirect
 	github.com/prometheus/common v0.66.1 // indirect
-	github.com/prometheus/procfs v0.16.1 // indirect
-	go.uber.org/mock v0.6.0 // indirect
 	go.uber.org/multierr v1.10.0 // indirect
 	go.yaml.in/yaml/v2 v2.4.2 // indirect
 	go.yaml.in/yaml/v3 v3.0.4 // indirect

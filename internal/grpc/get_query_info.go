@@ -2,6 +2,7 @@ package grpc
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"time"
 
@@ -21,6 +22,47 @@ type GetQueryInfoServer struct {
 	MaxMessageSize int
 	Logger         *zap.SugaredLogger
 	RQStorage      *storage.RunningQueriesStorage
+}
+
+func (s *GetQueryInfoServer) GetPidProcStat(ctx context.Context, in *pb.GetPidProcInfoReq) (*pb.GetPidProcInfoResponse, error) {
+	s.Logger.Debugf("got get pid info request %v", in)
+	start := time.Now()
+
+	pidResponse := &pb.GetPidProcInfoResponse{}
+	nErrors := 0
+	lastError := error(nil)
+
+	if in != nil && in.SegmentProcess != nil {
+		for _, segProcess := range in.SegmentProcess {
+			pidStat, err := utils.GetPidProcInfo(segProcess.Pid, segProcess.GpSegmentId, segProcess.SessId)
+			if err != nil {
+				if errors.Is(err, utils.ErrProcessNotFound) {
+					s.Logger.Debugf("pid %d not found: %v", segProcess.Pid, err)
+					continue
+				}
+				s.Logger.Debugf("got error while getting pid info %v for %v", err, segProcess)
+				nErrors++
+				lastError = err
+				continue
+			}
+			pidResponse.PidProcData = append(pidResponse.PidProcData, pidStat)
+		}
+	}
+
+	if lastError != nil {
+		s.Logger.Infof("got %v errors in pid request, the last error is %v", nErrors, lastError)
+	}
+
+	if metrics.YagpccMetrics != nil {
+		metrics.YagpccMetrics.HandleLatencies.With(map[string]string{"method": "GpPidProcInfo"}).Observe(time.Since(start).Seconds())
+	}
+
+	if nErrors > 0 && len(pidResponse.PidProcData) == 0 {
+		// something got totally wrong
+		return nil, lastError
+	}
+
+	return pidResponse, nil
 }
 
 func (s *GetQueryInfoServer) GetMetricQueries(ctx context.Context, in *pb.GetQueriesInfoReq) (*pb.GetQueriesInfoResponse, error) {

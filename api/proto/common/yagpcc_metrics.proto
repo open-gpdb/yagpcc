@@ -652,10 +652,10 @@ message ProcStat {
     int64 starttime = 21;
 
     // Virtual memory size in bytes.
-    int32 vsize = 22;
+    int64 vsize = 22;
 
     // Resident set size in pages.
-    int32 rss = 23;
+    int64 rss = 23;
 
     // Soft limit in bytes on the rss of the process.
     int64 rss_limit = 24;
@@ -829,9 +829,10 @@ message GpPidProcInfo {
 
     // actual data
     string cmdline         = 4;
-    ProcStat proc_stat     = 5;
-    ProcStatus proc_status = 6;
-    ProcIO proc_io         = 7;
+    string state           = 5;
+    ProcStat proc_stat     = 6;
+    ProcStatus proc_status = 7;
+    ProcIO proc_io         = 8;
 }
 
 message AggregatedMetrics {

@@ -2,6 +2,7 @@ package grpc_test
 
 import (
 	"context"
+	"os"
 	"sort"
 	"testing"
 	"time"
@@ -12,6 +13,8 @@ import (
 
 	pb "github.com/open-gpdb/yagpcc/api/proto/agent_segment"
 	pbc "github.com/open-gpdb/yagpcc/api/proto/common"
+	"github.com/open-gpdb/yagpcc/internal/grpc"
+	"github.com/open-gpdb/yagpcc/internal/utils"
 )
 
 func TestFilterMessages(t *testing.T) {
@@ -323,4 +326,88 @@ func TestDeleteCompleted(t *testing.T) {
 		require.NoError(t, err)
 		assertQueriesInfoResponseEqual(t, &pb.GetQueriesInfoResponse{}, response)
 	})
+}
+
+// newTestGetQueryInfoServer creates a GetQueryInfoServer with a logger suitable for tests.
+func newTestGetQueryInfoServer(t *testing.T) *grpc.GetQueryInfoServer {
+	t.Helper()
+	file, err := os.CreateTemp(t.TempDir(), "trace-*.log")
+	require.NoError(t, err)
+	t.Cleanup(func() {
+		_ = file.Close()
+	})
+	zLogger := utils.DualLog(true, file)
+	return &grpc.GetQueryInfoServer{
+		Logger:         zLogger,
+		MaxMessageSize: 100 * 1024 * 1024,
+	}
+}
+
+func TestGpPidProcInfo_NilRequest(t *testing.T) {
+	server := newTestGetQueryInfoServer(t)
+
+	resp, err := server.GetPidProcStat(context.Background(), nil)
+
+	require.NoError(t, err)
+	require.NotNil(t, resp)
+	assert.Empty(t, resp.PidProcData)
+}
+
+func TestGpPidProcInfo_EmptySegmentProcess(t *testing.T) {
+	server := newTestGetQueryInfoServer(t)
+
+	resp, err := server.GetPidProcStat(context.Background(), &pb.GetPidProcInfoReq{
+		SegmentProcess: []*pb.SegmentProcess{},
+	})
+
+	require.NoError(t, err)
+	require.NotNil(t, resp)
+	assert.Empty(t, resp.PidProcData)
+}
+
+func TestGpPidProcInfo_NilSegmentProcess(t *testing.T) {
+	server := newTestGetQueryInfoServer(t)
+
+	resp, err := server.GetPidProcStat(context.Background(), &pb.GetPidProcInfoReq{
+		SegmentProcess: nil,
+	})
+
+	require.NoError(t, err)
+	require.NotNil(t, resp)
+	assert.Empty(t, resp.PidProcData)
+}
+
+func TestGpPidProcInfo_NonExistentPids(t *testing.T) {
+	server := newTestGetQueryInfoServer(t)
+
+	// PIDs that are guaranteed not to exist.
+	resp, err := server.GetPidProcStat(context.Background(), &pb.GetPidProcInfoReq{
+		SegmentProcess: []*pb.SegmentProcess{
+			{GpSegmentId: 1, SessId: 10, Pid: 4194305000000},
+			{GpSegmentId: 2, SessId: 20, Pid: 4194305000001},
+		},
+	})
+
+	// Non-existent PIDs return ErrProcessNotFound from GetPidProcInfo and are
+	// skipped (not appended), so the response should be empty.
+	require.NoError(t, err)
+	require.NotNil(t, resp)
+	assert.Empty(t, resp.PidProcData, "non-existent PIDs should be skipped")
+}
+
+func TestGpPidProcInfo_MultipleSegmentProcesses(t *testing.T) {
+	server := newTestGetQueryInfoServer(t)
+
+	// Multiple non-existent PIDs — all should be skipped.
+	resp, err := server.GetPidProcStat(context.Background(), &pb.GetPidProcInfoReq{
+		SegmentProcess: []*pb.SegmentProcess{
+			{GpSegmentId: 0, SessId: 100, Pid: 4194305000000},
+			{GpSegmentId: 1, SessId: 200, Pid: 4194305000001},
+			{GpSegmentId: 2, SessId: 300, Pid: 4194305000002},
+		},
+	})
+
+	require.NoError(t, err)
+	require.NotNil(t, resp)
+	assert.Empty(t, resp.PidProcData, "all non-existent PIDs should be skipped")
 }
