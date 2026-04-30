@@ -103,6 +103,13 @@ func GetPidProcInfo(pid int64, gpSegmentID, sessID int64) (*pb.GpPidProcInfo, er
 		return nil, err
 	}
 
+	// /proc/<pid>/io
+	if pio, err := proc.IO(); err == nil {
+		info.ProcIo = convertProcIO(&pio)
+	} else if !isProcessGone(err) {
+		return nil, err
+	}
+
 	return info, nil
 }
 
@@ -177,6 +184,19 @@ func convertProcStatus(s *procfs.ProcStatus) *pb.ProcStatus {
 		Uids:                     uint64SliceToInt64(s.UIDs[:]),
 		Gids:                     uint64SliceToInt64(s.GIDs[:]),
 		CpusAllowedList:          uint64SliceToInt64(s.CpusAllowedList),
+	}
+}
+
+// convertProcIO maps prometheus/procfs.ProcIO → protobuf ProcIO.
+func convertProcIO(io *procfs.ProcIO) *pb.ProcIO {
+	return &pb.ProcIO{
+		Rchar:               int64(io.RChar),
+		Wchar:               int64(io.WChar),
+		Syscr:               int64(io.SyscR),
+		Syscw:               int64(io.SyscW),
+		ReadBytes:           int64(io.ReadBytes),
+		WriteBytes:          int64(io.WriteBytes),
+		CancelledWriteBytes: io.CancelledWriteBytes,
 	}
 }
 

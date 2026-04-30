@@ -160,6 +160,29 @@ func TestConvertProcStatus(t *testing.T) {
 	assert.Equal(t, []int64{0, 1, 2, 3}, result.CpusAllowedList)
 }
 
+func TestConvertProcIO(t *testing.T) {
+	src := &procfs.ProcIO{
+		RChar:               1000000,
+		WChar:               500000,
+		SyscR:               200,
+		SyscW:               100,
+		ReadBytes:           4096000,
+		WriteBytes:          2048000,
+		CancelledWriteBytes: 512,
+	}
+
+	result := convertProcIO(src)
+
+	require.NotNil(t, result)
+	assert.Equal(t, int64(1000000), result.Rchar)
+	assert.Equal(t, int64(500000), result.Wchar)
+	assert.Equal(t, int64(200), result.Syscr)
+	assert.Equal(t, int64(100), result.Syscw)
+	assert.Equal(t, int64(4096000), result.ReadBytes)
+	assert.Equal(t, int64(2048000), result.WriteBytes)
+	assert.Equal(t, int64(512), result.CancelledWriteBytes)
+}
+
 func TestParseCmdLineSessionStatus(t *testing.T) {
 	tests := []struct {
 		name     string

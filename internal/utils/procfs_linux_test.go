@@ -31,4 +31,11 @@ func TestGetPidProcInfo_CurrentProcess(t *testing.T) {
 	assert.NotEmpty(t, info.ProcStatus.Name)
 	assert.Greater(t, info.ProcStatus.VmSize, int64(0))
 	assert.Greater(t, info.ProcStatus.VmRss, int64(0))
+
+	require.NotNil(t, info.ProcIo)
+	// The current process must have read at least something (the test binary itself).
+	assert.GreaterOrEqual(t, info.ProcIo.Rchar, int64(0))
+	assert.GreaterOrEqual(t, info.ProcIo.Wchar, int64(0))
+	assert.GreaterOrEqual(t, info.ProcIo.Syscr, int64(0))
+	assert.GreaterOrEqual(t, info.ProcIo.Syscw, int64(0))
 }
