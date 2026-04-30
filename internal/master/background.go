@@ -462,6 +462,29 @@ func (bs *BackgroundStorage) RefreshQueries(ctx context.Context,
 	}
 }
 
+func (bs *BackgroundStorage) RefreshProcfs(ctx context.Context, procfsRefreshInterval time.Duration, nPullers int, portn uint32, msgSize int) error {
+	for {
+		currTime := time.Now()
+		nextTime := currTime.Add(procfsRefreshInterval)
+		select {
+		case <-ctx.Done():
+			bs.l.Warn("Done RefreshProcfs")
+			return fmt.Errorf("done context with %v", ctx.Err())
+		default:
+			bs.l.Debugf("Refresh procfs stat %v", currTime)
+			err := bs.GatherProcfsStat(ctx, nPullers, portn, procfsRefreshInterval, msgSize)
+			if err != nil {
+				// just log error, do not fail the whole service
+				bs.l.Errorf("fail to get procfs data %v", err)
+			}
+		}
+		if metrics.YagpccMetrics != nil {
+			metrics.YagpccMetrics.HandleLatencies.With(map[string]string{"method": "RefreshProcfs"}).Observe(time.Since(currTime).Seconds())
+		}
+		time.Sleep(time.Until(nextTime))
+	}
+}
+
 func InitConnection(ctx context.Context, l *zap.SugaredLogger, cfg *config.Config, firstTry bool) error {
 	tries := int(cfg.MasterConnectionTries)
 	if firstTry {
@@ -558,6 +581,12 @@ func InitBG(
 	)
 	errG.Go(func() error {
 		err := backgroundStorage.RefreshQueries(ctxI, archChan, cfg.QueriesRefreshInterval, cfg.SegmentGetTimeoutSec, cfg.ClearDeletedSessions)
+		l.Errorf("got %v refresh session and queries", err)
+		return err
+	},
+	)
+	errG.Go(func() error {
+		err := backgroundStorage.RefreshProcfs(ctxI, cfg.ProcfsRefreshInterval, int(cfg.SegmentPullThreads), cfg.ListenPort, int(cfg.MaxMessageSize))
 		l.Errorf("got %v refresh session and queries", err)
 		return err
 	},
