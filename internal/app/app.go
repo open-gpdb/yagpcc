@@ -382,12 +382,13 @@ func Run(ctx context.Context, configFile string) error {
 	metrics.YagpccMetrics.ExecutingQueryLatencies.AssignQueryGetter(rqStorage.GetQueriesStartTime)
 	aggStorage := storage.NewConfiguredAggregatedStorage(logger, cfg)
 	sessionsStorage := gp.NewSessionsStorage(rqStorage)
+	procfsStorage := storage.NewProcfsStorage()
 
 	masterConnection := gp.NewConnection(baseApp.L(), &cfg.MasterConnection, nil)
 
 	masterSentinel := master_sentinel.NewSentinel(baseApp.L(), masterConnection)
 	statActivityLister := stat_activity.NewLister(baseApp.L(), masterConnection)
-	backgroundStorage := master.NewBackgroundStorage(logger, sessionsStorage, rqStorage, aggStorage, statActivityLister)
+	backgroundStorage := master.NewBackgroundStorage(logger, sessionsStorage, rqStorage, aggStorage, procfsStorage, statActivityLister)
 
 	agentApp, err := NewApp(baseApp, cfg, statActivityLister, backgroundStorage)
 	if err != nil {

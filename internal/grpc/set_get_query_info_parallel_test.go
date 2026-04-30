@@ -30,7 +30,7 @@ func TestParallelSetGet(t *testing.T) {
 	rqStorage := storage.NewRunningQueriesStorage()
 	aggStorage := storage.NewAggregatedStorage(zLogger)
 	sessStorage := gp.NewSessionsStorage(rqStorage)
-	backgroundStorage := master.NewBackgroundStorage(zLogger, sessStorage, rqStorage, aggStorage, nil)
+	backgroundStorage := master.NewBackgroundStorage(zLogger, sessStorage, rqStorage, aggStorage, nil, nil)
 
 	tests := []struct {
 		name      string

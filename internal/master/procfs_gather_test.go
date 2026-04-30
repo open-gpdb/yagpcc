@@ -1,0 +1,623 @@
+package master
+
+import (
+	"context"
+	"fmt"
+	"log"
+	"net"
+	"sync"
+	"testing"
+	"time"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+	"go.uber.org/zap"
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials/insecure"
+	"google.golang.org/grpc/test/bufconn"
+
+	pb "github.com/open-gpdb/yagpcc/api/proto/agent_segment"
+	pbc "github.com/open-gpdb/yagpcc/api/proto/common"
+	"github.com/open-gpdb/yagpcc/internal/gp"
+	"github.com/open-gpdb/yagpcc/internal/gp/stat_activity"
+	"github.com/open-gpdb/yagpcc/internal/storage"
+)
+
+// --- mock statActivityLister ---
+
+type mockStatActivityLister struct {
+	sessions    []stat_activity.SessionPid
+	sessionsErr error
+	listCalled  bool
+}
+
+func (m *mockStatActivityLister) Start(context.Context) error { return nil }
+func (m *mockStatActivityLister) Stop()                       {}
+func (m *mockStatActivityLister) List(context.Context) ([]*gp.GpStatActivity, error) {
+	return nil, nil
+}
+func (m *mockStatActivityLister) ListAllSessions(context.Context) ([]stat_activity.SessionPid, error) {
+	m.listCalled = true
+	return m.sessions, m.sessionsErr
+}
+
+// --- fake gRPC servers ---
+
+// fakeProcStatServer returns empty responses (no PidProcData).
+type fakeProcStatServer struct {
+	pb.UnimplementedGetQueryInfoServer
+	mu      sync.Mutex
+	called  bool
+	lastReq *pb.GetPidProcInfoReq
+}
+
+func (s *fakeProcStatServer) GetPidProcStat(_ context.Context, req *pb.GetPidProcInfoReq) (*pb.GetPidProcInfoResponse, error) {
+	s.mu.Lock()
+	s.called = true
+	s.lastReq = req
+	s.mu.Unlock()
+	return &pb.GetPidProcInfoResponse{}, nil
+}
+
+func (s *fakeProcStatServer) snapshot() (bool, *pb.GetPidProcInfoReq) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.called, s.lastReq
+}
+
+func (s *fakeProcStatServer) GetMetricQueries(_ context.Context, _ *pb.GetQueriesInfoReq) (*pb.GetQueriesInfoResponse, error) {
+	return &pb.GetQueriesInfoResponse{}, nil
+}
+
+// dataProcStatServer returns actual PidProcData echoing back the requested segments.
+type dataProcStatServer struct {
+	pb.UnimplementedGetQueryInfoServer
+	mu      sync.Mutex
+	calls   int
+	allData []*pbc.GpPidProcInfo
+}
+
+func (s *dataProcStatServer) GetPidProcStat(_ context.Context, req *pb.GetPidProcInfoReq) (*pb.GetPidProcInfoResponse, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.calls++
+	resp := &pb.GetPidProcInfoResponse{
+		PidProcData: make([]*pbc.GpPidProcInfo, 0, len(req.SegmentProcess)),
+	}
+	for _, sp := range req.SegmentProcess {
+		info := &pbc.GpPidProcInfo{
+			GpSegmentId: sp.GpSegmentId,
+			SessId:      sp.SessId,
+			Pid:         sp.Pid,
+			Cmdline:     fmt.Sprintf("cmd-%d", sp.Pid),
+			State:       "S",
+		}
+		resp.PidProcData = append(resp.PidProcData, info)
+		s.allData = append(s.allData, info)
+	}
+	return resp, nil
+}
+
+func (s *dataProcStatServer) GetMetricQueries(context.Context, *pb.GetQueriesInfoReq) (*pb.GetQueriesInfoResponse, error) {
+	return &pb.GetQueriesInfoResponse{}, nil
+}
+
+func (s *dataProcStatServer) getCalls() int {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.calls
+}
+
+type failingProcStatServer struct {
+	pb.UnimplementedGetQueryInfoServer
+}
+
+func (s *failingProcStatServer) GetPidProcStat(context.Context, *pb.GetPidProcInfoReq) (*pb.GetPidProcInfoResponse, error) {
+	return nil, fmt.Errorf("simulated gRPC error")
+}
+
+func (s *failingProcStatServer) GetMetricQueries(context.Context, *pb.GetQueriesInfoReq) (*pb.GetQueriesInfoResponse, error) {
+	return &pb.GetQueriesInfoResponse{}, nil
+}
+
+// --- test helpers ---
+
+func setupBufconnServer(t *testing.T, srv pb.GetQueryInfoServer) *bufconn.Listener {
+	t.Helper()
+	lis := bufconn.Listen(1024 * 1024)
+	s := grpc.NewServer()
+	pb.RegisterGetQueryInfoServer(s, srv)
+	go func() {
+		if err := s.Serve(lis); err != nil {
+			log.Printf("bufconn server exited: %v", err)
+		}
+	}()
+	t.Cleanup(func() { s.Stop() })
+	return lis
+}
+
+func dialBufconn(t *testing.T, lis *bufconn.Listener) *grpc.ClientConn {
+	t.Helper()
+	conn, err := grpc.NewClient(
+		"passthrough:///bufconn",
+		grpc.WithContextDialer(func(context.Context, string) (net.Conn, error) {
+			return lis.Dial()
+		}),
+		grpc.WithTransportCredentials(insecure.NewCredentials()),
+	)
+	require.NoError(t, err)
+	t.Cleanup(func() { _ = conn.Close() })
+	return conn
+}
+
+func newTestLogger() *zap.SugaredLogger {
+	cfg := zap.NewDevelopmentConfig()
+	cfg.Level = zap.NewAtomicLevelAt(zap.WarnLevel)
+	l, _ := cfg.Build()
+	return l.Sugar()
+}
+
+// newTestProcfsGatherStorage creates a properly initialized ProcfsGatherStorage for tests.
+func newTestProcfsGatherStorage(mock statActivityLister) *ProcfsGatherStorage {
+	return NewProcfsGatherStorage(newTestLogger(), mock, time.Now())
+}
+
+// injectBufconn registers a bufconn connection for the given hostname in the global cache.
+func injectBufconn(t *testing.T, lis *bufconn.Listener) string {
+	t.Helper()
+	conn := dialBufconn(t, lis)
+	hostname := fmt.Sprintf("test-%d", time.Now().UnixNano())
+	segConnectionLock.Lock()
+	segConnections[hostname] = conn
+	segConnectionLock.Unlock()
+	t.Cleanup(func() {
+		segConnectionLock.Lock()
+		delete(segConnections, hostname)
+		segConnectionLock.Unlock()
+	})
+	return hostname
+}
+
+// ============================================================
+// Tests for NewProcfsGatherStorage
+// ============================================================
+
+func TestNewProcfsGatherStorage(t *testing.T) {
+	gTime := time.Date(2025, 1, 1, 12, 0, 0, 0, time.UTC)
+	mock := &mockStatActivityLister{}
+	ps := NewProcfsGatherStorage(newTestLogger(), mock, gTime)
+
+	require.NotNil(t, ps)
+	require.NotNil(t, ps.mx)
+	assert.Equal(t, gTime, ps.gatherTime)
+	assert.NotNil(t, ps.procfsStat)
+	assert.Empty(t, ps.procfsStat)
+}
+
+// ============================================================
+// Tests for addProcfsStat
+// ============================================================
+
+func TestAddProcfsStat_SingleBatch(t *testing.T) {
+	ps := newTestProcfsGatherStorage(nil)
+
+	data := []*pbc.GpPidProcInfo{
+		{GpSegmentId: 1, SessId: 10, Pid: 100, Cmdline: "cmd1"},
+		{GpSegmentId: 2, SessId: 20, Pid: 200, Cmdline: "cmd2"},
+	}
+	ps.addProcfsStat(data)
+
+	result := ps.GetProcfsStat()
+	require.Len(t, result, 2)
+	assert.Equal(t, "cmd1", result[0].Cmdline)
+	assert.Equal(t, "cmd2", result[1].Cmdline)
+}
+
+func TestAddProcfsStat_MultipleBatches(t *testing.T) {
+	ps := newTestProcfsGatherStorage(nil)
+
+	ps.addProcfsStat([]*pbc.GpPidProcInfo{
+		{GpSegmentId: 1, SessId: 10, Pid: 100, Cmdline: "batch1"},
+	})
+	ps.addProcfsStat([]*pbc.GpPidProcInfo{
+		{GpSegmentId: 2, SessId: 20, Pid: 200, Cmdline: "batch2"},
+		{GpSegmentId: 3, SessId: 30, Pid: 300, Cmdline: "batch3"},
+	})
+
+	result := ps.GetProcfsStat()
+	require.Len(t, result, 3)
+	assert.Equal(t, "batch1", result[0].Cmdline)
+	assert.Equal(t, "batch2", result[1].Cmdline)
+	assert.Equal(t, "batch3", result[2].Cmdline)
+}
+
+func TestAddProcfsStat_EmptyBatch(t *testing.T) {
+	ps := newTestProcfsGatherStorage(nil)
+
+	ps.addProcfsStat([]*pbc.GpPidProcInfo{})
+	assert.Empty(t, ps.GetProcfsStat())
+
+	ps.addProcfsStat(nil)
+	assert.Empty(t, ps.GetProcfsStat())
+}
+
+func TestAddProcfsStat_ConcurrentAccess(t *testing.T) {
+	ps := newTestProcfsGatherStorage(nil)
+
+	var wg sync.WaitGroup
+	for i := 0; i < 10; i++ {
+		wg.Add(1)
+		go func(id int) {
+			defer wg.Done()
+			ps.addProcfsStat([]*pbc.GpPidProcInfo{
+				{GpSegmentId: int64(id), Pid: int64(id * 100), Cmdline: fmt.Sprintf("cmd-%d", id)},
+			})
+		}(i)
+	}
+	wg.Wait()
+
+	result := ps.GetProcfsStat()
+	assert.Len(t, result, 10)
+}
+
+// ============================================================
+// Tests for GetProcfsStat
+// ============================================================
+
+func TestGetProcfsStat_Empty(t *testing.T) {
+	ps := newTestProcfsGatherStorage(nil)
+	result := ps.GetProcfsStat()
+	assert.NotNil(t, result)
+	assert.Empty(t, result)
+}
+
+func TestGetProcfsStat_ReturnsClone(t *testing.T) {
+	ps := newTestProcfsGatherStorage(nil)
+	ps.addProcfsStat([]*pbc.GpPidProcInfo{
+		{GpSegmentId: 1, Pid: 100, Cmdline: "original"},
+	})
+
+	result1 := ps.GetProcfsStat()
+	result2 := ps.GetProcfsStat()
+
+	// Modifying the returned slice should not affect the internal state
+	result1[0] = &pbc.GpPidProcInfo{Cmdline: "modified"}
+	assert.Equal(t, "original", result2[0].Cmdline)
+	assert.Equal(t, "original", ps.GetProcfsStat()[0].Cmdline)
+}
+
+// ============================================================
+// Tests for getJobsMap
+// ============================================================
+
+func TestGetJobsMap_EmptyInput(t *testing.T) {
+	ps := newTestProcfsGatherStorage(nil)
+	result := ps.getJobsMap(nil)
+	assert.NotNil(t, result)
+	assert.Empty(t, result)
+
+	result2 := ps.getJobsMap([]stat_activity.SessionPid{})
+	assert.NotNil(t, result2)
+	assert.Empty(t, result2)
+}
+
+func TestGetJobsMap_SingleHost(t *testing.T) {
+	storage.SetHostnameForSegindex(10, "host-a")
+
+	sessions := []stat_activity.SessionPid{
+		{GpSegmentId: 10, Pid: 100, SessId: 1},
+		{GpSegmentId: 10, Pid: 200, SessId: 2},
+	}
+
+	ps := newTestProcfsGatherStorage(nil)
+	result := ps.getJobsMap(sessions)
+
+	_, exists := result["host-a"]
+	assert.True(t, exists, "expected key 'host-a' in hostJobMap")
+}
+
+func TestGetJobsMap_MultipleHosts(t *testing.T) {
+	storage.SetHostnameForSegindex(20, "host-b")
+	storage.SetHostnameForSegindex(21, "host-c")
+
+	sessions := []stat_activity.SessionPid{
+		{GpSegmentId: 20, Pid: 100, SessId: 1},
+		{GpSegmentId: 21, Pid: 200, SessId: 2},
+		{GpSegmentId: 20, Pid: 300, SessId: 3},
+	}
+
+	ps := newTestProcfsGatherStorage(nil)
+	result := ps.getJobsMap(sessions)
+
+	assert.Contains(t, result, "host-b")
+	assert.Contains(t, result, "host-c")
+}
+
+func TestGetJobsMap_UnknownSegindex(t *testing.T) {
+	sessions := []stat_activity.SessionPid{
+		{GpSegmentId: 9999, Pid: 100, SessId: 1},
+	}
+
+	ps := newTestProcfsGatherStorage(nil)
+	result := ps.getJobsMap(sessions)
+	_, exists := result["9999"]
+	assert.True(t, exists, "expected key '9999' for unknown segindex")
+}
+
+// ============================================================
+// Tests for processProcfsRequests
+// ============================================================
+
+func TestProcessProcfsRequests_Success(t *testing.T) {
+	fakeSrv := &fakeProcStatServer{}
+	lis := setupBufconnServer(t, fakeSrv)
+	hostname := injectBufconn(t, lis)
+
+	reqs := []stat_activity.SessionPid{
+		{GpSegmentId: 1, Pid: 100, SessId: 10},
+		{GpSegmentId: 2, Pid: 200, SessId: 20},
+	}
+
+	ps := newTestProcfsGatherStorage(nil)
+	ctx := context.Background()
+	err := ps.processProcfsRequests(ctx, hostname, 0, 5*time.Second, 4*1024*1024, reqs)
+	require.NoError(t, err)
+	called, lastReq := fakeSrv.snapshot()
+	assert.True(t, called, "expected GetPidProcStat to be called")
+	require.NotNil(t, lastReq)
+	assert.Len(t, lastReq.SegmentProcess, 2)
+
+	sp0 := lastReq.SegmentProcess[0]
+	assert.Equal(t, int64(1), sp0.GpSegmentId)
+	assert.Equal(t, int64(100), sp0.Pid)
+	assert.Equal(t, int64(10), sp0.SessId)
+
+	sp1 := lastReq.SegmentProcess[1]
+	assert.Equal(t, int64(2), sp1.GpSegmentId)
+	assert.Equal(t, int64(200), sp1.Pid)
+	assert.Equal(t, int64(20), sp1.SessId)
+}
+
+func TestProcessProcfsRequests_SavesData(t *testing.T) {
+	dataSrv := &dataProcStatServer{}
+	lis := setupBufconnServer(t, dataSrv)
+	hostname := injectBufconn(t, lis)
+
+	reqs := []stat_activity.SessionPid{
+		{GpSegmentId: 1, Pid: 100, SessId: 10},
+		{GpSegmentId: 2, Pid: 200, SessId: 20},
+	}
+
+	ps := newTestProcfsGatherStorage(nil)
+	err := ps.processProcfsRequests(context.Background(), hostname, 0, 5*time.Second, 4*1024*1024, reqs)
+	require.NoError(t, err)
+
+	// Verify data was saved via addProcfsStat
+	result := ps.GetProcfsStat()
+	require.Len(t, result, 2)
+	assert.Equal(t, int64(1), result[0].GpSegmentId)
+	assert.Equal(t, int64(100), result[0].Pid)
+	assert.Equal(t, "cmd-100", result[0].Cmdline)
+	assert.Equal(t, int64(2), result[1].GpSegmentId)
+	assert.Equal(t, int64(200), result[1].Pid)
+	assert.Equal(t, "cmd-200", result[1].Cmdline)
+}
+
+func TestProcessProcfsRequests_SavesDataWithBatching(t *testing.T) {
+	dataSrv := &dataProcStatServer{}
+	lis := setupBufconnServer(t, dataSrv)
+	hostname := injectBufconn(t, lis)
+
+	// Create jobsPerQuery + 5 requests to trigger batching
+	reqs := make([]stat_activity.SessionPid, 0, jobsPerQuery+5)
+	for i := 0; i < jobsPerQuery+5; i++ {
+		reqs = append(reqs, stat_activity.SessionPid{
+			GpSegmentId: 1,
+			Pid:         100 + i,
+			SessId:      i + 1,
+		})
+	}
+
+	ps := newTestProcfsGatherStorage(nil)
+	err := ps.processProcfsRequests(context.Background(), hostname, 0, 10*time.Second, 4*1024*1024, reqs)
+	require.NoError(t, err)
+
+	// Should have called the server at least twice (one batch of 1000, one of 5)
+	assert.GreaterOrEqual(t, dataSrv.getCalls(), 2)
+
+	// All data should be accumulated
+	result := ps.GetProcfsStat()
+	assert.Len(t, result, jobsPerQuery+5)
+}
+
+func TestProcessProcfsRequests_GrpcError(t *testing.T) {
+	failSrv := &failingProcStatServer{}
+	lis := setupBufconnServer(t, failSrv)
+	hostname := injectBufconn(t, lis)
+
+	reqs := []stat_activity.SessionPid{
+		{GpSegmentId: 1, Pid: 100, SessId: 10},
+	}
+
+	ps := newTestProcfsGatherStorage(nil)
+	err := ps.processProcfsRequests(context.Background(), hostname, 0, 5*time.Second, 4*1024*1024, reqs)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "simulated gRPC error")
+
+	// No data should have been saved
+	assert.Empty(t, ps.GetProcfsStat())
+}
+
+func TestProcessProcfsRequests_CancelledContext(t *testing.T) {
+	fakeSrv := &fakeProcStatServer{}
+	lis := setupBufconnServer(t, fakeSrv)
+	hostname := injectBufconn(t, lis)
+
+	reqs := []stat_activity.SessionPid{
+		{GpSegmentId: 1, Pid: 100, SessId: 10},
+	}
+
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel() // cancel immediately
+
+	ps := newTestProcfsGatherStorage(nil)
+	err := ps.processProcfsRequests(ctx, hostname, 0, 5*time.Second, 4*1024*1024, reqs)
+	if err != nil {
+		assert.ErrorIs(t, ctx.Err(), context.Canceled)
+	}
+}
+
+func TestProcessProcfsRequests_EmptyRequests(t *testing.T) {
+	fakeSrv := &fakeProcStatServer{}
+	lis := setupBufconnServer(t, fakeSrv)
+	hostname := injectBufconn(t, lis)
+
+	ps := newTestProcfsGatherStorage(nil)
+	err := ps.processProcfsRequests(context.Background(), hostname, 0, 5*time.Second, 4*1024*1024, nil)
+	require.NoError(t, err)
+	called, _ := fakeSrv.snapshot()
+	assert.False(t, called, "GetPidProcStat should not be called with empty segment list")
+	assert.Empty(t, ps.GetProcfsStat())
+}
+
+// ============================================================
+// Tests for GatherProcfsStat
+// ============================================================
+
+func TestGatherProcfsStat_ListAllSessionsError(t *testing.T) {
+	mock := &mockStatActivityLister{
+		sessionsErr: fmt.Errorf("db connection failed"),
+	}
+	ps := newTestProcfsGatherStorage(mock)
+
+	err := ps.GatherProcfsStat(context.Background(), 2, 50051, 5*time.Second, 4*1024*1024)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "db connection failed")
+	assert.True(t, mock.listCalled)
+}
+
+func TestGatherProcfsStat_EmptySessions(t *testing.T) {
+	mock := &mockStatActivityLister{
+		sessions: []stat_activity.SessionPid{},
+	}
+	ps := newTestProcfsGatherStorage(mock)
+
+	err := ps.GatherProcfsStat(context.Background(), 2, 50051, 5*time.Second, 4*1024*1024)
+	require.NoError(t, err)
+	assert.True(t, mock.listCalled)
+	assert.Empty(t, ps.GetProcfsStat())
+}
+
+func TestGatherProcfsStat_WithSessions_SavesData(t *testing.T) {
+	dataSrv := &dataProcStatServer{}
+	lis := setupBufconnServer(t, dataSrv)
+	hostname := injectBufconn(t, lis)
+
+	storage.SetHostnameForSegindex(30, hostname)
+
+	mock := &mockStatActivityLister{
+		sessions: []stat_activity.SessionPid{
+			{GpSegmentId: 30, Pid: 100, SessId: 1},
+			{GpSegmentId: 30, Pid: 200, SessId: 2},
+		},
+	}
+	ps := newTestProcfsGatherStorage(mock)
+
+	err := ps.GatherProcfsStat(context.Background(), 2, 0, 5*time.Second, 4*1024*1024)
+	require.NoError(t, err)
+	assert.True(t, mock.listCalled)
+
+	// Verify data was accumulated
+	result := ps.GetProcfsStat()
+	require.Len(t, result, 2)
+	// Check that the PIDs match (order may vary due to concurrency)
+	pids := make(map[int64]bool)
+	for _, r := range result {
+		pids[r.Pid] = true
+	}
+	assert.True(t, pids[100])
+	assert.True(t, pids[200])
+}
+
+func TestGatherProcfsStat_ContextCancelled(t *testing.T) {
+	mock := &mockStatActivityLister{
+		sessions: []stat_activity.SessionPid{
+			{GpSegmentId: 40, Pid: 100, SessId: 1},
+		},
+	}
+	ps := newTestProcfsGatherStorage(mock)
+
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+
+	err := ps.GatherProcfsStat(ctx, 2, 50051, 5*time.Second, 4*1024*1024)
+	_ = err // may or may not error
+}
+
+func TestGatherProcfsStat_GrpcFailure(t *testing.T) {
+	failSrv := &failingProcStatServer{}
+	lis := setupBufconnServer(t, failSrv)
+	hostname := injectBufconn(t, lis)
+
+	storage.SetHostnameForSegindex(50, hostname)
+
+	mock := &mockStatActivityLister{
+		sessions: []stat_activity.SessionPid{
+			{GpSegmentId: 50, Pid: 100, SessId: 1},
+		},
+	}
+	ps := newTestProcfsGatherStorage(mock)
+
+	err := ps.GatherProcfsStat(context.Background(), 2, 0, 5*time.Second, 4*1024*1024)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "simulated gRPC error")
+	// No data should be saved on error
+	assert.Empty(t, ps.GetProcfsStat())
+}
+
+func TestGatherProcfsStat_ManySessionsBatching(t *testing.T) {
+	dataSrv := &dataProcStatServer{}
+	lis := setupBufconnServer(t, dataSrv)
+	hostname := injectBufconn(t, lis)
+
+	storage.SetHostnameForSegindex(60, hostname)
+
+	sessions := make([]stat_activity.SessionPid, 0, jobsPerQuery+5)
+	for i := 0; i < jobsPerQuery+5; i++ {
+		sessions = append(sessions, stat_activity.SessionPid{
+			GpSegmentId: 60,
+			Pid:         100 + i,
+			SessId:      i + 1,
+		})
+	}
+
+	mock := &mockStatActivityLister{sessions: sessions}
+	ps := newTestProcfsGatherStorage(mock)
+
+	err := ps.GatherProcfsStat(context.Background(), 4, 0, 10*time.Second, 4*1024*1024)
+	require.NoError(t, err)
+	assert.True(t, mock.listCalled)
+
+	result := ps.GetProcfsStat()
+	assert.Len(t, result, jobsPerQuery+5)
+}
+
+func TestGatherProcfsStat_InvalidNPullers(t *testing.T) {
+	mock := &mockStatActivityLister{}
+	ps := newTestProcfsGatherStorage(mock)
+
+	for _, n := range []int{0, -1, -100} {
+		err := ps.GatherProcfsStat(context.Background(), n, 50051, 5*time.Second, 4*1024*1024)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "nPullers must be greater than 0")
+		assert.False(t, mock.listCalled, "ListAllSessions should not be called for invalid nPullers")
+	}
+}
+
+// ============================================================
+// Tests for constants
+// ============================================================
+
+func TestConstants(t *testing.T) {
+	assert.Equal(t, 1000, jobsPerQuery)
+}

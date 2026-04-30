@@ -3,6 +3,8 @@ package master
 import (
 	"context"
 	"fmt"
+	"slices"
+	"sync"
 	"time"
 
 	"golang.org/x/sync/errgroup"
@@ -13,6 +15,8 @@ import (
 	"github.com/open-gpdb/yagpcc/internal/storage"
 
 	pb "github.com/open-gpdb/yagpcc/api/proto/agent_segment"
+	pbc "github.com/open-gpdb/yagpcc/api/proto/common"
+	"go.uber.org/zap"
 )
 
 const (
@@ -21,9 +25,27 @@ const (
 
 type (
 	hostJobMap = map[string][]stat_activity.SessionPid
+
+	ProcfsGatherStorage struct {
+		mx                 *sync.RWMutex
+		procfsStat         []*pbc.GpPidProcInfo
+		l                  *zap.SugaredLogger
+		statActivityLister statActivityLister
+		gatherTime         time.Time
+	}
 )
 
-func (bs *BackgroundStorage) getJobsMap(sessions []stat_activity.SessionPid) hostJobMap {
+func NewProcfsGatherStorage(l *zap.SugaredLogger, sActivityLister statActivityLister, gTime time.Time) *ProcfsGatherStorage {
+	return &ProcfsGatherStorage{
+		mx:                 &sync.RWMutex{},
+		l:                  l,
+		statActivityLister: sActivityLister,
+		gatherTime:         gTime,
+		procfsStat:         make([]*pbc.GpPidProcInfo, 0, 10),
+	}
+}
+
+func (ps *ProcfsGatherStorage) getJobsMap(sessions []stat_activity.SessionPid) hostJobMap {
 	hostJobs := make(hostJobMap)
 	// make work for each host
 	for _, process := range sessions {
@@ -42,7 +64,14 @@ func (bs *BackgroundStorage) getJobsMap(sessions []stat_activity.SessionPid) hos
 	return hostJobs
 }
 
-func (bs *BackgroundStorage) processProcfsRequests(ctx context.Context, hostname string, portn uint32, gatherTimeout time.Duration, maxMsgSize int, reqs []stat_activity.SessionPid) error {
+func (ps *ProcfsGatherStorage) addProcfsStat(procfsStat []*pbc.GpPidProcInfo) {
+	ps.mx.Lock()
+	defer ps.mx.Unlock()
+
+	ps.procfsStat = append(ps.procfsStat, procfsStat...)
+}
+
+func (ps *ProcfsGatherStorage) processProcfsRequests(ctx context.Context, hostname string, portn uint32, gatherTimeout time.Duration, maxMsgSize int, reqs []stat_activity.SessionPid) error {
 	grpcConn, err := getGrpcClientConnection(ctx, hostname, portn, gatherTimeout.Seconds())
 	if err != nil {
 		return fmt.Errorf("grpc client connection error: %v", err)
@@ -65,34 +94,35 @@ func (bs *BackgroundStorage) processProcfsRequests(ctx context.Context, hostname
 				SessId:      int64(req.SessId),
 			})
 			if len(msgReq.SegmentProcess) >= jobsPerQuery {
-				_, errGet := cGet.GetPidProcStat(ctxTimeout, msgReq, maxSizeOption)
+				segResponse, errGet := cGet.GetPidProcStat(ctxTimeout, msgReq, maxSizeOption)
 				if errGet != nil {
 					return fmt.Errorf("grpc get pid proc stat error: %v", errGet)
 				}
+				ps.addProcfsStat(segResponse.GetPidProcData())
 				msgReq.SegmentProcess = make([]*pb.SegmentProcess, 0, 10)
 			}
 		}
 	}
 	if len(msgReq.SegmentProcess) > 0 {
-		_, errGet := cGet.GetPidProcStat(ctxTimeout, msgReq, maxSizeOption)
+		segResponse, errGet := cGet.GetPidProcStat(ctxTimeout, msgReq, maxSizeOption)
 		if errGet != nil {
 			return fmt.Errorf("grpc get pid proc stat error: %v", errGet)
 		}
-
+		ps.addProcfsStat(segResponse.GetPidProcData())
 	}
 	return nil
 }
 
-func (bs *BackgroundStorage) GatherProcfsStat(ctx context.Context, nPullers int, portn uint32, gatherTimeout time.Duration, maxMsgSize int) error {
+func (ps *ProcfsGatherStorage) GatherProcfsStat(ctx context.Context, nPullers int, portn uint32, gatherTimeout time.Duration, maxMsgSize int) error {
 	if nPullers <= 0 {
 		return fmt.Errorf("nPullers must be greater than 0, got %d", nPullers)
 	}
-	bs.l.Debug("GatherProcfsStat")
-	sessions, err := bs.statActivityLister.ListAllSessions(ctx)
+	ps.l.Debug("GatherProcfsStat")
+	sessions, err := ps.statActivityLister.ListAllSessions(ctx)
 	if err != nil {
 		return fmt.Errorf("error listing sessions pids: %v", err)
 	}
-	hostJobs := bs.getJobsMap(sessions)
+	hostJobs := ps.getJobsMap(sessions)
 
 	ctxT, ctxTC := context.WithTimeout(ctx, gatherTimeout)
 	defer ctxTC()
@@ -101,9 +131,16 @@ func (bs *BackgroundStorage) GatherProcfsStat(ctx context.Context, nPullers int,
 
 	for hostname, procfsProcesses := range hostJobs {
 		g.Go(func() error {
-			return bs.processProcfsRequests(ctxG, hostname, portn, gatherTimeout, maxMsgSize, procfsProcesses)
+			return ps.processProcfsRequests(ctxG, hostname, portn, gatherTimeout, maxMsgSize, procfsProcesses)
 		})
 	}
 
 	return g.Wait()
+}
+
+func (ps *ProcfsGatherStorage) GetProcfsStat() []*pbc.GpPidProcInfo {
+	ps.mx.RLock()
+	defer ps.mx.RUnlock()
+
+	return slices.Clone(ps.procfsStat)
 }

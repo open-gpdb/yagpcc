@@ -138,7 +138,8 @@ func setupGRPCClientSet(t *testing.T, sessionMocker *MockStatActivityLister) (*g
 	rqStorage := storage.NewRunningQueriesStorage()
 	sessStorage := gp.NewSessionsStorage(rqStorage)
 	aggStorage := storage.NewAggregatedStorage(zLogger)
-	backgroundStorage := master.NewBackgroundStorage(zLogger, sessStorage, rqStorage, aggStorage, sessionMocker)
+	procfsStorage := storage.NewProcfsStorage()
+	backgroundStorage := master.NewBackgroundStorage(zLogger, sessStorage, rqStorage, aggStorage, procfsStorage, sessionMocker)
 
 	conn, err := gogrpc.NewClient(
 		"localhost",

@@ -39,6 +39,7 @@ type (
 		SessionStorage     *gp.SessionsStorage
 		AggStorage         *storage.AggregatedStorage
 		RQStorage          *storage.RunningQueriesStorage
+		ProcfsStorage      *storage.ProcfsStorage
 		statActivityLister statActivityLister
 	}
 )
@@ -48,6 +49,22 @@ var (
 	segCount     int
 	segCountLock sync.Mutex
 )
+
+func NewBackgroundStorage(l *zap.SugaredLogger,
+	sessionStorage *gp.SessionsStorage,
+	rqStorage *storage.RunningQueriesStorage,
+	aggStorage *storage.AggregatedStorage,
+	procfsStorage *storage.ProcfsStorage,
+	sActivityLister statActivityLister) *BackgroundStorage {
+	return &BackgroundStorage{
+		l:                  l,
+		SessionStorage:     sessionStorage,
+		AggStorage:         aggStorage,
+		RQStorage:          rqStorage,
+		ProcfsStorage:      procfsStorage,
+		statActivityLister: sActivityLister,
+	}
+}
 
 func (bs *BackgroundStorage) SendSegmentRefreshMessages(ctx context.Context, pullRateSec float64, configCacheDurability time.Duration, portn uint32, customSegmentList *config.SegmentList) error {
 
@@ -472,10 +489,13 @@ func (bs *BackgroundStorage) RefreshProcfs(ctx context.Context, procfsRefreshInt
 			return fmt.Errorf("done context with %v", ctx.Err())
 		default:
 			bs.l.Debugf("Refresh procfs stat %v", currTime)
-			err := bs.GatherProcfsStat(ctx, nPullers, portn, procfsRefreshInterval, msgSize)
+			procfsGatherStorage := NewProcfsGatherStorage(bs.l, bs.statActivityLister, currTime)
+			err := procfsGatherStorage.GatherProcfsStat(ctx, nPullers, portn, procfsRefreshInterval, msgSize)
 			if err != nil {
 				// just log error, do not fail the whole service
 				bs.l.Errorf("fail to get procfs data %v", err)
+			} else {
+				bs.ProcfsStorage.RegisterProcfsStat(currTime, procfsGatherStorage.GetProcfsStat())
 			}
 		}
 		if metrics.YagpccMetrics != nil {
@@ -495,16 +515,6 @@ func InitConnection(ctx context.Context, l *zap.SugaredLogger, cfg *config.Confi
 		return err
 	}
 	return nil
-}
-
-func NewBackgroundStorage(l *zap.SugaredLogger, sessionStorage *gp.SessionsStorage, rqStorage *storage.RunningQueriesStorage, aggStorage *storage.AggregatedStorage, sActivityLister statActivityLister) *BackgroundStorage {
-	return &BackgroundStorage{
-		l:                  l,
-		SessionStorage:     sessionStorage,
-		AggStorage:         aggStorage,
-		RQStorage:          rqStorage,
-		statActivityLister: sActivityLister,
-	}
 }
 
 func InitBG(
