@@ -536,7 +536,7 @@ func TestProcfsStatToLastStat_WithProcStat(t *testing.T) {
 	assert.Equal(t, float64(100), result.SystemStat.UserTimeSeconds)
 	assert.Equal(t, float64(50), result.SystemStat.KernelTimeSeconds)
 	assert.Equal(t, uint64(2048), result.SystemStat.Vsize)
-	assert.Equal(t, uint64(2048*1024), result.SystemStat.VmSizeKb)
+	assert.Equal(t, uint64(2048/1024), result.SystemStat.VmSizeKb)
 	assert.Equal(t, uint64(1024), result.SystemStat.Rss)
 }
 

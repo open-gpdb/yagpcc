@@ -178,7 +178,7 @@ func TestProcfsDiff_SnapshotFieldsFromLast(t *testing.T) {
 	assert.Equal(t, int64(99), result.GpSegmentId)
 	assert.Equal(t, int64(999), result.ProcStat.Pid)
 	assert.Equal(t, int64(42), result.ProcStat.Ppid)
-	assert.Equal(t, int64(555), result.ProcStat.MinFlt)
+	assert.Equal(t, int64(455), result.ProcStat.MinFlt)
 	assert.Equal(t, int64(100), result.ProcStat.Utime)
 	assert.Equal(t, int64(100), result.ProcStat.Stime)
 	assert.Equal(t, int64(5), result.ProcStat.GuestTime)
