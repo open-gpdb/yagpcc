@@ -85,6 +85,9 @@ func NewProcfsStorage(opts ...ProcfsOption) *ProcfsStorage {
 
 func WithMaximumStoredPoints(maximumStoredPoints int) ProcfsOption {
 	return func(p *ProcfsStorage) {
+		if maximumStoredPoints < 1 {
+			maximumStoredPoints = 1
+		}
 		p.maximumStoredPoints = maximumStoredPoints
 	}
 }

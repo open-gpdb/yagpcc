@@ -487,6 +487,9 @@ func (bs *BackgroundStorage) RefreshQueries(ctx context.Context,
 }
 
 func (bs *BackgroundStorage) RefreshProcfs(ctx context.Context, procfsRefreshInterval time.Duration, nPullers int, portn uint32, msgSize int) error {
+	if procfsRefreshInterval <= 0 {
+		return fmt.Errorf("procfsRefreshInterval must be > 0, got %v", procfsRefreshInterval)
+	}
 	ticker := time.NewTicker(procfsRefreshInterval)
 	defer ticker.Stop()
 

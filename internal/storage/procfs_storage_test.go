@@ -374,6 +374,33 @@ func TestTidyUpProcfsStat_EmptySlice(t *testing.T) {
 	assert.Empty(t, ps.procfsStat)
 }
 
+func TestWithMaximumStoredPoints_Clamping(t *testing.T) {
+	// zero should be clamped to 1
+	ps := NewProcfsStorage(WithMaximumStoredPoints(0))
+	assert.Equal(t, 1, ps.maximumStoredPoints)
+
+	// negative should be clamped to 1
+	ps = NewProcfsStorage(WithMaximumStoredPoints(-5))
+	assert.Equal(t, 1, ps.maximumStoredPoints)
+
+	// positive value should be kept as-is
+	ps = NewProcfsStorage(WithMaximumStoredPoints(10))
+	assert.Equal(t, 10, ps.maximumStoredPoints)
+}
+
+func TestTidyUpProcfsStat_WithMinimumStoredPoints(t *testing.T) {
+	// maximumStoredPoints of 1 (the minimum after clamping) must work correctly
+	ps := NewProcfsStorage(WithMaximumStoredPoints(1))
+	for i := 0; i < 5; i++ {
+		ps.RegisterProcfsStat(time.Unix(int64(i), 0), []*pbc.GpPidProcInfo{
+			{GpSegmentId: int64(i), SessId: 1, Pid: 1, Cmdline: "cmd"},
+		})
+	}
+	ps.mx.RLock()
+	defer ps.mx.RUnlock()
+	assert.Len(t, ps.procfsStat, 1)
+}
+
 // --- getNMin, get5Min, get15Min, get30Min ---
 
 func buildWithUniqueData(seconds ...float64) *ProcfsStorage {

@@ -160,5 +160,17 @@ func ReadFromFile(configFile string) (*Config, error) {
 }
 
 func (cfg *Config) Validate() error {
+	if cfg.SessionRefreshInterval <= 0 {
+		return fmt.Errorf("session_refresh_interval must be > 0, got %v", cfg.SessionRefreshInterval)
+	}
+	if cfg.QueriesRefreshInterval <= 0 {
+		return fmt.Errorf("queries_refresh_interval must be > 0, got %v", cfg.QueriesRefreshInterval)
+	}
+	if cfg.ProcfsRefreshInterval <= 0 {
+		return fmt.Errorf("procfs_refresh_interval must be > 0, got %v", cfg.ProcfsRefreshInterval)
+	}
+	if cfg.SessionSendMetricInterval <= 0 {
+		return fmt.Errorf("session_send_metric_interval must be > 0, got %v", cfg.SessionSendMetricInterval)
+	}
 	return nil
 }
