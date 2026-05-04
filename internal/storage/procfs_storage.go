@@ -3,6 +3,7 @@ package storage
 import (
 	"errors"
 	"fmt"
+	"maps"
 	"sync"
 	"time"
 
@@ -131,7 +132,7 @@ func (p *ProcfsStorage) GetNearestNTime(d time.Duration) (ProcMap, error) {
 		break
 	}
 
-	return p.procfsStat[minIndex].pidProcData, nil
+	return maps.Clone(p.procfsStat[minIndex].pidProcData), nil
 }
 
 func (p *ProcfsStorage) getNMin(d time.Duration) (ProcMap, ProcMap, error) {
