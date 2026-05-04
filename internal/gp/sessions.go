@@ -578,7 +578,7 @@ func (s *SessionsStorage) GetAllSessions(showSystem bool, runningQType pbm.Runni
 
 func procfsStatToLastStat(procfsStat *pbc.GpPidProcInfo) (*pbc.GPMetrics, error) {
 	if procfsStat == nil {
-		return nil, fmt.Errorf("Empty procfs info")
+		return nil, fmt.Errorf("empty procfs info")
 	}
 	result := &pbc.GPMetrics{
 		SystemStat: &pbc.SystemStat{},
