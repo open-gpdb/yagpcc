@@ -45,12 +45,16 @@ const (
 	defaultStoredPoints = 30
 )
 
-func NewProcfsStorage() *ProcfsStorage {
-	return &ProcfsStorage{
+func NewProcfsStorage(opts ...ProcfsOption) *ProcfsStorage {
+	p := &ProcfsStorage{
 		mx:                  &sync.RWMutex{},
 		maximumStoredPoints: defaultStoredPoints,
-		procfsStat:          make([]ProcfsStatType, 0, defaultStoredPoints),
 	}
+	for _, opt := range opts {
+		opt(p)
+	}
+	p.procfsStat = make([]ProcfsStatType, 0, p.maximumStoredPoints)
+	return p
 }
 
 func WithMaximumStoredPoints(maximumStoredPoints int) ProcfsOption {
@@ -109,6 +113,13 @@ func (p *ProcfsStorage) GetNearestNTime(d time.Duration) (ProcMap, error) {
 	p.mx.RLock()
 	defer p.mx.RUnlock()
 
+	return p.getNearestNTimeUnlocked(d)
+}
+
+// getNearestNTimeUnlocked searches for the nearest snapshot without acquiring a lock.
+// Callers must hold at least p.mx.RLock before calling this method.
+// Returns the ProcMap snapshot closest to duration d in the past, or an error if no data exists.
+func (p *ProcfsStorage) getNearestNTimeUnlocked(d time.Duration) (ProcMap, error) {
 	if len(p.procfsStat) == 0 {
 		return nil, errors.New("no data in procfsStat")
 	}
@@ -136,11 +147,14 @@ func (p *ProcfsStorage) GetNearestNTime(d time.Duration) (ProcMap, error) {
 }
 
 func (p *ProcfsStorage) getNMin(d time.Duration) (ProcMap, ProcMap, error) {
-	nearest, err := p.GetNearestNTime(d)
+	p.mx.RLock()
+	defer p.mx.RUnlock()
+
+	nearest, err := p.getNearestNTimeUnlocked(d)
 	if err != nil {
 		return nil, nil, fmt.Errorf("fail in get %s interval: %w", d, err)
 	}
-	return nearest, p.procfsStat[len(p.procfsStat)-1].pidProcData, nil
+	return nearest, maps.Clone(p.procfsStat[len(p.procfsStat)-1].pidProcData), nil
 }
 
 func (p *ProcfsStorage) Get5Min() (ProcMap, ProcMap, error) {

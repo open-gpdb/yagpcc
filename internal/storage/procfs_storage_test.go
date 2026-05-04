@@ -420,7 +420,7 @@ func TestGetNMin_EmptyStorage(t *testing.T) {
 	require.Error(t, err)
 	assert.Nil(t, nearest)
 	assert.Nil(t, latest)
-	assert.Contains(t, err.Error(), "fail in get 5 minutes interval")
+	assert.Contains(t, err.Error(), "fail in get 5m0s interval")
 }
 
 func TestGetNMin_SingleElement(t *testing.T) {
