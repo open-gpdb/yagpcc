@@ -597,7 +597,7 @@ func InitBG(
 	)
 	errG.Go(func() error {
 		err := backgroundStorage.RefreshProcfs(ctxI, cfg.ProcfsRefreshInterval, int(cfg.SegmentPullThreads), cfg.ListenPort, int(cfg.MaxMessageSize))
-		l.Errorf("got %v refresh session and queries", err)
+		l.Errorf("got %v in RefreshProcfs", err)
 		return err
 	},
 	)
