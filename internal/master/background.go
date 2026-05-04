@@ -39,6 +39,7 @@ type (
 		SessionStorage     *gp.SessionsStorage
 		AggStorage         *storage.AggregatedStorage
 		RQStorage          *storage.RunningQueriesStorage
+		procfsStorage      *storage.ProcfsStorage
 		statActivityLister statActivityLister
 	}
 )
@@ -48,6 +49,22 @@ var (
 	segCount     int
 	segCountLock sync.Mutex
 )
+
+func NewBackgroundStorage(l *zap.SugaredLogger,
+	sessionStorage *gp.SessionsStorage,
+	rqStorage *storage.RunningQueriesStorage,
+	aggStorage *storage.AggregatedStorage,
+	procfsStorage *storage.ProcfsStorage,
+	sActivityLister statActivityLister) *BackgroundStorage {
+	return &BackgroundStorage{
+		l:                  l,
+		SessionStorage:     sessionStorage,
+		AggStorage:         aggStorage,
+		RQStorage:          rqStorage,
+		procfsStorage:      procfsStorage,
+		statActivityLister: sActivityLister,
+	}
+}
 
 func (bs *BackgroundStorage) SendSegmentRefreshMessages(ctx context.Context, pullRateSec float64, configCacheDurability time.Duration, portn uint32, customSegmentList *config.SegmentList) error {
 
@@ -237,14 +254,16 @@ func (bs *BackgroundStorage) launchArchivers(ctx context.Context,
 }
 
 func (bs *BackgroundStorage) SendSessionMetrics(ctx context.Context, sessChan chan *gp.SessionDataWrite, sessionSendMetricInterval time.Duration, clusterID string, hostname string) error {
+	ticker := time.NewTicker(sessionSendMetricInterval)
+	defer ticker.Stop()
+
 	for {
-		currTime := time.Now().Truncate(time.Second)
-		nextTime := currTime.Add(sessionSendMetricInterval)
 		select {
 		case <-ctx.Done():
 			bs.l.Warn("Done SendSessionMetrics")
 			return fmt.Errorf("done context with %v", ctx.Err())
-		default:
+		case <-ticker.C:
+			currTime := time.Now()
 			// send session stat
 			sMap := bs.SessionStorage.GetSessions()
 			for keySO, valSO := range sMap {
@@ -274,11 +293,10 @@ func (bs *BackgroundStorage) SendSessionMetrics(ctx context.Context, sessChan ch
 			if metrics.YagpccMetrics != nil {
 				metrics.YagpccMetrics.TotalSessions.Set(float64(bs.SessionStorage.SessionsCount()))
 			}
+			if metrics.YagpccMetrics != nil {
+				metrics.YagpccMetrics.HandleLatencies.With(map[string]string{"method": "SendSessionMetrics"}).Observe(time.Since(currTime).Seconds())
+			}
 		}
-		if metrics.YagpccMetrics != nil {
-			metrics.YagpccMetrics.HandleLatencies.With(map[string]string{"method": "SendSessionMetrics"}).Observe(time.Since(currTime).Seconds())
-		}
-		time.Sleep(time.Until(nextTime))
 	}
 }
 
@@ -316,11 +334,15 @@ func (bs *BackgroundStorage) TryRefreshSessionsFromGP(
 	}
 
 	bs.l.Debugf("got %v sessions from gp", len(newSesList))
-	err = bs.SessionStorage.RefreshSessionList(bs.l, newSesList, clearDeletedSessions)
+	err = bs.SessionStorage.RefreshSessionList(newSesList, clearDeletedSessions)
 	if err != nil {
 		return fmt.Errorf("error refreshing sessions: %w", err)
 	}
 
+	err = bs.SessionStorage.RecalculateProcfsUsage()
+	if err != nil {
+		return fmt.Errorf("error recalculating procfs usage: %w", err)
+	}
 	bs.l.Debugf("refreshed session list")
 	return nil
 }
@@ -408,25 +430,26 @@ func (bs *BackgroundStorage) ClearCompletedQueries(ctx context.Context,
 }
 
 func (bs *BackgroundStorage) RefreshSessions(ctx context.Context, sessionRefreshInterval time.Duration, clearDeletedSessions bool) error {
+	ticker := time.NewTicker(sessionRefreshInterval)
+	defer ticker.Stop()
+
 	for {
-		currTime := time.Now()
-		nextTime := currTime.Truncate(sessionRefreshInterval).Add(sessionRefreshInterval)
 		select {
 		case <-ctx.Done():
 			bs.l.Warn("Done RefreshSessions")
 			return fmt.Errorf("done context with %v", ctx.Err())
-		default:
+		case <-ticker.C:
+			currTime := time.Now()
 			bs.l.Info("Refresh session List")
 			err := bs.TryRefreshSessionsFromGP(ctx, clearDeletedSessions)
 			if err != nil {
 				bs.l.Errorf("fail to refresh session list %v", err)
 				return err
 			}
+			if metrics.YagpccMetrics != nil {
+				metrics.YagpccMetrics.HandleLatencies.With(map[string]string{"method": "RefreshSessions"}).Observe(time.Since(currTime).Seconds())
+			}
 		}
-		if metrics.YagpccMetrics != nil {
-			metrics.YagpccMetrics.HandleLatencies.With(map[string]string{"method": "RefreshSessions"}).Observe(time.Since(currTime).Seconds())
-		}
-		time.Sleep(time.Until(nextTime))
 	}
 }
 
@@ -435,14 +458,16 @@ func (bs *BackgroundStorage) RefreshQueries(ctx context.Context,
 	queriesRefreshInterval time.Duration,
 	segmentGetTimeoutSec float64,
 	clearDeletedSessions bool) error {
+	ticker := time.NewTicker(queriesRefreshInterval)
+	defer ticker.Stop()
+
 	for {
-		currTime := time.Now()
-		nextTime := currTime.Add(queriesRefreshInterval)
 		select {
 		case <-ctx.Done():
 			bs.l.Warn("Done RefreshQueries")
 			return fmt.Errorf("done context with %v", ctx.Err())
-		default:
+		case <-ticker.C:
+			currTime := time.Now()
 			bs.l.Debug("Clear queries list")
 			err := bs.ClearCompletedQueries(
 				ctx,
@@ -454,11 +479,42 @@ func (bs *BackgroundStorage) RefreshQueries(ctx context.Context,
 				bs.l.Errorf("fail to clear queries list %v", err)
 				return err
 			}
+			if metrics.YagpccMetrics != nil {
+				metrics.YagpccMetrics.HandleLatencies.With(map[string]string{"method": "RefreshQueries"}).Observe(time.Since(currTime).Seconds())
+			}
 		}
-		if metrics.YagpccMetrics != nil {
-			metrics.YagpccMetrics.HandleLatencies.With(map[string]string{"method": "RefreshQueries"}).Observe(time.Since(currTime).Seconds())
+	}
+}
+
+func (bs *BackgroundStorage) RefreshProcfs(ctx context.Context, procfsRefreshInterval time.Duration, nPullers int, portn uint32, msgSize int) error {
+	if procfsRefreshInterval <= 0 {
+		return fmt.Errorf("procfsRefreshInterval must be > 0, got %v", procfsRefreshInterval)
+	}
+	ticker := time.NewTicker(procfsRefreshInterval)
+	defer ticker.Stop()
+
+	procfsGatherer := NewProcfsGatherStorage(bs.l, bs.statActivityLister)
+
+	for {
+		select {
+		case <-ctx.Done():
+			bs.l.Warn("Done RefreshProcfs")
+			return fmt.Errorf("done context with %v", ctx.Err())
+		case <-ticker.C:
+			currTime := time.Now()
+			bs.l.Debugf("Refresh procfs stat %v", currTime)
+			result, err := procfsGatherer.GatherProcfsStat(ctx, nPullers, portn, procfsRefreshInterval, msgSize)
+			if err != nil {
+				// just log error, do not fail the whole service
+				bs.l.Errorf("fail to get procfs data %v", err)
+				continue
+			}
+			bs.procfsStorage.RegisterProcfsStat(currTime, result)
+			// measure only successfull latencies
+			if metrics.YagpccMetrics != nil {
+				metrics.YagpccMetrics.HandleLatencies.With(map[string]string{"method": "RefreshProcfs"}).Observe(time.Since(currTime).Seconds())
+			}
 		}
-		time.Sleep(time.Until(nextTime))
 	}
 }
 
@@ -472,16 +528,6 @@ func InitConnection(ctx context.Context, l *zap.SugaredLogger, cfg *config.Confi
 		return err
 	}
 	return nil
-}
-
-func NewBackgroundStorage(l *zap.SugaredLogger, sessionStorage *gp.SessionsStorage, rqStorage *storage.RunningQueriesStorage, aggStorage *storage.AggregatedStorage, sActivityLister statActivityLister) *BackgroundStorage {
-	return &BackgroundStorage{
-		l:                  l,
-		SessionStorage:     sessionStorage,
-		AggStorage:         aggStorage,
-		RQStorage:          rqStorage,
-		statActivityLister: sActivityLister,
-	}
 }
 
 func InitBG(
@@ -559,6 +605,12 @@ func InitBG(
 	errG.Go(func() error {
 		err := backgroundStorage.RefreshQueries(ctxI, archChan, cfg.QueriesRefreshInterval, cfg.SegmentGetTimeoutSec, cfg.ClearDeletedSessions)
 		l.Errorf("got %v refresh session and queries", err)
+		return err
+	},
+	)
+	errG.Go(func() error {
+		err := backgroundStorage.RefreshProcfs(ctxI, cfg.ProcfsRefreshInterval, int(cfg.SegmentPullThreads), cfg.ListenPort, int(cfg.MaxMessageSize))
+		l.Errorf("got %v in RefreshProcfs", err)
 		return err
 	},
 	)

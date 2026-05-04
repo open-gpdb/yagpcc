@@ -11,6 +11,7 @@ import (
 
 	pbm "github.com/open-gpdb/yagpcc/api/proto/agent_master"
 	pbc "github.com/open-gpdb/yagpcc/api/proto/common"
+	"github.com/open-gpdb/yagpcc/internal/storage"
 	"github.com/open-gpdb/yagpcc/internal/utils"
 )
 
@@ -123,7 +124,7 @@ func TestRefreshSessionList(t *testing.T) {
 	file, err := os.Create("trace.log")
 	require.NoError(t, err)
 	zLogger := utils.DualLog(true, file)
-	s := NewSessionsStorage(nil)
+	s := NewSessionsStorage(zLogger, nil, nil)
 
 	activityList1 := []*GpStatActivity{
 		{
@@ -142,7 +143,7 @@ func TestRefreshSessionList(t *testing.T) {
 		},
 	}
 
-	err = s.RefreshSessionList(zLogger, activityList1, true)
+	err = s.RefreshSessionList(activityList1, true)
 	if err != nil {
 		t.Errorf("%v", err)
 	}
@@ -165,7 +166,7 @@ func TestRefreshSessionList(t *testing.T) {
 		},
 	}
 
-	err = s.RefreshSessionList(zLogger, activityList2, true)
+	err = s.RefreshSessionList(activityList2, true)
 	if err != nil {
 		t.Errorf("%v", err)
 	}
@@ -194,7 +195,7 @@ func TestRefreshSessionListNegativeSessID(t *testing.T) {
 	file, err := os.Create("trace.log")
 	require.NoError(t, err)
 	zLogger := utils.DualLog(true, file)
-	s := NewSessionsStorage(nil)
+	s := NewSessionsStorage(zLogger, nil, nil)
 
 	// One real client backend + three cloudberry system processes
 	// all reporting sess_id == -1 but with distinct pids.
@@ -205,7 +206,7 @@ func TestRefreshSessionListNegativeSessID(t *testing.T) {
 		{DatID: 1, Datname: "test", Pid: 19705, SessID: -1, TmID: 100}, // archiver
 	}
 
-	require.NoError(t, s.RefreshSessionList(zLogger, activityList1, true))
+	require.NoError(t, s.RefreshSessionList(activityList1, true))
 	assert.Equal(t, 4, len(s.sessMap), "every -1 session must get its own -pid key")
 
 	// real session is keyed by sess_id
@@ -228,7 +229,7 @@ func TestRefreshSessionListNegativeSessID(t *testing.T) {
 	// A second refresh with the SAME system processes must keep them
 	// (i.e. clearDeletedSessions must not thrash entries because the
 	// refresh-key derivation matches the insert-key derivation).
-	require.NoError(t, s.RefreshSessionList(zLogger, activityList1, true))
+	require.NoError(t, s.RefreshSessionList(activityList1, true))
 	assert.Equal(t, 4, len(s.sessMap), "stable refresh must not delete and recreate -pid entries")
 
 	// Drop one system process (pid=19703 / walwriter) and verify only that
@@ -240,7 +241,7 @@ func TestRefreshSessionListNegativeSessID(t *testing.T) {
 		{DatID: 1, Datname: "test", Pid: 19705, SessID: -1, TmID: 100},
 	}
 
-	require.NoError(t, s.RefreshSessionList(zLogger, activityList2, true))
+	require.NoError(t, s.RefreshSessionList(activityList2, true))
 	assert.Equal(t, 3, len(s.sessMap))
 
 	_, okS = s.sessMap[SessionKey{SessID: -19703}]
@@ -260,7 +261,7 @@ func TestRegisterNewSessionQuery(t *testing.T) {
 	if err != nil {
 		t.Errorf("%v", err)
 	}
-	s := NewSessionsStorage(nil)
+	s := NewSessionsStorage(zLogger, nil, nil)
 	qKey := pbc.QueryKey{Ssid: 1, Tmid: 100, Ccnt: 1}
 	qInfo := pbc.QueryInfo{QueryId: 1234, QueryText: "Select 1"}
 
@@ -290,7 +291,7 @@ func TestRegisterNewSessionQuery(t *testing.T) {
 		},
 	}
 
-	err = s.RefreshSessionList(zLogger, activityList, true)
+	err = s.RefreshSessionList(activityList, true)
 	if err != nil {
 		t.Errorf("%v", err)
 	}
@@ -307,7 +308,7 @@ func TestRegisterNewSessionQuery(t *testing.T) {
 	assert.Equal(t, valS.RefCounter, 2)
 	assert.Equal(t, valS.SessionData.RunningQueries.GetCurrentQuery(), int32(1))
 
-	err = s.RefreshSessionList(zLogger, activityList, true)
+	err = s.RefreshSessionList(activityList, true)
 	if err != nil {
 		t.Errorf("%v", err)
 	}
@@ -339,10 +340,16 @@ func TestRegisterNewSessionQuery(t *testing.T) {
 }
 
 func TestAggregateSessMetrics(t *testing.T) {
-	s := NewSessionsStorage(nil)
+	file, err := os.Create("trace.log")
+	require.NoError(t, err)
+	zLogger := utils.DualLog(true, file)
+	if err != nil {
+		t.Errorf("%v", err)
+	}
+	s := NewSessionsStorage(zLogger, nil, nil)
 	qKey := pbc.QueryKey{Ssid: 1, Tmid: 100, Ccnt: 1}
 	qInfo := pbc.QueryInfo{QueryId: 1234, QueryText: "Select 1"}
-	err := s.UpdateSessionQuery(&qKey, &qInfo, 0, &pbc.AdditionalQueryInfo{NestedLevel: 0}, false)
+	err = s.UpdateSessionQuery(&qKey, &qInfo, 0, &pbc.AdditionalQueryInfo{NestedLevel: 0}, false)
 	if err != nil {
 		t.Errorf("%v", err)
 	}
@@ -384,7 +391,13 @@ func TestAggregateSessMetrics(t *testing.T) {
 }
 
 func TestUpdateSessionStatAggregatedMetricsOnlyNestingLevelZero(t *testing.T) {
-	s := NewSessionsStorage(nil)
+	file, err := os.Create("trace.log")
+	require.NoError(t, err)
+	zLogger := utils.DualLog(true, file)
+	if err != nil {
+		t.Errorf("%v", err)
+	}
+	s := NewSessionsStorage(zLogger, nil, nil)
 	qKey := &pbc.QueryKey{Ssid: 1, Tmid: 100, Ccnt: 1}
 	qInfo := &pbc.QueryInfo{QueryId: 1234, QueryText: "Select 1"}
 	require.NoError(t, s.UpdateSessionQuery(qKey, qInfo, 0, &pbc.AdditionalQueryInfo{NestedLevel: 0}, false))
@@ -424,7 +437,13 @@ func TestUpdateSessionStatAggregatedMetricsOnlyNestingLevelZero(t *testing.T) {
 }
 
 func TestCanLock(t *testing.T) {
-	s := NewSessionsStorage(nil)
+	file, err := os.Create("trace.log")
+	require.NoError(t, err)
+	zLogger := utils.DualLog(true, file)
+	if err != nil {
+		t.Errorf("%v", err)
+	}
+	s := NewSessionsStorage(zLogger, nil, nil)
 	assert.Equal(t, true, s.CanLock())
 	s.mx.Lock()
 	defer s.mx.Unlock()
@@ -432,14 +451,26 @@ func TestCanLock(t *testing.T) {
 }
 
 func TestQueriesCount(t *testing.T) {
-	s := NewSessionsStorage(nil)
+	file, err := os.Create("trace.log")
+	require.NoError(t, err)
+	zLogger := utils.DualLog(true, file)
+	if err != nil {
+		t.Errorf("%v", err)
+	}
+	s := NewSessionsStorage(zLogger, nil, nil)
 	assert.Equal(t, 0, s.SessionsCount())
 	s.RegisterNewSessionQuery(nil, false, &pbc.QueryKey{Ssid: 1}, nil, 0)
 	assert.Equal(t, 1, s.SessionsCount())
 }
 
 func TestGetSession(t *testing.T) {
-	s := NewSessionsStorage(nil)
+	file, err := os.Create("trace.log")
+	require.NoError(t, err)
+	zLogger := utils.DualLog(true, file)
+	if err != nil {
+		t.Errorf("%v", err)
+	}
+	s := NewSessionsStorage(zLogger, nil, nil)
 	s.RegisterNewSessionQuery(nil, false, &pbc.QueryKey{Ssid: 1}, nil, 0)
 	val, ok := s.GetSession(SessionKey{SessID: 1})
 	assert.Equal(t, ok, true)
@@ -449,7 +480,13 @@ func TestGetSession(t *testing.T) {
 }
 
 func TestGetSessions(t *testing.T) {
-	s := NewSessionsStorage(nil)
+	file, err := os.Create("trace.log")
+	require.NoError(t, err)
+	zLogger := utils.DualLog(true, file)
+	if err != nil {
+		t.Errorf("%v", err)
+	}
+	s := NewSessionsStorage(zLogger, nil, nil)
 	testQ := []*pbc.QueryKey{{Ssid: 1}, {Ssid: 2}}
 	for _, tQ := range testQ {
 		s.RegisterNewSessionQuery(nil, false, tQ, nil, 0)
@@ -459,4 +496,310 @@ func TestGetSessions(t *testing.T) {
 		_, ok := s.GetSession(tQ)
 		assert.Equal(t, ok, true)
 	}
+}
+
+// --- procfsStatToLastStat ---
+
+func TestProcfsStatToLastStat_NilInput(t *testing.T) {
+	result, err := procfsStatToLastStat(nil)
+	require.Error(t, err)
+	assert.Nil(t, result)
+	assert.Contains(t, err.Error(), "empty procfs info")
+}
+
+func TestProcfsStatToLastStat_EmptyProcInfo(t *testing.T) {
+	// GpPidProcInfo with no ProcStat and no ProcIo
+	info := &pbc.GpPidProcInfo{}
+	result, err := procfsStatToLastStat(info)
+	require.NoError(t, err)
+	require.NotNil(t, result)
+	require.NotNil(t, result.SystemStat)
+	// All fields should be zero
+	assert.Equal(t, float64(0), result.SystemStat.UserTimeSeconds)
+	assert.Equal(t, float64(0), result.SystemStat.KernelTimeSeconds)
+	assert.Equal(t, uint64(0), result.SystemStat.Vsize)
+	assert.Equal(t, uint64(0), result.SystemStat.Rss)
+}
+
+func TestProcfsStatToLastStat_WithProcStat(t *testing.T) {
+	info := &pbc.GpPidProcInfo{
+		ProcStat: &pbc.ProcStat{
+			Utime: 100,
+			Stime: 50,
+			Vsize: 2048,
+			Rss:   1024,
+		},
+	}
+	result, err := procfsStatToLastStat(info)
+	require.NoError(t, err)
+	require.NotNil(t, result.SystemStat)
+	assert.Equal(t, float64(100), result.SystemStat.UserTimeSeconds)
+	assert.Equal(t, float64(50), result.SystemStat.KernelTimeSeconds)
+	assert.Equal(t, uint64(2048), result.SystemStat.Vsize)
+	assert.Equal(t, uint64(2048/1024), result.SystemStat.VmSizeKb)
+	assert.Equal(t, uint64(1024), result.SystemStat.Rss)
+}
+
+func TestProcfsStatToLastStat_WithProcIO(t *testing.T) {
+	info := &pbc.GpPidProcInfo{
+		ProcIo: &pbc.ProcIO{
+			Rchar:               500,
+			Wchar:               300,
+			Syscr:               10,
+			Syscw:               8,
+			ReadBytes:           1000,
+			WriteBytes:          800,
+			CancelledWriteBytes: 50,
+		},
+	}
+	result, err := procfsStatToLastStat(info)
+	require.NoError(t, err)
+	require.NotNil(t, result.SystemStat)
+	assert.Equal(t, uint64(500), result.SystemStat.Rchar)
+	assert.Equal(t, uint64(300), result.SystemStat.Wchar)
+	assert.Equal(t, uint64(10), result.SystemStat.Syscr)
+	assert.Equal(t, uint64(8), result.SystemStat.Syscw)
+	assert.Equal(t, uint64(1000), result.SystemStat.ReadBytes)
+	assert.Equal(t, uint64(800), result.SystemStat.WriteBytes)
+	assert.Equal(t, uint64(50), result.SystemStat.CancelledWriteBytes)
+}
+
+func TestProcfsStatToLastStat_WithBothProcStatAndProcIO(t *testing.T) {
+	info := &pbc.GpPidProcInfo{
+		ProcStat: &pbc.ProcStat{Utime: 42, Stime: 21, Vsize: 100, Rss: 50},
+		ProcIo:   &pbc.ProcIO{ReadBytes: 999, WriteBytes: 888},
+	}
+	result, err := procfsStatToLastStat(info)
+	require.NoError(t, err)
+	require.NotNil(t, result.SystemStat)
+	assert.Equal(t, float64(42), result.SystemStat.UserTimeSeconds)
+	assert.Equal(t, float64(21), result.SystemStat.KernelTimeSeconds)
+	assert.Equal(t, uint64(999), result.SystemStat.ReadBytes)
+	assert.Equal(t, uint64(888), result.SystemStat.WriteBytes)
+}
+
+// --- RecalculateProcfsUsage ---
+
+func newTestSessionsStorage(t *testing.T, procfsStorage *storage.ProcfsStorage) *SessionsStorage {
+	t.Helper()
+	file, err := os.Create("trace.log")
+	require.NoError(t, err)
+	zLogger := utils.DualLog(true, file)
+	return NewSessionsStorage(zLogger, nil, procfsStorage)
+}
+
+func TestRecalculateProcfsUsage_NilProcfsStorage(t *testing.T) {
+	// nil procfsStorage — RecalculateProcfsUsage should return nil (procfs disabled)
+	s := newTestSessionsStorage(t, nil)
+	activityList := []*GpStatActivity{
+		{DatID: 1, Datname: "test", Pid: 10, SessID: 1, TmID: 100},
+	}
+	require.NoError(t, s.RefreshSessionList(activityList, true))
+
+	err := s.RecalculateProcfsUsage()
+	require.NoError(t, err)
+}
+
+func TestRecalculateProcfsUsage_EmptyProcfsStorage(t *testing.T) {
+	// ProcfsStorage has no data — RecalculateProcfsUsage should return error
+	procfsStore := storage.NewProcfsStorage()
+	s := newTestSessionsStorage(t, procfsStore)
+
+	// Add a session
+	activityList := []*GpStatActivity{
+		{DatID: 1, Datname: "test", Pid: 10, SessID: 1, TmID: 100},
+	}
+	require.NoError(t, s.RefreshSessionList(activityList, true))
+
+	err := s.RecalculateProcfsUsage()
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "fail in get 5 min")
+}
+
+func TestRecalculateProcfsUsage_NoSessions(t *testing.T) {
+	// No sessions in storage — should succeed with no updates
+	procfsStore := storage.NewProcfsStorage()
+	procfsStore.RegisterProcfsStat(time.Now(), []*pbc.GpPidProcInfo{
+		{GpSegmentId: 0, SessId: 1, Pid: 10, ProcStat: &pbc.ProcStat{Utime: 100}},
+	})
+	s := newTestSessionsStorage(t, procfsStore)
+
+	err := s.RecalculateProcfsUsage()
+	require.NoError(t, err)
+}
+
+func TestRecalculateProcfsUsage_UpdatesLongRunningGPMetrics(t *testing.T) {
+	procfsStore := storage.NewProcfsStorage()
+	// Register two snapshots so get5Min works
+	base := time.Now().Add(-time.Second)
+	procfsStore.RegisterProcfsStat(base, []*pbc.GpPidProcInfo{
+		{GpSegmentId: 0, SessId: 1, Pid: 10,
+			ProcStat: &pbc.ProcStat{Utime: 10, Stime: 5, Vsize: 100, Rss: 50},
+			ProcIo:   &pbc.ProcIO{ReadBytes: 100, WriteBytes: 50}},
+	})
+	procfsStore.RegisterProcfsStat(base.Add(time.Second), []*pbc.GpPidProcInfo{
+		{GpSegmentId: 0, SessId: 1, Pid: 10,
+			ProcStat: &pbc.ProcStat{Utime: 30, Stime: 15, Vsize: 200, Rss: 100},
+			ProcIo:   &pbc.ProcIO{ReadBytes: 500, WriteBytes: 250}},
+	})
+
+	s := newTestSessionsStorage(t, procfsStore)
+	activityList := []*GpStatActivity{
+		{DatID: 1, Datname: "test", Pid: 10, SessID: 1, TmID: 100},
+	}
+	require.NoError(t, s.RefreshSessionList(activityList, true))
+
+	// Verify LongRunningGPMetrics is initially empty
+	valS, ok := s.GetSession(SessionKey{SessID: 1})
+	require.True(t, ok)
+	valS.SessionLock.RLock()
+	assert.Nil(t, valS.SessionData.LongRunningGPMetrics.SystemStat)
+	valS.SessionLock.RUnlock()
+
+	// Run RecalculateProcfsUsage
+	err := s.RecalculateProcfsUsage()
+	require.NoError(t, err)
+
+	// Verify LongRunningGPMetrics was updated
+	valS, ok = s.GetSession(SessionKey{SessID: 1})
+	require.True(t, ok)
+	valS.SessionLock.RLock()
+	defer valS.SessionLock.RUnlock()
+	require.NotNil(t, valS.SessionData.LongRunningGPMetrics)
+	require.NotNil(t, valS.SessionData.LongRunningGPMetrics.SystemStat)
+	// Diff: Utime=30-10=20, Stime=15-5=10
+	assert.Equal(t, float64(20), valS.SessionData.LongRunningGPMetrics.SystemStat.UserTimeSeconds)
+	assert.Equal(t, float64(10), valS.SessionData.LongRunningGPMetrics.SystemStat.KernelTimeSeconds)
+	// Diff: ReadBytes=500-100=400, WriteBytes=250-50=200
+	assert.Equal(t, uint64(400), valS.SessionData.LongRunningGPMetrics.SystemStat.ReadBytes)
+	assert.Equal(t, uint64(200), valS.SessionData.LongRunningGPMetrics.SystemStat.WriteBytes)
+	// Vsize and Rss are snapshot values from the diff (last snapshot values)
+	assert.Equal(t, uint64(200), valS.SessionData.LongRunningGPMetrics.SystemStat.Vsize)
+	assert.Equal(t, uint64(100), valS.SessionData.LongRunningGPMetrics.SystemStat.Rss)
+}
+
+func TestRecalculateProcfsUsage_MultipleSessions(t *testing.T) {
+	procfsStore := storage.NewProcfsStorage()
+	base := time.Now().Add(-time.Second)
+	procfsStore.RegisterProcfsStat(base, []*pbc.GpPidProcInfo{
+		{GpSegmentId: 0, SessId: 1, Pid: 10,
+			ProcStat: &pbc.ProcStat{Utime: 0}, ProcIo: &pbc.ProcIO{ReadBytes: 0}},
+		{GpSegmentId: 0, SessId: 2, Pid: 20,
+			ProcStat: &pbc.ProcStat{Utime: 0}, ProcIo: &pbc.ProcIO{ReadBytes: 0}},
+	})
+	procfsStore.RegisterProcfsStat(base.Add(time.Second), []*pbc.GpPidProcInfo{
+		{GpSegmentId: 0, SessId: 1, Pid: 10,
+			ProcStat: &pbc.ProcStat{Utime: 100}, ProcIo: &pbc.ProcIO{ReadBytes: 500}},
+		{GpSegmentId: 0, SessId: 2, Pid: 20,
+			ProcStat: &pbc.ProcStat{Utime: 200}, ProcIo: &pbc.ProcIO{ReadBytes: 600}},
+	})
+
+	s := newTestSessionsStorage(t, procfsStore)
+	activityList := []*GpStatActivity{
+		{DatID: 1, Datname: "test", Pid: 10, SessID: 1, TmID: 100},
+		{DatID: 1, Datname: "test", Pid: 20, SessID: 2, TmID: 100},
+	}
+	require.NoError(t, s.RefreshSessionList(activityList, true))
+
+	require.NoError(t, s.RecalculateProcfsUsage())
+
+	// Check session 1
+	valS1, ok := s.GetSession(SessionKey{SessID: 1})
+	require.True(t, ok)
+	valS1.SessionLock.RLock()
+	require.NotNil(t, valS1.SessionData.LongRunningGPMetrics.SystemStat)
+	assert.Equal(t, float64(100), valS1.SessionData.LongRunningGPMetrics.SystemStat.UserTimeSeconds)
+	assert.Equal(t, uint64(500), valS1.SessionData.LongRunningGPMetrics.SystemStat.ReadBytes)
+	valS1.SessionLock.RUnlock()
+
+	// Check session 2
+	valS2, ok := s.GetSession(SessionKey{SessID: 2})
+	require.True(t, ok)
+	valS2.SessionLock.RLock()
+	require.NotNil(t, valS2.SessionData.LongRunningGPMetrics.SystemStat)
+	assert.Equal(t, float64(200), valS2.SessionData.LongRunningGPMetrics.SystemStat.UserTimeSeconds)
+	assert.Equal(t, uint64(600), valS2.SessionData.LongRunningGPMetrics.SystemStat.ReadBytes)
+	valS2.SessionLock.RUnlock()
+}
+
+func TestRecalculateProcfsUsage_SessionWithoutProcfsData(t *testing.T) {
+	// Session 1 has procfs data, session 2 does not
+	procfsStore := storage.NewProcfsStorage()
+	base := time.Now().Add(-time.Second)
+	procfsStore.RegisterProcfsStat(base, []*pbc.GpPidProcInfo{
+		{GpSegmentId: 0, SessId: 1, Pid: 10,
+			ProcStat: &pbc.ProcStat{Utime: 0}},
+	})
+	procfsStore.RegisterProcfsStat(base.Add(time.Second), []*pbc.GpPidProcInfo{
+		{GpSegmentId: 0, SessId: 1, Pid: 10,
+			ProcStat: &pbc.ProcStat{Utime: 50}},
+	})
+
+	s := newTestSessionsStorage(t, procfsStore)
+	activityList := []*GpStatActivity{
+		{DatID: 1, Datname: "test", Pid: 10, SessID: 1, TmID: 100},
+		{DatID: 1, Datname: "test", Pid: 20, SessID: 2, TmID: 100},
+	}
+	require.NoError(t, s.RefreshSessionList(activityList, true))
+
+	require.NoError(t, s.RecalculateProcfsUsage())
+
+	// Session 1 should be updated
+	valS1, ok := s.GetSession(SessionKey{SessID: 1})
+	require.True(t, ok)
+	valS1.SessionLock.RLock()
+	require.NotNil(t, valS1.SessionData.LongRunningGPMetrics.SystemStat)
+	assert.Equal(t, float64(50), valS1.SessionData.LongRunningGPMetrics.SystemStat.UserTimeSeconds)
+	valS1.SessionLock.RUnlock()
+
+	// Session 2 should NOT be updated (no procfs data)
+	valS2, ok := s.GetSession(SessionKey{SessID: 2})
+	require.True(t, ok)
+	valS2.SessionLock.RLock()
+	assert.Nil(t, valS2.SessionData.LongRunningGPMetrics.SystemStat)
+	valS2.SessionLock.RUnlock()
+}
+
+func TestRecalculateProcfsUsage_OverwritesPreviousMetrics(t *testing.T) {
+	procfsStore := storage.NewProcfsStorage()
+	base := time.Now().Add(-2 * time.Second)
+	procfsStore.RegisterProcfsStat(base, []*pbc.GpPidProcInfo{
+		{GpSegmentId: 0, SessId: 1, Pid: 10,
+			ProcStat: &pbc.ProcStat{Utime: 0}, ProcIo: &pbc.ProcIO{ReadBytes: 0}},
+	})
+	procfsStore.RegisterProcfsStat(base.Add(time.Second), []*pbc.GpPidProcInfo{
+		{GpSegmentId: 0, SessId: 1, Pid: 10,
+			ProcStat: &pbc.ProcStat{Utime: 100}, ProcIo: &pbc.ProcIO{ReadBytes: 500}},
+	})
+
+	s := newTestSessionsStorage(t, procfsStore)
+	activityList := []*GpStatActivity{
+		{DatID: 1, Datname: "test", Pid: 10, SessID: 1, TmID: 100},
+	}
+	require.NoError(t, s.RefreshSessionList(activityList, true))
+
+	// First recalculation
+	require.NoError(t, s.RecalculateProcfsUsage())
+	valS, ok := s.GetSession(SessionKey{SessID: 1})
+	require.True(t, ok)
+	valS.SessionLock.RLock()
+	assert.Equal(t, float64(100), valS.SessionData.LongRunningGPMetrics.SystemStat.UserTimeSeconds)
+	valS.SessionLock.RUnlock()
+
+	// Register new snapshot with higher values
+	procfsStore.RegisterProcfsStat(base.Add(2*time.Second), []*pbc.GpPidProcInfo{
+		{GpSegmentId: 0, SessId: 1, Pid: 10,
+			ProcStat: &pbc.ProcStat{Utime: 300}, ProcIo: &pbc.ProcIO{ReadBytes: 1500}},
+	})
+
+	// Second recalculation should overwrite previous metrics
+	require.NoError(t, s.RecalculateProcfsUsage())
+	valS, ok = s.GetSession(SessionKey{SessID: 1})
+	require.True(t, ok)
+	valS.SessionLock.RLock()
+	// get5Min picks first=base (nearest to 5min ago), last=base+2s (latest)
+	// New diff: Utime=300-0=300, ReadBytes=1500-0=1500
+	assert.Equal(t, float64(300), valS.SessionData.LongRunningGPMetrics.SystemStat.UserTimeSeconds)
+	assert.Equal(t, uint64(1500), valS.SessionData.LongRunningGPMetrics.SystemStat.ReadBytes)
+	valS.SessionLock.RUnlock()
 }

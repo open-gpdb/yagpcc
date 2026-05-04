@@ -577,7 +577,7 @@ message SpillInfo {
 // See https://pkg.go.dev/github.com/prometheus/procfs#ProcStat
 message ProcStat {
     // The process ID.
-    int32 pid = 1;
+    int64 pid = 1;
 
     // The filename of the executable.
     string comm = 2;
@@ -586,7 +586,7 @@ message ProcStat {
     string state = 3;
 
     // The PID of the parent of this process.
-    int32 ppid = 4;
+    int64 ppid = 4;
 
     // The process group ID of the process.
     int32 pgrp = 5;
@@ -606,35 +606,35 @@ message ProcStat {
 
     // The number of minor faults the process has made which have not required
     // loading a memory page from disk.
-    int32 min_flt = 10;
+    int64 min_flt = 10;
 
     // The number of minor faults that the process's waited-for children have
     // made.
-    int32 cmin_flt = 11;
+    int64 cmin_flt = 11;
 
     // The number of major faults the process has made which have required
     // loading a memory page from disk.
-    int32 maj_flt = 12;
+    int64 maj_flt = 12;
 
     // The number of major faults that the process's waited-for children have
     // made.
-    int32 cmaj_flt = 13;
+    int64 cmaj_flt = 13;
 
     // Amount of time that this process has been scheduled in user mode,
     // measured in clock ticks.
-    int32 utime = 14;
+    int64 utime = 14;
 
     // Amount of time that this process has been scheduled in kernel mode,
     // measured in clock ticks.
-    int32 stime = 15;
+    int64 stime = 15;
 
     // Amount of time that this process's waited-for children have been
     // scheduled in user mode, measured in clock ticks.
-    int32 cutime = 16;
+    int64 cutime = 16;
 
     // Amount of time that this process's waited-for children have been
     // scheduled in kernel mode, measured in clock ticks.
-    int32 cstime = 17;
+    int64 cstime = 17;
 
     // For processes running a real-time scheduling policy, this is the negated
     // scheduling priority, minus one.
@@ -684,10 +684,10 @@ message ProcStat {
 
     // Guest time of the process (time spent running a virtual CPU for a guest
     // operating system), measured in clock ticks.
-    int32 guest_time = 32;
+    int64 guest_time = 32;
 
     // Guest time of the process's children, measured in clock ticks.
-    int32 cguest_time = 33;
+    int64 cguest_time = 33;
 }
 
 // ProcStatus provides status information about the process,
@@ -695,7 +695,7 @@ message ProcStat {
 // See https://pkg.go.dev/github.com/prometheus/procfs@v0.20.1#ProcStatus
 message ProcStatus {
     // The process ID.
-    int32 pid = 1;
+    int64 pid = 1;
 
     // The process name.
     string name = 2;

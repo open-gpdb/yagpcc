@@ -54,6 +54,7 @@ type Config struct {
 	ShortAggInterval           time.Duration      `config:"short_agg_interval" yaml:"short_agg_interval"`
 	SessionRefreshInterval     time.Duration      `config:"session_refresh_interval" yaml:"session_refresh_interval"`
 	QueriesRefreshInterval     time.Duration      `config:"session_refresh_interval" yaml:"queries_refresh_interval"`
+	ProcfsRefreshInterval      time.Duration      `config:"procfs_refresh_interval" yaml:"procfs_refresh_interval"`
 	SessionSendMetricInterval  time.Duration      `config:"session_send_metric_interval" yaml:"session_send_metric_interval"`
 	MinFreePercent             uint32             `config:"min_free_percent" yaml:"min_free_percent"`
 	CustomSegmentList          *SegmentList       `config:"custom_segment_list" yaml:"custom_segment_list"`
@@ -116,6 +117,7 @@ func DefaultConfig() (*Config, error) {
 		ShortAggInterval:           time.Duration(time.Minute * 10),
 		SessionRefreshInterval:     time.Duration(time.Second * 30),
 		QueriesRefreshInterval:     time.Duration(time.Second * 1),
+		ProcfsRefreshInterval:      time.Duration(time.Second * 60),
 		SessionSendMetricInterval:  time.Duration(time.Second * 60),
 		MinFreePercent:             10,
 		CustomSegmentList:          nil,
@@ -158,5 +160,17 @@ func ReadFromFile(configFile string) (*Config, error) {
 }
 
 func (cfg *Config) Validate() error {
+	if cfg.SessionRefreshInterval <= 0 {
+		return fmt.Errorf("session_refresh_interval must be > 0, got %v", cfg.SessionRefreshInterval)
+	}
+	if cfg.QueriesRefreshInterval <= 0 {
+		return fmt.Errorf("queries_refresh_interval must be > 0, got %v", cfg.QueriesRefreshInterval)
+	}
+	if cfg.ProcfsRefreshInterval <= 0 {
+		return fmt.Errorf("procfs_refresh_interval must be > 0, got %v", cfg.ProcfsRefreshInterval)
+	}
+	if cfg.SessionSendMetricInterval <= 0 {
+		return fmt.Errorf("session_send_metric_interval must be > 0, got %v", cfg.SessionSendMetricInterval)
+	}
 	return nil
 }

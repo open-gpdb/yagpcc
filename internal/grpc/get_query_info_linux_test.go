@@ -33,12 +33,12 @@ func TestGpPidProcInfo_CurrentProcess(t *testing.T) {
 	assert.NotEmpty(t, info.Cmdline)
 
 	require.NotNil(t, info.ProcStat)
-	assert.Equal(t, int32(pid), info.ProcStat.Pid)
+	assert.Equal(t, int64(pid), info.ProcStat.Pid)
 	assert.NotEmpty(t, info.ProcStat.Comm)
 	assert.NotEmpty(t, info.ProcStat.State)
 
 	require.NotNil(t, info.ProcStatus)
-	assert.Equal(t, int32(pid), info.ProcStatus.Pid)
+	assert.Equal(t, int64(pid), info.ProcStatus.Pid)
 	assert.NotEmpty(t, info.ProcStatus.Name)
 }
 

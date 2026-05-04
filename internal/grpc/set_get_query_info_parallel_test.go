@@ -29,8 +29,8 @@ func TestParallelSetGet(t *testing.T) {
 	require.NoError(t, err, "error setting up logger")
 	rqStorage := storage.NewRunningQueriesStorage()
 	aggStorage := storage.NewAggregatedStorage(zLogger)
-	sessStorage := gp.NewSessionsStorage(rqStorage)
-	backgroundStorage := master.NewBackgroundStorage(zLogger, sessStorage, rqStorage, aggStorage, nil)
+	sessStorage := gp.NewSessionsStorage(zLogger, rqStorage, nil)
+	backgroundStorage := master.NewBackgroundStorage(zLogger, sessStorage, rqStorage, aggStorage, nil, nil)
 
 	tests := []struct {
 		name      string

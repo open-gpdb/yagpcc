@@ -21,9 +21,9 @@ func newTestActionsServer(t *testing.T) *ActionsServer {
 	t.Helper()
 	z := zap.NewNop().Sugar()
 	rq := storage.NewRunningQueriesStorage()
-	sessStorage := gp.NewSessionsStorage(rq)
+	sessStorage := gp.NewSessionsStorage(z, rq, nil)
 	agg := storage.NewAggregatedStorage(z)
-	bg := master.NewBackgroundStorage(z, sessStorage, rq, agg, nil)
+	bg := master.NewBackgroundStorage(z, sessStorage, rq, agg, nil, nil)
 	return &ActionsServer{
 		Logger:            z,
 		Timeout:           5 * time.Second,
@@ -194,9 +194,8 @@ func TestTerminateSessions_NilBackgroundStorage_ReturnsError(t *testing.T) {
 
 func TestTerminateSessions_MatchingSessions_ReturnsResponses(t *testing.T) {
 	srv := newTestActionsServer(t)
-	z := zap.NewNop().Sugar()
 
-	err := srv.BackgroundStorage.SessionStorage.RefreshSessionList(z, []*gp.GpStatActivity{
+	err := srv.BackgroundStorage.SessionStorage.RefreshSessionList([]*gp.GpStatActivity{
 		{SessID: 1, Datname: "appdb", Usename: "alice"},
 		{SessID: 2, Datname: "otherdb", Usename: "bob"},
 	}, false)
@@ -216,11 +215,10 @@ func TestTerminateSessions_MatchingSessions_ReturnsResponses(t *testing.T) {
 
 func TestTerminateSessions_ForbiddenSessId_ReturnsPerSessionError(t *testing.T) {
 	srv := newTestActionsServer(t)
-	z := zap.NewNop().Sugar()
 
 	// SessID == 0 is forbidden; non-system username ensures the session passes
 	// the NotSystemSession filter and is returned by GetAllSessions.
-	err := srv.BackgroundStorage.SessionStorage.RefreshSessionList(z, []*gp.GpStatActivity{
+	err := srv.BackgroundStorage.SessionStorage.RefreshSessionList([]*gp.GpStatActivity{
 		{SessID: 0, Datname: "appdb", Usename: "alice"},
 	}, false)
 	require.NoError(t, err)
@@ -251,10 +249,9 @@ func TestTerminateSessions_NilSessionStorage_ReturnsError(t *testing.T) {
 
 func TestTerminateSessions_MixedSessions_ReturnsPerSessionResults(t *testing.T) {
 	srv := newTestActionsServer(t)
-	z := zap.NewNop().Sugar()
 
 	// SessID=0 is forbidden; SessID=3 is a regular session that will fail CancelQuery.
-	err := srv.BackgroundStorage.SessionStorage.RefreshSessionList(z, []*gp.GpStatActivity{
+	err := srv.BackgroundStorage.SessionStorage.RefreshSessionList([]*gp.GpStatActivity{
 		{SessID: 0, Datname: "appdb", Usename: "alice"},
 		{SessID: 3, Datname: "appdb", Usename: "alice"},
 	}, false)
