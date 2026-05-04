@@ -96,9 +96,11 @@ type (
 	SessionMapT map[SessionKey]*SessionInfo
 
 	SessionsStorage struct {
-		mx        *sync.RWMutex
-		sessMap   SessionMapT
-		rqStorage *storage.RunningQueriesStorage
+		l             *zap.SugaredLogger
+		mx            *sync.RWMutex
+		sessMap       SessionMapT
+		rqStorage     *storage.RunningQueriesStorage
+		procfsStorage *storage.ProcfsStorage
 	}
 )
 
@@ -111,11 +113,13 @@ var (
 	}
 )
 
-func NewSessionsStorage(rqStorage *storage.RunningQueriesStorage) *SessionsStorage {
+func NewSessionsStorage(l *zap.SugaredLogger, rqStorage *storage.RunningQueriesStorage, procfsStorage *storage.ProcfsStorage) *SessionsStorage {
 	return &SessionsStorage{
-		mx:        &sync.RWMutex{},
-		sessMap:   make(SessionMapT, 0),
-		rqStorage: rqStorage,
+		mx:            &sync.RWMutex{},
+		sessMap:       make(SessionMapT, 0),
+		l:             l,
+		rqStorage:     rqStorage,
+		procfsStorage: procfsStorage,
 	}
 }
 
@@ -572,9 +576,68 @@ func (s *SessionsStorage) GetAllSessions(showSystem bool, runningQType pbm.Runni
 	return result, nil
 }
 
-func (s *SessionsStorage) RefreshSessionList(l *zap.SugaredLogger, newList []*GpStatActivity, clearDeletedSessions bool) error {
+func procfsStatToLastStat(procfsStat *pbc.GpPidProcInfo) (*pbc.GPMetrics, error) {
+	if procfsStat == nil {
+		return nil, fmt.Errorf("Empty procfs info")
+	}
+	result := &pbc.GPMetrics{
+		SystemStat: &pbc.SystemStat{},
+	}
+	if procfsStat.ProcStat != nil {
+		result.SystemStat = &pbc.SystemStat{
+			UserTimeSeconds:   float64(procfsStat.ProcStat.Utime),
+			KernelTimeSeconds: float64(procfsStat.ProcStat.Stime),
+			Vsize:             uint64(procfsStat.ProcStat.Vsize),
+			VmSizeKb:          uint64(procfsStat.ProcStat.Vsize) * 1024,
+			Rss:               uint64(procfsStat.ProcStat.Rss),
+		}
+	}
+	if procfsStat.ProcIo != nil {
+		result.SystemStat.Rchar = uint64(procfsStat.ProcIo.Rchar)
+		result.SystemStat.Wchar = uint64(procfsStat.ProcIo.Wchar)
+		result.SystemStat.Syscr = uint64(procfsStat.ProcIo.Syscr)
+		result.SystemStat.Syscw = uint64(procfsStat.ProcIo.Syscw)
+		result.SystemStat.ReadBytes = uint64(procfsStat.ProcIo.ReadBytes)
+		result.SystemStat.WriteBytes = uint64(procfsStat.ProcIo.WriteBytes)
+		result.SystemStat.CancelledWriteBytes = uint64(procfsStat.ProcIo.CancelledWriteBytes)
+	}
+	return result, nil
+}
 
-	l.Debug("Refreshing session list")
+func (s *SessionsStorage) RecalculateProcfsUsage() error {
+	s.l.Debug("Recalculate procfs usage for last metrics")
+	s.mx.RLock()
+	clonedMap := maps.Clone(s.sessMap)
+	s.mx.RUnlock()
+	keyList := make([]int64, 0, 10)
+	for keyS := range clonedMap {
+		keyList = append(keyList, int64(keyS.SessID))
+	}
+	s.l.Debug("Recalculate procfs usage for last metrics", zap.Int("count", len(keyList)))
+	procfsStat, err := s.procfsStorage.GetProcfsSessions(keyList)
+	if err != nil {
+		return err
+	}
+	for keyS, valS := range clonedMap {
+		procfsStatForSess, ok := procfsStat[int64(keyS.SessID)]
+		if ok {
+			lastMetrics, err := procfsStatToLastStat(procfsStatForSess)
+			if err != nil {
+				// just skip errors
+				s.l.Debug("Fail to convert metrics %v", err)
+				continue
+			}
+			valS.SessionLock.Lock()
+			valS.SessionData.LongRunningGPMetrics = lastMetrics
+			valS.SessionLock.Unlock()
+		}
+	}
+	return nil
+}
+
+func (s *SessionsStorage) RefreshSessionList(newList []*GpStatActivity, clearDeletedSessions bool) error {
+
+	s.l.Debug("Refreshing session list")
 	refreshedSessID := make(map[SessionKey]bool, 0)
 	for _, valN := range newList {
 		// rewrite state for blocked sessions
@@ -645,9 +708,9 @@ func (s *SessionsStorage) RefreshSessionList(l *zap.SugaredLogger, newList []*Gp
 			keyPair.SessionLock.RUnlock()
 			// we expect here 1 refcounter because we store the last query
 			if refCounter > 1 {
-				l.Infof("Delete session %v with refcounter %v", keyPair.SessionKey, refCounter)
+				s.l.Infof("Delete session %v with refcounter %v", keyPair.SessionKey, refCounter)
 			}
-			l.Debugf("Delete session %v", keyPair.SessionKey)
+			s.l.Debugf("Delete session %v", keyPair.SessionKey)
 			if metrics.YagpccMetrics != nil {
 				metrics.YagpccMetrics.DeletedSessions.Inc()
 			}

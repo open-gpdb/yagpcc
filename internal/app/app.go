@@ -381,8 +381,8 @@ func Run(ctx context.Context, configFile string) error {
 	rqStorage := storage.NewConfiguredRunningQueriesStorage(cfg)
 	metrics.YagpccMetrics.ExecutingQueryLatencies.AssignQueryGetter(rqStorage.GetQueriesStartTime)
 	aggStorage := storage.NewConfiguredAggregatedStorage(logger, cfg)
-	sessionsStorage := gp.NewSessionsStorage(rqStorage)
 	procfsStorage := storage.NewProcfsStorage()
+	sessionsStorage := gp.NewSessionsStorage(logger, rqStorage, procfsStorage)
 
 	masterConnection := gp.NewConnection(baseApp.L(), &cfg.MasterConnection, nil)
 
