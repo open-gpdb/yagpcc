@@ -3,7 +3,6 @@ package master
 import (
 	"context"
 	"fmt"
-	"slices"
 	"sync"
 	"time"
 
@@ -27,21 +26,15 @@ type (
 	hostJobMap = map[string][]stat_activity.SessionPid
 
 	ProcfsGatherStorage struct {
-		mx                 *sync.RWMutex
-		procfsStat         []*pbc.GpPidProcInfo
 		l                  *zap.SugaredLogger
 		statActivityLister statActivityLister
-		gatherTime         time.Time
 	}
 )
 
-func NewProcfsGatherStorage(l *zap.SugaredLogger, sActivityLister statActivityLister, gTime time.Time) *ProcfsGatherStorage {
+func NewProcfsGatherStorage(l *zap.SugaredLogger, sActivityLister statActivityLister) *ProcfsGatherStorage {
 	return &ProcfsGatherStorage{
-		mx:                 &sync.RWMutex{},
 		l:                  l,
 		statActivityLister: sActivityLister,
-		gatherTime:         gTime,
-		procfsStat:         make([]*pbc.GpPidProcInfo, 0, 10),
 	}
 }
 
@@ -64,17 +57,10 @@ func (ps *ProcfsGatherStorage) getJobsMap(sessions []stat_activity.SessionPid) h
 	return hostJobs
 }
 
-func (ps *ProcfsGatherStorage) addProcfsStat(procfsStat []*pbc.GpPidProcInfo) {
-	ps.mx.Lock()
-	defer ps.mx.Unlock()
-
-	ps.procfsStat = append(ps.procfsStat, procfsStat...)
-}
-
-func (ps *ProcfsGatherStorage) processProcfsRequests(ctx context.Context, hostname string, portn uint32, gatherTimeout time.Duration, maxMsgSize int, reqs []stat_activity.SessionPid) error {
+func (ps *ProcfsGatherStorage) processProcfsRequests(ctx context.Context, hostname string, portn uint32, gatherTimeout time.Duration, maxMsgSize int, reqs []stat_activity.SessionPid) ([]*pbc.GpPidProcInfo, error) {
 	grpcConn, err := getGrpcClientConnection(ctx, hostname, portn, gatherTimeout.Seconds())
 	if err != nil {
-		return fmt.Errorf("grpc client connection error: %v", err)
+		return nil, fmt.Errorf("grpc client connection error: %v", err)
 	}
 	cGet := pb.NewGetQueryInfoClient(grpcConn)
 	ctxTimeout, ctxCancel := context.WithTimeout(ctx, gatherTimeout)
@@ -83,10 +69,11 @@ func (ps *ProcfsGatherStorage) processProcfsRequests(ctx context.Context, hostna
 	msgReq := &pb.GetPidProcInfoReq{
 		SegmentProcess: make([]*pb.SegmentProcess, 0, 10),
 	}
+	var result []*pbc.GpPidProcInfo
 	for _, req := range reqs {
 		select {
 		case <-ctx.Done():
-			return ctx.Err()
+			return nil, ctx.Err()
 		default:
 			msgReq.SegmentProcess = append(msgReq.SegmentProcess, &pb.SegmentProcess{
 				GpSegmentId: int64(req.GpSegmentId),
@@ -96,9 +83,9 @@ func (ps *ProcfsGatherStorage) processProcfsRequests(ctx context.Context, hostna
 			if len(msgReq.SegmentProcess) >= jobsPerQuery {
 				segResponse, errGet := cGet.GetPidProcStat(ctxTimeout, msgReq, maxSizeOption)
 				if errGet != nil {
-					return fmt.Errorf("grpc get pid proc stat error: %v", errGet)
+					return nil, fmt.Errorf("grpc get pid proc stat error: %v", errGet)
 				}
-				ps.addProcfsStat(segResponse.GetPidProcData())
+				result = append(result, segResponse.GetPidProcData()...)
 				msgReq.SegmentProcess = make([]*pb.SegmentProcess, 0, 10)
 			}
 		}
@@ -106,21 +93,21 @@ func (ps *ProcfsGatherStorage) processProcfsRequests(ctx context.Context, hostna
 	if len(msgReq.SegmentProcess) > 0 {
 		segResponse, errGet := cGet.GetPidProcStat(ctxTimeout, msgReq, maxSizeOption)
 		if errGet != nil {
-			return fmt.Errorf("grpc get pid proc stat error: %v", errGet)
+			return nil, fmt.Errorf("grpc get pid proc stat error: %v", errGet)
 		}
-		ps.addProcfsStat(segResponse.GetPidProcData())
+		result = append(result, segResponse.GetPidProcData()...)
 	}
-	return nil
+	return result, nil
 }
 
-func (ps *ProcfsGatherStorage) GatherProcfsStat(ctx context.Context, nPullers int, portn uint32, gatherTimeout time.Duration, maxMsgSize int) error {
+func (ps *ProcfsGatherStorage) GatherProcfsStat(ctx context.Context, nPullers int, portn uint32, gatherTimeout time.Duration, maxMsgSize int) ([]*pbc.GpPidProcInfo, error) {
 	if nPullers <= 0 {
-		return fmt.Errorf("nPullers must be greater than 0, got %d", nPullers)
+		return nil, fmt.Errorf("nPullers must be greater than 0, got %d", nPullers)
 	}
 	ps.l.Debug("GatherProcfsStat")
 	sessions, err := ps.statActivityLister.ListAllSessions(ctx)
 	if err != nil {
-		return fmt.Errorf("error listing sessions pids: %v", err)
+		return nil, fmt.Errorf("error listing sessions pids: %v", err)
 	}
 	hostJobs := ps.getJobsMap(sessions)
 
@@ -129,18 +116,24 @@ func (ps *ProcfsGatherStorage) GatherProcfsStat(ctx context.Context, nPullers in
 
 	g, ctxG := errgroup.WithContext(ctxT)
 
+	var mu sync.Mutex
+	var collected []*pbc.GpPidProcInfo
+
 	for hostname, procfsProcesses := range hostJobs {
 		g.Go(func() error {
-			return ps.processProcfsRequests(ctxG, hostname, portn, gatherTimeout, maxMsgSize, procfsProcesses)
+			result, errR := ps.processProcfsRequests(ctxG, hostname, portn, gatherTimeout, maxMsgSize, procfsProcesses)
+			if errR != nil {
+				return errR
+			}
+			mu.Lock()
+			collected = append(collected, result...)
+			mu.Unlock()
+			return nil
 		})
 	}
 
-	return g.Wait()
-}
-
-func (ps *ProcfsGatherStorage) GetProcfsStat() []*pbc.GpPidProcInfo {
-	ps.mx.RLock()
-	defer ps.mx.RUnlock()
-
-	return slices.Clone(ps.procfsStat)
+	if err := g.Wait(); err != nil {
+		return nil, err
+	}
+	return collected, nil
 }

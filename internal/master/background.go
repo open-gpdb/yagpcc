@@ -490,6 +490,8 @@ func (bs *BackgroundStorage) RefreshProcfs(ctx context.Context, procfsRefreshInt
 	ticker := time.NewTicker(procfsRefreshInterval)
 	defer ticker.Stop()
 
+	procfsGatherer := NewProcfsGatherStorage(bs.l, bs.statActivityLister)
+
 	for {
 		select {
 		case <-ctx.Done():
@@ -498,14 +500,13 @@ func (bs *BackgroundStorage) RefreshProcfs(ctx context.Context, procfsRefreshInt
 		case <-ticker.C:
 			currTime := time.Now()
 			bs.l.Debugf("Refresh procfs stat %v", currTime)
-			procfsGatherStorage := NewProcfsGatherStorage(bs.l, bs.statActivityLister, currTime)
-			err := procfsGatherStorage.GatherProcfsStat(ctx, nPullers, portn, procfsRefreshInterval, msgSize)
+			result, err := procfsGatherer.GatherProcfsStat(ctx, nPullers, portn, procfsRefreshInterval, msgSize)
 			if err != nil {
 				// just log error, do not fail the whole service
 				bs.l.Errorf("fail to get procfs data %v", err)
 				continue
 			}
-			bs.procfsStorage.RegisterProcfsStat(currTime, procfsGatherStorage.GetProcfsStat())
+			bs.procfsStorage.RegisterProcfsStat(currTime, result)
 			// measure only successfull latencies
 			if metrics.YagpccMetrics != nil {
 				metrics.YagpccMetrics.HandleLatencies.With(map[string]string{"method": "RefreshProcfs"}).Observe(time.Since(currTime).Seconds())

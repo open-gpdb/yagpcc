@@ -605,6 +605,9 @@ func procfsStatToLastStat(procfsStat *pbc.GpPidProcInfo) (*pbc.GPMetrics, error)
 }
 
 func (s *SessionsStorage) RecalculateProcfsUsage() error {
+	if s.procfsStorage == nil {
+		return nil
+	}
 	s.l.Debug("Recalculate procfs usage for last metrics")
 	s.mx.RLock()
 	clonedMap := maps.Clone(s.sessMap)

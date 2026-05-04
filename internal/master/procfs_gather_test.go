@@ -159,7 +159,7 @@ func newTestLogger() *zap.SugaredLogger {
 
 // newTestProcfsGatherStorage creates a properly initialized ProcfsGatherStorage for tests.
 func newTestProcfsGatherStorage(mock statActivityLister) *ProcfsGatherStorage {
-	return NewProcfsGatherStorage(newTestLogger(), mock, time.Now())
+	return NewProcfsGatherStorage(newTestLogger(), mock)
 }
 
 // injectBufconn registers a bufconn connection for the given hostname in the global cache.
@@ -183,108 +183,17 @@ func injectBufconn(t *testing.T, lis *bufconn.Listener) string {
 // ============================================================
 
 func TestNewProcfsGatherStorage(t *testing.T) {
-	gTime := time.Date(2025, 1, 1, 12, 0, 0, 0, time.UTC)
 	mock := &mockStatActivityLister{}
-	ps := NewProcfsGatherStorage(newTestLogger(), mock, gTime)
+	ps := NewProcfsGatherStorage(newTestLogger(), mock)
 
 	require.NotNil(t, ps)
-	require.NotNil(t, ps.mx)
-	assert.Equal(t, gTime, ps.gatherTime)
-	assert.NotNil(t, ps.procfsStat)
-	assert.Empty(t, ps.procfsStat)
+	assert.NotNil(t, ps.l)
+	assert.NotNil(t, ps.statActivityLister)
 }
 
 // ============================================================
 // Tests for addProcfsStat
 // ============================================================
-
-func TestAddProcfsStat_SingleBatch(t *testing.T) {
-	ps := newTestProcfsGatherStorage(nil)
-
-	data := []*pbc.GpPidProcInfo{
-		{GpSegmentId: 1, SessId: 10, Pid: 100, Cmdline: "cmd1"},
-		{GpSegmentId: 2, SessId: 20, Pid: 200, Cmdline: "cmd2"},
-	}
-	ps.addProcfsStat(data)
-
-	result := ps.GetProcfsStat()
-	require.Len(t, result, 2)
-	assert.Equal(t, "cmd1", result[0].Cmdline)
-	assert.Equal(t, "cmd2", result[1].Cmdline)
-}
-
-func TestAddProcfsStat_MultipleBatches(t *testing.T) {
-	ps := newTestProcfsGatherStorage(nil)
-
-	ps.addProcfsStat([]*pbc.GpPidProcInfo{
-		{GpSegmentId: 1, SessId: 10, Pid: 100, Cmdline: "batch1"},
-	})
-	ps.addProcfsStat([]*pbc.GpPidProcInfo{
-		{GpSegmentId: 2, SessId: 20, Pid: 200, Cmdline: "batch2"},
-		{GpSegmentId: 3, SessId: 30, Pid: 300, Cmdline: "batch3"},
-	})
-
-	result := ps.GetProcfsStat()
-	require.Len(t, result, 3)
-	assert.Equal(t, "batch1", result[0].Cmdline)
-	assert.Equal(t, "batch2", result[1].Cmdline)
-	assert.Equal(t, "batch3", result[2].Cmdline)
-}
-
-func TestAddProcfsStat_EmptyBatch(t *testing.T) {
-	ps := newTestProcfsGatherStorage(nil)
-
-	ps.addProcfsStat([]*pbc.GpPidProcInfo{})
-	assert.Empty(t, ps.GetProcfsStat())
-
-	ps.addProcfsStat(nil)
-	assert.Empty(t, ps.GetProcfsStat())
-}
-
-func TestAddProcfsStat_ConcurrentAccess(t *testing.T) {
-	ps := newTestProcfsGatherStorage(nil)
-
-	var wg sync.WaitGroup
-	for i := 0; i < 10; i++ {
-		wg.Add(1)
-		go func(id int) {
-			defer wg.Done()
-			ps.addProcfsStat([]*pbc.GpPidProcInfo{
-				{GpSegmentId: int64(id), Pid: int64(id * 100), Cmdline: fmt.Sprintf("cmd-%d", id)},
-			})
-		}(i)
-	}
-	wg.Wait()
-
-	result := ps.GetProcfsStat()
-	assert.Len(t, result, 10)
-}
-
-// ============================================================
-// Tests for GetProcfsStat
-// ============================================================
-
-func TestGetProcfsStat_Empty(t *testing.T) {
-	ps := newTestProcfsGatherStorage(nil)
-	result := ps.GetProcfsStat()
-	assert.NotNil(t, result)
-	assert.Empty(t, result)
-}
-
-func TestGetProcfsStat_ReturnsClone(t *testing.T) {
-	ps := newTestProcfsGatherStorage(nil)
-	ps.addProcfsStat([]*pbc.GpPidProcInfo{
-		{GpSegmentId: 1, Pid: 100, Cmdline: "original"},
-	})
-
-	result1 := ps.GetProcfsStat()
-	result2 := ps.GetProcfsStat()
-
-	// Modifying the returned slice should not affect the internal state
-	result1[0] = &pbc.GpPidProcInfo{Cmdline: "modified"}
-	assert.Equal(t, "original", result2[0].Cmdline)
-	assert.Equal(t, "original", ps.GetProcfsStat()[0].Cmdline)
-}
 
 // ============================================================
 // Tests for getJobsMap
@@ -360,7 +269,7 @@ func TestProcessProcfsRequests_Success(t *testing.T) {
 
 	ps := newTestProcfsGatherStorage(nil)
 	ctx := context.Background()
-	err := ps.processProcfsRequests(ctx, hostname, 0, 5*time.Second, 4*1024*1024, reqs)
+	_, err := ps.processProcfsRequests(ctx, hostname, 0, 5*time.Second, 4*1024*1024, reqs)
 	require.NoError(t, err)
 	called, lastReq := fakeSrv.snapshot()
 	assert.True(t, called, "expected GetPidProcStat to be called")
@@ -389,11 +298,10 @@ func TestProcessProcfsRequests_SavesData(t *testing.T) {
 	}
 
 	ps := newTestProcfsGatherStorage(nil)
-	err := ps.processProcfsRequests(context.Background(), hostname, 0, 5*time.Second, 4*1024*1024, reqs)
+	result, err := ps.processProcfsRequests(context.Background(), hostname, 0, 5*time.Second, 4*1024*1024, reqs)
 	require.NoError(t, err)
 
-	// Verify data was saved via addProcfsStat
-	result := ps.GetProcfsStat()
+	// Verify data was returned directly
 	require.Len(t, result, 2)
 	assert.Equal(t, int64(1), result[0].GpSegmentId)
 	assert.Equal(t, int64(100), result[0].Pid)
@@ -419,14 +327,13 @@ func TestProcessProcfsRequests_SavesDataWithBatching(t *testing.T) {
 	}
 
 	ps := newTestProcfsGatherStorage(nil)
-	err := ps.processProcfsRequests(context.Background(), hostname, 0, 10*time.Second, 4*1024*1024, reqs)
+	result, err := ps.processProcfsRequests(context.Background(), hostname, 0, 10*time.Second, 4*1024*1024, reqs)
 	require.NoError(t, err)
 
 	// Should have called the server at least twice (one batch of 1000, one of 5)
 	assert.GreaterOrEqual(t, dataSrv.getCalls(), 2)
 
-	// All data should be accumulated
-	result := ps.GetProcfsStat()
+	// All data should be returned
 	assert.Len(t, result, jobsPerQuery+5)
 }
 
@@ -440,12 +347,9 @@ func TestProcessProcfsRequests_GrpcError(t *testing.T) {
 	}
 
 	ps := newTestProcfsGatherStorage(nil)
-	err := ps.processProcfsRequests(context.Background(), hostname, 0, 5*time.Second, 4*1024*1024, reqs)
+	_, err := ps.processProcfsRequests(context.Background(), hostname, 0, 5*time.Second, 4*1024*1024, reqs)
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "simulated gRPC error")
-
-	// No data should have been saved
-	assert.Empty(t, ps.GetProcfsStat())
 }
 
 func TestProcessProcfsRequests_CancelledContext(t *testing.T) {
@@ -461,7 +365,7 @@ func TestProcessProcfsRequests_CancelledContext(t *testing.T) {
 	cancel() // cancel immediately
 
 	ps := newTestProcfsGatherStorage(nil)
-	err := ps.processProcfsRequests(ctx, hostname, 0, 5*time.Second, 4*1024*1024, reqs)
+	_, err := ps.processProcfsRequests(ctx, hostname, 0, 5*time.Second, 4*1024*1024, reqs)
 	if err != nil {
 		assert.ErrorIs(t, ctx.Err(), context.Canceled)
 	}
@@ -473,11 +377,11 @@ func TestProcessProcfsRequests_EmptyRequests(t *testing.T) {
 	hostname := injectBufconn(t, lis)
 
 	ps := newTestProcfsGatherStorage(nil)
-	err := ps.processProcfsRequests(context.Background(), hostname, 0, 5*time.Second, 4*1024*1024, nil)
+	result, err := ps.processProcfsRequests(context.Background(), hostname, 0, 5*time.Second, 4*1024*1024, nil)
 	require.NoError(t, err)
 	called, _ := fakeSrv.snapshot()
 	assert.False(t, called, "GetPidProcStat should not be called with empty segment list")
-	assert.Empty(t, ps.GetProcfsStat())
+	assert.Empty(t, result)
 }
 
 // ============================================================
@@ -490,7 +394,7 @@ func TestGatherProcfsStat_ListAllSessionsError(t *testing.T) {
 	}
 	ps := newTestProcfsGatherStorage(mock)
 
-	err := ps.GatherProcfsStat(context.Background(), 2, 50051, 5*time.Second, 4*1024*1024)
+	_, err := ps.GatherProcfsStat(context.Background(), 2, 50051, 5*time.Second, 4*1024*1024)
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "db connection failed")
 	assert.True(t, mock.listCalled)
@@ -502,10 +406,10 @@ func TestGatherProcfsStat_EmptySessions(t *testing.T) {
 	}
 	ps := newTestProcfsGatherStorage(mock)
 
-	err := ps.GatherProcfsStat(context.Background(), 2, 50051, 5*time.Second, 4*1024*1024)
+	result, err := ps.GatherProcfsStat(context.Background(), 2, 50051, 5*time.Second, 4*1024*1024)
 	require.NoError(t, err)
 	assert.True(t, mock.listCalled)
-	assert.Empty(t, ps.GetProcfsStat())
+	assert.Empty(t, result)
 }
 
 func TestGatherProcfsStat_WithSessions_SavesData(t *testing.T) {
@@ -523,12 +427,11 @@ func TestGatherProcfsStat_WithSessions_SavesData(t *testing.T) {
 	}
 	ps := newTestProcfsGatherStorage(mock)
 
-	err := ps.GatherProcfsStat(context.Background(), 2, 0, 5*time.Second, 4*1024*1024)
+	result, err := ps.GatherProcfsStat(context.Background(), 2, 0, 5*time.Second, 4*1024*1024)
 	require.NoError(t, err)
 	assert.True(t, mock.listCalled)
 
-	// Verify data was accumulated
-	result := ps.GetProcfsStat()
+	// Verify data was returned
 	require.Len(t, result, 2)
 	// Check that the PIDs match (order may vary due to concurrency)
 	pids := make(map[int64]bool)
@@ -550,7 +453,7 @@ func TestGatherProcfsStat_ContextCancelled(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
 
-	err := ps.GatherProcfsStat(ctx, 2, 50051, 5*time.Second, 4*1024*1024)
+	_, err := ps.GatherProcfsStat(ctx, 2, 50051, 5*time.Second, 4*1024*1024)
 	_ = err // may or may not error
 }
 
@@ -568,11 +471,10 @@ func TestGatherProcfsStat_GrpcFailure(t *testing.T) {
 	}
 	ps := newTestProcfsGatherStorage(mock)
 
-	err := ps.GatherProcfsStat(context.Background(), 2, 0, 5*time.Second, 4*1024*1024)
+	result, err := ps.GatherProcfsStat(context.Background(), 2, 0, 5*time.Second, 4*1024*1024)
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "simulated gRPC error")
-	// No data should be saved on error
-	assert.Empty(t, ps.GetProcfsStat())
+	assert.Nil(t, result)
 }
 
 func TestGatherProcfsStat_ManySessionsBatching(t *testing.T) {
@@ -594,11 +496,10 @@ func TestGatherProcfsStat_ManySessionsBatching(t *testing.T) {
 	mock := &mockStatActivityLister{sessions: sessions}
 	ps := newTestProcfsGatherStorage(mock)
 
-	err := ps.GatherProcfsStat(context.Background(), 4, 0, 10*time.Second, 4*1024*1024)
+	result, err := ps.GatherProcfsStat(context.Background(), 4, 0, 10*time.Second, 4*1024*1024)
 	require.NoError(t, err)
 	assert.True(t, mock.listCalled)
 
-	result := ps.GetProcfsStat()
 	assert.Len(t, result, jobsPerQuery+5)
 }
 
@@ -607,7 +508,7 @@ func TestGatherProcfsStat_InvalidNPullers(t *testing.T) {
 	ps := newTestProcfsGatherStorage(mock)
 
 	for _, n := range []int{0, -1, -100} {
-		err := ps.GatherProcfsStat(context.Background(), n, 50051, 5*time.Second, 4*1024*1024)
+		_, err := ps.GatherProcfsStat(context.Background(), n, 50051, 5*time.Second, 4*1024*1024)
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "nPullers must be greater than 0")
 		assert.False(t, mock.listCalled, "ListAllSessions should not be called for invalid nPullers")

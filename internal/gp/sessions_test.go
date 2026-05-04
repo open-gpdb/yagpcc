@@ -588,6 +588,18 @@ func newTestSessionsStorage(t *testing.T, procfsStorage *storage.ProcfsStorage) 
 	return NewSessionsStorage(zLogger, nil, procfsStorage)
 }
 
+func TestRecalculateProcfsUsage_NilProcfsStorage(t *testing.T) {
+	// nil procfsStorage — RecalculateProcfsUsage should return nil (procfs disabled)
+	s := newTestSessionsStorage(t, nil)
+	activityList := []*GpStatActivity{
+		{DatID: 1, Datname: "test", Pid: 10, SessID: 1, TmID: 100},
+	}
+	require.NoError(t, s.RefreshSessionList(activityList, true))
+
+	err := s.RecalculateProcfsUsage()
+	require.NoError(t, err)
+}
+
 func TestRecalculateProcfsUsage_EmptyProcfsStorage(t *testing.T) {
 	// ProcfsStorage has no data — RecalculateProcfsUsage should return error
 	procfsStore := storage.NewProcfsStorage()
