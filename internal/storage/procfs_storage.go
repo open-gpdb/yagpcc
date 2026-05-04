@@ -137,7 +137,7 @@ func (p *ProcfsStorage) GetNearestNTime(d time.Duration) (ProcMap, error) {
 func (p *ProcfsStorage) getNMin(d time.Duration) (ProcMap, ProcMap, error) {
 	nearest, err := p.GetNearestNTime(d)
 	if err != nil {
-		return nil, nil, fmt.Errorf("fail in get 5 minutes interval %v", err)
+		return nil, nil, fmt.Errorf("fail in get %s interval: %w", d, err)
 	}
 	return nearest, p.procfsStat[len(p.procfsStat)-1].pidProcData, nil
 }
