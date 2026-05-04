@@ -504,7 +504,7 @@ func TestProcfsStatToLastStat_NilInput(t *testing.T) {
 	result, err := procfsStatToLastStat(nil)
 	require.Error(t, err)
 	assert.Nil(t, result)
-	assert.Contains(t, err.Error(), "Empty procfs info")
+	assert.Contains(t, err.Error(), "empty procfs info")
 }
 
 func TestProcfsStatToLastStat_EmptyProcInfo(t *testing.T) {
