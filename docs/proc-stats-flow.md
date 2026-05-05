@@ -2,9 +2,9 @@
 
 This document describes how yagpcc collects per-process Linux procfs data
 (`/proc/<pid>/{stat,status,io,cmdline}`) for every Greenplum / Cloudberry
-backend across the cluster, attributes it to the running query and session,
-and proposes an architecture for `top`-style 5 / 15 / 30-minute rolling
-averages exposed on the master.
+backend across the cluster, attributes it to the running session, and
+exposes 5-minute rolling deltas on the master via the existing
+`LastMetrics` field on `SessionState`.
 
 For the broader picture see [Architecture overview](./architecture.md) and
 [Service architecture](./service-architecture.md). For the user-facing API
@@ -12,10 +12,11 @@ see [API description](./API.md).
 
 ---
 
-## 1. Schema and right-now per-query / cluster flow
+## 1. Schema and per-session cluster-wide flow
 
 The data flow has three stages: PID discovery on the master, a per-host
-gRPC fan-out to segment-host yagpccs, and aggregation back on the master.
+gRPC fan-out to segment-host yagpccs, and snapshot storage + diff-based
+aggregation back on the master.
 
 ### 1.1 PID discovery (master, via libpq)
 
@@ -43,17 +44,30 @@ topology that the master pulls from `gp_segment_configuration` (see
 
 ### 1.2 Per-host fan-out (master → segment-host yagpcc, gRPC)
 
-As a proposed follow-up wiring step, the master would group the latest
-`[]SessionPid` by the segment-host that owns each `gp_segment_id` and
-issue one `GetPidProcStat` call per host, re-using the existing
-`segChan` puller machinery in
-[internal/master/background.go](../internal/master/background.go)).
-Concretely, this still needs to be implemented in the master background
-processing path: `processSegment` currently calls `GetMetricQueries`, and
-the planned `GetPidProcStat` request/response handling would be added
-alongside that existing RPC as follow-up implementation work.
+The master groups the latest `[]SessionPid` by the segment-host that
+owns each `gp_segment_id` and issues one or more `GetPidProcStat` calls
+per host. This is implemented in
+[`ProcfsGatherStorage`](../internal/master/procfs_gather.go), which is
+separate from the existing `segChan` puller machinery used for
+`GetMetricQueries`.
 
-Request and response messages are already defined:
+The fan-out works as follows:
+
+1. [`GatherProcfsStat()`](../internal/master/procfs_gather.go) calls
+   `ListAllSessions(ctx)` to get the current PID list.
+2. [`getJobsMap()`](../internal/master/procfs_gather.go) groups sessions
+   by hostname (resolved via
+   [`GetHostnameForSegindex()`](../internal/storage/config_storage.go)).
+3. An `errgroup` launches one goroutine per host, each calling
+   [`processProcfsRequests()`](../internal/master/procfs_gather.go).
+4. Each goroutine opens a gRPC connection to the segment-host yagpcc and
+   sends `GetPidProcStat` requests, batching up to `jobsPerQuery = 1000`
+   `SegmentProcess` entries per RPC call to stay within message size
+   limits.
+5. Results from all hosts are collected under a mutex and returned as a
+   flat `[]*GpPidProcInfo`.
+
+Request and response messages are defined in:
 
 ```
 // api/proto/agent_segment/yagpcc_get_service.proto
@@ -107,15 +121,14 @@ message ProcIO {
 }
 ```
 
-All `ProcIO` fields are cumulative kernel counters, so the master
-computes per-tick **deltas** to derive `read_bytes/sec`,
-`write_bytes/sec`, etc. The numeric fields in `ProcStat`, `ProcStatus`,
-and `ProcIO` are intentionally **signed** (`int32` / `int64` rather than
-the `uint*` types used by `prometheus/procfs`) so the same layout can
-also carry deltas (where a negative value is a legitimate signal of
-counter reset / PID reuse) without needing a parallel signed-delta
-schema. Counter values themselves never exceed `2^63` for any realistic
-process lifetime, so the conversion is lossless.
+All `ProcIO` fields are cumulative kernel counters. The master computes
+**deltas** between two snapshots to derive interval-based metrics (see
+§1.4). The numeric fields in `ProcStat`, `ProcStatus`, and `ProcIO` are
+intentionally **signed** (`int32` / `int64` rather than the `uint*` types
+used by `prometheus/procfs`) so the same layout can also carry deltas
+without needing a parallel signed-delta schema. Counter values themselves
+never exceed `2^63` for any realistic process lifetime, so the conversion
+is lossless.
 
 ### 1.3 Segment side (stateless)
 
@@ -125,11 +138,19 @@ The segment-host yagpcc keeps **no local state** for proc-stats. On every
 1. Iterates the `SegmentProcess` entries from the request.
 2. For each `(gp_segment_id, sess_id, pid)` reads
    `/proc/<pid>/stat`, `/proc/<pid>/status`, `/proc/<pid>/io`,
-   `/proc/<pid>/cmdline`.
-3. Skips entries where the process has already exited (`ENOENT`) so that
-   the master can detect process disappearance from the missing key
-   alone.
-4. Returns the assembled `[]GpPidProcInfo`.
+   `/proc/<pid>/cmdline` via
+   [`GetPidProcInfo()`](../internal/utils/procfs.go).
+3. Skips entries where the process has already exited
+   (`ErrProcessNotFound` / `ENOENT`) so that the master can detect
+   process disappearance from the missing key alone.
+4. If some PIDs error but at least one succeeds, returns the partial
+   result. Only returns an error if **all** PIDs fail.
+5. Returns the assembled `[]GpPidProcInfo`.
+
+The handler is implemented in
+[`GetQueryInfoServer.GetPidProcStat()`](../internal/grpc/get_query_info.go)
+and is registered on both segment and master roles in
+[`NewApp()`](../internal/app/app.go).
 
 Note that `/proc/<pid>/io` counters (`read_bytes`, `write_bytes`,
 `rchar`, `wchar`, `syscr`, `syscw`, `cancelled_write_bytes`) are also
@@ -140,34 +161,80 @@ delivers data only when the `yagp-hooks-collector` extension is loaded
 in Greenplum and only for queries it can hook. `GetPidProcStat` is the
 authoritative path for per-tick procfs sampling and works for every
 backend in `pg_stat_activity` (including system processes that
-`yagp-hooks-collector` never sees), so the master uses `ProcIO` raw
-counters from this RPC and computes deltas itself.
+`yagp-hooks-collector` never sees).
 
-### 1.4 Master aggregation (right-now per query, cluster-wide)
+### 1.4 Master aggregation (snapshot-pair diffing, per session)
 
-For every `GpPidProcInfo` returned, the master uses
-`SessionsStorage` ([internal/gp/sessions.go](../internal/gp/sessions.go))
-to look up the `SessionInfo` keyed by `SessID` (taking the new
-`SessID == -1 → -pid` translation into account when the backend is a
-Cloudberry system process), and, if the session has a running query,
-attributes the sample to that `(SessID, ccnt)`.
+The master does **not** use EMA (exponential moving averages). Instead,
+it stores raw snapshots in a ring buffer and computes deltas between any
+two snapshots on demand.
 
-For each running query the master sums across **all** the segments
-that returned a `GpPidProcInfo`:
+The flow is driven by two independent ticker goroutines launched in
+[`InitBG()`](../internal/master/background.go):
 
-| Cluster-wide metric for the running query | Computation |
-|-------------------------------------------|-------------|
-| CPU seconds in the last interval | `Σ_segments Δ(utime + stime) / clk_tck` |
-| Bytes read in the last interval | `Σ_segments Δ(read_bytes)` |
-| Bytes written in the last interval | `Σ_segments Δ(write_bytes)` |
-| RSS (gauge) | `Σ_segments ProcStatus.vm_rss` |
-| Peak VmSize (gauge) | `max_segments ProcStatus.vm_peak` |
+**Gather loop** — [`RefreshProcfs()`](../internal/master/background.go):
 
-`clk_tck` is `sysconf(_SC_CLK_TCK)` on the master host (typically `100`).
-This number is exposed alongside the existing `SessionState.QueryMetrics`
-so consumers calling `GetGPQuery(query_key)` see the live cluster-wide
-CPU / RSS / IO of the running query in addition to the hook-collected
-`GPMetrics`.
+1. Fires every `procfs_refresh_interval` (config).
+2. Creates a [`ProcfsGatherStorage`](../internal/master/procfs_gather.go)
+   and calls `GatherProcfsStat()` to fan out to all segment hosts.
+3. Calls
+   [`ProcfsStorage.RegisterProcfsStat(time.Now(), result)`](../internal/storage/procfs_storage.go)
+   to append the gathered `[]*GpPidProcInfo` as a new timestamped
+   snapshot in the ring buffer.
+4. `RegisterProcfsStat` builds two maps for fast access:
+   - `pidProcData` (`ProcMap`): keyed by `ProcKey{GpSegmentId, SessId, Pid}` → `*ProcStat`
+   - `pidProcIndex` (`ProcIndexMap`): keyed by `ProcIndexKey{SessId}` → `[]*ProcIndexData{GpSegmentId, Pid}`
+5. Calls `TidyUpProcfsStat()` to trim the ring buffer to
+   `maximumStoredPoints` (default 30).
+
+**Session refresh loop** — [`RefreshSessions()`](../internal/master/background.go):
+
+1. Fires every `session_refresh_interval`.
+2. Calls
+   [`TryRefreshSessionsFromGP()`](../internal/master/background.go)
+   which, after refreshing the session list, calls
+   [`RecalculateProcfsUsage()`](../internal/gp/sessions.go).
+3. `RecalculateProcfsUsage()` collects all session IDs and calls
+   [`ProcfsStorage.GetProcfsSessions(sessIds)`](../internal/storage/procfs_storage.go).
+4. `GetProcfsSessions()` calls `get5Min()` to find the snapshot nearest
+   to 5 minutes ago and pairs it with the latest snapshot.
+5. For each session, [`getProcfsSession()`](../internal/storage/procfs_storage.go)
+   iterates all `(GpSegmentId, Pid)` entries from the session's index in
+   the **latest** snapshot, computes per-process deltas via
+   [`ProcfsDiff()`](../internal/storage/procfs_group.go), and aggregates
+   across segments via
+   [`GroupProcfsMetrics()`](../internal/storage/procfs_group.go) using
+   `AggSegmentHost` aggregation.
+6. The aggregated `GpPidProcInfo` is converted to `GPMetrics` via
+   [`procfsStatToLastStat()`](../internal/gp/sessions.go) and written
+   into `SessionData.LongRunningGPMetrics`.
+
+This means each session's `LastMetrics` (exposed on `SessionState` via
+the existing `GetGPSessions` / `GetGPQuery` RPCs) contains the
+**5-minute delta** of cluster-wide procfs counters for that session:
+
+| `LastMetrics.SystemStat` field | Source |
+|-------------------------------|--------|
+| `UserTimeSeconds` | `Σ_segments Δ(ProcStat.Utime)` |
+| `KernelTimeSeconds` | `Σ_segments Δ(ProcStat.Stime)` |
+| `Vsize` | per-host sum of `ProcStat.Vsize` (latest snapshot) |
+| `Rss` | per-host sum of `ProcStat.Rss` (latest snapshot) |
+| `Rchar` | `Σ_segments Δ(ProcIO.Rchar)` |
+| `Wchar` | `Σ_segments Δ(ProcIO.Wchar)` |
+| `Syscr` | `Σ_segments Δ(ProcIO.Syscr)` |
+| `Syscw` | `Σ_segments Δ(ProcIO.Syscw)` |
+| `ReadBytes` | `Σ_segments Δ(ProcIO.ReadBytes)` |
+| `WriteBytes` | `Σ_segments Δ(ProcIO.WriteBytes)` |
+| `CancelledWriteBytes` | `Σ_segments Δ(ProcIO.CancelledWriteBytes)` |
+
+The `Δ` notation means `nonNegativeDiff(first, last)` — if the counter
+decreased (PID reuse or counter reset), the diff is clamped to zero.
+
+Memory metrics (`Vsize`, `Rss`) use `AggSegmentHost` aggregation: within
+a single host, values from multiple processes are summed into an
+intermediate map keyed by `(MetricName, Hostname)`, then the per-host
+total is used as the final value. This avoids double-counting when
+multiple segments on the same host report the same process.
 
 ### 1.5 End-to-end sequence
 
@@ -175,297 +242,229 @@ CPU / RSS / IO of the running query in addition to the hook-collected
 sequenceDiagram
     participant GP as Greenplum master (libpq)
     participant M as Master yagpcc
+    participant PS as ProcfsStorage (ring buffer)
+    participant SS as SessionsStorage
     participant SH as Segment-host yagpcc
     participant Procfs as /proc on segment host
 
+    Note over M: RefreshProcfs ticker fires
     M->>GP: gp_dist_random('pg_stat_activity') UNION pg_stat_activity
     GP-->>M: rows of (gp_segment_id, pid, sess_id, backend_type)
     Note over M: group by hostname,<br/>build GetPidProcInfoReq per host
-    loop per segment host (parallel via segChan)
+    loop per segment host (parallel via errgroup)
         M->>SH: GetPidProcStat(SegmentProcess[])
         SH->>Procfs: read /proc/<pid>/{stat,status,io,cmdline}
-        Procfs-->>SH: ProcStat / ProcStatus
+        Procfs-->>SH: raw procfs data
         SH-->>M: GpPidProcInfo[]
     end
-    Note over M: merge by (SessID, GpSegmentId, Pid),<br/>resolve running query via SessionsStorage,<br/>compute cluster-wide deltas
+    M->>PS: RegisterProcfsStat(time.Now(), collected)
+    Note over PS: append snapshot,<br/>trim ring buffer
+
+    Note over M: RefreshSessions ticker fires
+    M->>SS: TryRefreshSessionsFromGP()
+    SS->>PS: GetProcfsSessions(sessIds)
+    Note over PS: get5Min() → find nearest<br/>snapshot to 5min ago
+    Note over PS: for each session:<br/>ProcfsDiff(old, new)<br/>GroupProcfsMetrics(AggSegmentHost)
+    PS-->>SS: map[sessId]*GpPidProcInfo
+    Note over SS: procfsStatToLastStat() →<br/>write LongRunningGPMetrics
 ```
 
 ---
 
-## 2. Architecture for 5 / 15 / 30-minute top-style averages
+## 2. Storage architecture on the master
 
-The `top` utility shows three load averages with time constants of 1, 5
-and 15 minutes. We expose the same idea at two grains:
+### 2.1 Ring-buffer snapshot store
 
-- **Per-session** — every `SessionInfo` carries 5 / 15 / 30-minute
-  rolling averages of CPU rate, RSS, and IO rates, summed across the
-  session's processes on every segment.
-- **Cluster-wide rollup** — a single `ProcAvg` instance for the whole
-  cluster, reported in a new `GetClusterTop` RPC.
+Instead of maintaining per-process delta state and computing EMA rolling
+averages, the master stores **raw snapshots** in a fixed-size ring buffer.
+Any two snapshots can be diffed on demand to produce deltas over the
+corresponding time window.
 
-All rolling state lives **only on the master**. Segments stay stateless
-and just answer `GetPidProcStat` each tick.
+This design is simple, stateless between ticks, and naturally handles:
 
-### 2.1 Algorithm: top-style EMA, decoupled from sample period
+- **Missed ticks** — the ring buffer just has fewer snapshots; the
+  nearest-snapshot search still works.
+- **PID reuse** — `nonNegativeDiff()` clamps negative deltas to zero,
+  so a counter reset produces a zero delta rather than a spike.
+- **Process disappearance** — if a PID is absent from the latest
+  snapshot, it simply doesn't contribute to the session's aggregated
+  metrics.
 
-For each metric stream `M(t)` (CPU rate in seconds-per-second,
-instantaneous RSS bytes, IO bytes/sec) we keep three exponential moving
-averages with time constants `τ ∈ {5min, 15min, 30min}`. On every sample
-taken at time `t` with elapsed `Δt = t - t_prev`:
-
-```
-α   = 1 - exp(-Δt / τ)
-EMA = EMA*(1 - α) + sample*α
-```
-
-This is the same recurrence the kernel uses for `loadavg`, but written
-for variable `Δt`, so it is robust to:
-
-- missed ticks (network blip, segment restart, segment unreachable);
-- a changing `segment_pull_rate_sec` between ticks;
-- long pauses caused by GC / scheduling on the master.
-
-If `Δt → 0` then `α → 0` and the EMA does not move; if `Δt ≫ τ` then
-`α → 1` and the EMA snaps to the sample. Both are the desired behaviour.
-
-#### Sample inputs
-
-For each session sample, with the per-segment delta state from the
-previous tick:
-
-| Sample | Definition |
-|--------|------------|
-| `cpu_rate` | `(Σ_segments Δ(utime + stime) ticks) / clk_tck / Δt` (units: cores) |
-| `rss` | `Σ_segments ProcStatus.vm_rss` (units: bytes; instantaneous gauge — averaged directly) |
-| `io_read_rate` | `Σ_segments Δ(read_bytes) / Δt` |
-| `io_write_rate` | `Σ_segments Δ(write_bytes) / Δt` |
-| `chr_read_rate` | `Σ_segments Δ(rchar) / Δt` |
-| `chr_write_rate` | `Σ_segments Δ(wchar) / Δt` |
-
-Per-segment delta state is keyed by `(SessID, GpSegmentId, Pid)` and
-includes `proc_stat.starttime`, so PID reuse on a segment is detected
-by a `starttime` mismatch and produces a delta-reset (no spike).
-
-### 2.2 Storage on the master (sketch)
-
-Sketch only — actual implementation is a follow-up plan, not part of
-this doc.
+### 2.2 Storage types
 
 ```go
-// extension of internal/gp/sessions.go SessionInfo
-type ProcAvg struct {
-    Cpu5,  Cpu15,  Cpu30  float64 // CPU cores, cluster-wide for this session
-    Rss5,  Rss15,  Rss30  float64 // bytes
-    IoR5,  IoR15,  IoR30  float64 // bytes/sec read   (read_bytes)
-    IoW5,  IoW15,  IoW30  float64 // bytes/sec written (write_bytes)
-    LastSampleAt time.Time
+// internal/storage/procfs_storage.go
+
+type ProcKey struct {
+    GpSegmentId int64
+    SessId      int64
+    Pid         int64
 }
 
-// per-process delta state used to derive samples between ticks
-type pidSample struct {
-    StartTime  uint64    // proc_stat.starttime (clock ticks since boot)
-    Utime      uint32
-    Stime      uint32
-    ReadBytes  uint64
-    WriteBytes uint64
-    Rchar      uint64
-    Wchar      uint64
-    SampledAt  time.Time
+type ProcIndexKey struct {
+    SessId int64
 }
 
-type procKey struct {
-    SessID      int
-    GpSegmentId int
-    Pid         int
+type ProcIndexData struct {
+    GpSegmentId int64
+    Pid         int64
 }
 
-type pidSampleStore map[procKey]pidSample
+type ProcStat struct {
+    Cmdline    string
+    State      string
+    ProcStat   *pbc.ProcStat
+    ProcStatus *pbc.ProcStatus
+    ProcIO     *pbc.ProcIO
+}
+
+type ProcMap      map[ProcKey]*ProcStat
+type ProcIndexMap map[ProcIndexKey][]*ProcIndexData
+
+type ProcfsStatType struct {
+    statTime     time.Time
+    pidProcData  ProcMap       // primary: (seg, sess, pid) → stats
+    pidProcIndex ProcIndexMap  // secondary: sess → [(seg, pid), ...]
+}
+
+type ProcfsStorage struct {
+    mx                  *sync.RWMutex
+    procfsStat          []ProcfsStatType  // ring buffer, newest last
+    maximumStoredPoints int               // default 30
+}
 ```
 
-The cluster-wide `ProcAvg` is updated by **summing the per-tick session
-samples first and then applying the EMA step** (sum-then-smooth, not
-smooth-then-sum). Re-smoothing already-smoothed per-session curves
-would lag the true cluster total by an extra `τ` and is wrong.
+Each snapshot (`ProcfsStatType`) contains:
 
-### 2.3 Lifecycle / eviction
+- `statTime` — when the snapshot was taken.
+- `pidProcData` — a map from `ProcKey{GpSegmentId, SessId, Pid}` to the
+  parsed procfs data for that process.
+- `pidProcIndex` — a secondary index from `ProcIndexKey{SessId}` to the
+  list of `(GpSegmentId, Pid)` pairs belonging to that session, enabling
+  efficient per-session lookups.
 
-- **Per-session `ProcAvg`** is dropped together with its `SessionInfo`
-  in the `clearDeletedSessions` branch of
-  `RefreshSessionList` ([internal/gp/sessions.go](../internal/gp/sessions.go)).
-  No separate GC.
-- **Per-PID delta state** (`pidSampleStore`) is GC'd on each tick: any
-  `procKey` not present in the latest `[]SessionPid` is dropped. A PID
-  that disappears mid-window simply stops contributing to its session
-  EMA — the existing decay carries the value down towards zero over
-  ≈ 3·τ, exactly like `top`.
-- **PID reuse** is detected by `proc_stat.starttime`: if the new sample
-  has a different `starttime` than the cached one for the same
-  `(seg, pid)`, the sample is treated as a fresh start (cache the new
-  baseline, emit no delta this tick).
+### 2.3 Snapshot lookup
 
-### 2.4 Proposed gRPC surface
+[`getNearestNTimeUnlocked(d)`](../internal/storage/procfs_storage.go)
+searches the ring buffer for the snapshot whose age (relative to the
+newest snapshot) is closest to duration `d`. Since snapshots are stored
+in chronological order, the search walks backwards from the newest entry
+and stops as soon as the absolute difference starts growing (early exit).
 
-These are **proposals** — not implemented as part of this doc.
+Convenience wrappers:
 
-- Extend `SessionState` in
-  [api/proto/common/yagpcc_session.proto](../api/proto/common/yagpcc_session.proto)
-  with an optional field:
+| Method | Window |
+|--------|--------|
+| `get5Min()` | 5 minutes |
+| `get15Min()` | 15 minutes |
+| `get30Min()` | 30 minutes |
 
-  ```
-  ProcAvg proc_avg = N;  // master-only, populated on master role
-  ```
+Currently, `GetProcfsSessions()` uses `get5Min()` to produce the
+per-session deltas exposed via `LastMetrics`.
 
-  and the matching message (probably best placed in
-  `api/proto/common/yagpcc_metrics.proto` next to `GpPidProcInfo`):
+### 2.4 Diff and aggregation
 
-  ```
-  message ProcAvg {
-      double cpu_5,  cpu_15,  cpu_30;
-      double rss_5,  rss_15,  rss_30;
-      double io_r_5, io_r_15, io_r_30;
-      double io_w_5, io_w_15, io_w_30;
-      google.protobuf.Timestamp last_sample_at;
-  }
-  ```
+**Per-process diff** —
+[`ProcfsDiff(first, last)`](../internal/storage/procfs_group.go) produces
+a `GpPidProcInfo` where:
 
-- Add a master-side `GetClusterTop` RPC in
-  [api/proto/agent_master/yagpcc_get_service.proto](../api/proto/agent_master/yagpcc_get_service.proto):
+- Snapshot fields (`Pid`, `Comm`, `State`, `Cmdline`, `ProcStatus`, …)
+  are taken from `last`.
+- Cumulative counters (`Utime`, `Stime`, `MinFlt`, `MajFlt`, `Rchar`,
+  `WriteBytes`, …) are diffed via `nonNegativeDiff(first, last)` — if
+  `last < first` (counter reset / PID reuse), the result is `0`.
 
-  ```
-  rpc GetClusterTop (GetClusterTopReq) returns (GetClusterTopResponse) {}
+**Per-session aggregation** —
+[`GroupProcfsMetrics(dest, source, aggKind, segHostname, intermediateResults)`](../internal/storage/procfs_group.go)
+merges one process's diff into a session-level accumulator:
 
-  message GetClusterTopReq {
-      int64       limit  = 1;            // top-N sessions
-      SessionField sort  = 2;            // e.g. TOTAL_USERTIMESECONDS, or a new CLUSTER_TOP_* enum
-  }
-  message GetClusterTopResponse {
-      ProcAvg cluster                 = 1;  // cluster-wide rollup
-      repeated SessionState sessions  = 2;  // top-N by sort key, with proc_avg populated
-  }
-  ```
+- CPU counters (`Utime`, `Stime`, `Cutime`, `Cstime`, `GuestTime`,
+  `CguestTime`) are **summed** across all segments.
+- IO counters (`Rchar`, `Wchar`, `Syscr`, `Syscw`, `ReadBytes`,
+  `WriteBytes`, `CancelledWriteBytes`) are **summed** across all
+  segments.
+- Memory gauges (`Vsize`, `Rss`) use an intermediate map keyed by
+  `(MetricName, Hostname)` to first sum within each host, then either
+  take the per-host value (`AggSegmentHost`) or the max across hosts
+  (`AggMax`). The per-session path uses `AggSegmentHost`.
 
-The existing `GetGPSessions` / `GetGPQuery` pathways remain unchanged;
-they just gain a populated `proc_avg` on each `SessionState`.
+### 2.5 Lifecycle / eviction
 
-### 2.5 Configuration
+- **Ring buffer trimming** —
+  [`TidyUpProcfsStat()`](../internal/storage/procfs_storage.go) is called
+  after every `RegisterProcfsStat()`. If the buffer exceeds
+  `maximumStoredPoints`, the oldest snapshots are discarded.
+- **No per-PID GC** — individual processes are not tracked across ticks.
+  If a PID disappears from a snapshot, it simply won't appear in the
+  diff. If a session disappears from `pg_stat_activity`, it is removed
+  from `SessionsStorage` by `RefreshSessionList()` (when
+  `clearDeletedSessions` is enabled), and its procfs data naturally
+  stops being queried.
 
-Existing knobs that govern sample cadence:
+### 2.6 Exposure via existing gRPC surface
+
+No new proto messages or RPCs were added. Procfs data is exposed through
+the existing `SessionState.LastMetrics` field:
+
+1. [`RecalculateProcfsUsage()`](../internal/gp/sessions.go) iterates all
+   sessions and calls `GetProcfsSessions()`.
+2. For each session with procfs data,
+   [`procfsStatToLastStat()`](../internal/gp/sessions.go) converts the
+   aggregated `GpPidProcInfo` into a `GPMetrics` with a populated
+   `SystemStat`:
+
+   ```go
+   result.SystemStat = &pbc.SystemStat{
+       UserTimeSeconds:   float64(procfsStat.ProcStat.Utime),
+       KernelTimeSeconds: float64(procfsStat.ProcStat.Stime),
+       Vsize:             uint64(procfsStat.ProcStat.Vsize),
+       VmSizeKb:          uint64(procfsStat.ProcStat.Vsize) / 1024,
+       Rss:               uint64(procfsStat.ProcStat.Rss),
+       // ProcIO fields mapped to SystemStat IO fields...
+   }
+   ```
+
+3. This is written to `SessionData.LongRunningGPMetrics`, which is
+   exposed as `LastMetrics` on `SessionState` in the existing
+   `GetGPSessions` / `GetGPQuery` RPCs.
+
+Consumers calling `GetGPSessions` or `GetGPQuery` see the 5-minute
+cluster-wide CPU / RSS / IO deltas for each session in `LastMetrics`,
+alongside any hook-collected metrics in `TotalMetrics` and
+`QueryMetrics`.
+
+### 2.7 Configuration
 
 | Knob | Default | Defined in |
 |------|---------|------------|
-| `segment_pull_rate_sec` | per yagpcc.yaml | [cmd/server/yagpcc_master.yaml](../cmd/server/yagpcc_master.yaml), [internal/config/config.go](../internal/config/config.go) |
-| `segment_pull_threads`  | per yagpcc.yaml | same |
-| `WithBackgroundAllSessionsCollectionInterval` | `60s` | [internal/gp/stat_activity/lister.go](../internal/gp/stat_activity/lister.go) |
+| `procfs_refresh_interval` | per yagpcc.yaml | [internal/config/config.go](../internal/config/config.go) — `ProcfsRefreshInterval` |
+| `segment_pull_threads` | per yagpcc.yaml | [internal/config/config.go](../internal/config/config.go) — used as `nPullers` for errgroup concurrency |
+| `max_message_size` | per yagpcc.yaml | [internal/config/config.go](../internal/config/config.go) — gRPC max receive message size |
+| `maximumStoredPoints` | `30` | [internal/storage/procfs_storage.go](../internal/storage/procfs_storage.go) — `WithMaximumStoredPoints()` option |
+| `WithBackgroundAllSessionsCollectionInterval` | `60s` | [internal/gp/stat_activity/lister.go](../internal/gp/stat_activity/lister.go) — PID list refresh cadence |
 | `WithBackgroundAllSessionsCacheTTL` | `600s` | same |
-
-New knobs to add when implementing the architecture:
-
-| Knob | Default | Purpose |
-|------|---------|---------|
-| `proc_pull_rate_sec` | equal to `segment_pull_rate_sec` | Cadence for `GetPidProcStat`. Independent so the new pull doesn't have to share the fan-out cadence of `GetMetricQueries`. |
-| `proc_avg_taus` | `[5m, 15m, 30m]` | Time constants of the three EMAs. Configurable so operators can tune to longer windows on lightly-used clusters. |
-
-### 2.6 Worked numeric example
-
-Setup:
-
-- One session running on two segments, CPU-bound.
-- `clk_tck = 100`.
-- Master ticks every `Δt = 5s`.
-- `τ_5 = 300s`, `τ_15 = 900s`, `τ_30 = 1800s`.
-- Initial EMAs are zero; per-segment delta state is empty.
-
-Pre-computed `α`:
-
-| τ | `α = 1 - exp(-5/τ)` |
-|---|---------------------|
-| 300s  | `0.01653` |
-| 900s  | `0.00554` |
-| 1800s | `0.00277` |
-
-#### Tick t = 0 (baseline)
-
-The master records the raw counters (`utime`, `stime`, `read_bytes`, …,
-`starttime`) for each `(seg, pid)`. No deltas are emitted yet because
-there is no previous sample. EMAs stay at `0`.
-
-#### Tick t = 5s
-
-Per-segment deltas (in clock ticks):
-
-| Segment | `Δ(utime + stime)` | wall | utilization |
-|---------|--------------------|------|-------------|
-| seg-0   | 480 ticks → 4.80s  | 5s   | 96% of 1 core |
-| seg-1   | 500 ticks → 5.00s  | 5s   | 100% of 1 core |
-
-Cluster sample:
-
-```
-cpu_rate = (480 + 500) / 100 / 5 = 1.96 cores
-```
-
-EMA update for the session, starting from `EMA = 0`:
-
-| τ | `(1 - α)` | `EMA·(1-α)` | `α·sample` | new EMA |
-|---|-----------|-------------|------------|---------|
-| 300s  | 0.98347 | 0.0000 | 0.03240 | **0.03240** |
-| 900s  | 0.99446 | 0.0000 | 0.01086 | **0.01086** |
-| 1800s | 0.99723 | 0.0000 | 0.00543 | **0.00543** |
-
-#### Tick t = 10s (same load)
-
-Same `cpu_rate = 1.96`. EMAs from the previous tick:
-
-| τ | previous EMA | `EMA·(1-α)` | `α·sample` | new EMA |
-|---|--------------|-------------|------------|---------|
-| 300s  | 0.03240 | 0.03186 | 0.03240 | **0.06426** |
-| 900s  | 0.01086 | 0.01080 | 0.01086 | **0.02166** |
-| 1800s | 0.00543 | 0.00541 | 0.00543 | **0.01084** |
-
-After many ticks at constant load each EMA converges to the sample
-value `1.96` cores; the 5-minute EMA reaches that asymptote first, the
-30-minute EMA last (≈ 3·τ to within a few percent).
-
-#### Cluster-wide rollup
-
-If three sessions are each producing the same `cpu_rate = 1.96`, the
-cluster sample at every tick is `5.88 cores`. After the first
-post-baseline tick:
-
-| τ | cluster `EMA = α·5.88` |
-|---|------------------------|
-| 300s  | **0.0972** |
-| 900s  | **0.0326** |
-| 1800s | **0.0163** |
-
-Note this is computed from the **summed** per-session samples
-(sum-then-smooth), not from `Σ EMA_session`.
-
-#### Process disappears mid-window
-
-If the running query finishes between tick `T` and tick `T + 1`, then
-at tick `T + 1`:
-
-- The PID is missing from `[]SessionPid` returned by
-  `Lister.ListAllSessions`. The master never asks for it via
-  `GetPidProcStat`, so it gets no `GpPidProcInfo`.
-- Its `procKey` is removed from `pidSampleStore`.
-- The session sample for this tick is `0` (no live processes
-  contributing).
-- The EMA decays as `EMA_{T+1} = EMA_T · (1 - α)` per tick.
-  Half-life ≈ `τ · ln(2)` (≈ `3.5min` for `τ = 5min`,
-  `≈ 10.4min` for `τ = 15min`, `≈ 20.8min` for `τ = 30min`),
-  matching `top` semantics.
 
 ---
 
-## 3. Out of scope
+## 3. Out of scope / future work
 
-- Implementing the segment-side procfs reader and
-  `GetQueryInfoServer.GetPidProcStat`.
-- Implementing the master-side `pidSampleStore` and EMA aggregator.
-- Adding the `ProcAvg` proto message, the `proc_avg` field on
-  `SessionState`, and the `GetClusterTop` RPC.
-- Wiring `proc_pull_rate_sec` and `proc_avg_taus` config.
+The following are **not** part of the current implementation and may be
+considered as future enhancements:
 
-These are tracked as follow-up implementation plans.
+- **EMA-based rolling averages** — the current implementation uses
+  simple snapshot-pair diffing over a fixed window (5 min). A future
+  enhancement could add exponential moving averages with configurable
+  time constants (e.g. 5 / 15 / 30 min) for smoother `top`-style
+  output.
+- **`GetClusterTop` RPC** — a dedicated RPC returning cluster-wide
+  rollup metrics sorted by resource usage.
+- **`ProcAvg` proto message** — a dedicated message for per-session
+  rolling averages on `SessionState`.
+- **Per-query attribution** — the current implementation attributes
+  procfs data to **sessions** (via `SessId`). Attributing to specific
+  running queries (via `(SessId, Ccnt)`) would require correlating
+  procfs snapshots with query start/end times.
+- **Configurable diff windows** — currently hardcoded to 5 minutes in
+  `GetProcfsSessions()`. Making the window configurable (or exposing
+  5 / 15 / 30 min variants) would allow consumers to choose their
+  preferred time horizon.
