@@ -509,7 +509,7 @@ No parameters. Returns aggregate session counts by state.
 All endpoints return `Content-Type: text/csv; charset=utf-8` with a `Content-Disposition: attachment` header.
 
 - **Sessions endpoints** (`/csv/sessions`, `/csv/session`, `/csv/queries`): Each row is a flattened `SessionState` with ~220 columns covering session info, query info, and all metrics (total, last, query). If pagination produces a next page, the response includes an `X-Next-Page-Token` header.
-- **Query endpoint** (`/csv/query`): Returns `TotalQueryData` — one header row for `QueryStat` fields plus per-segment metrics.
+- **Query endpoint** (`/csv/query`): Returns `TotalQueryData` as two sections in the same CSV stream. The first section has a `QueryStat` header row followed by the query statistics row. The second section starts immediately after with a `SegmentMetrics` header row followed by one row per segment in `segment_query_metrics`.
 - **Total sessions stat** (`/csv/total_sessions_stat`): Two columns: `state` and `count`.
 
 ### Example usage

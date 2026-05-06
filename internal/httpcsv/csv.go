@@ -506,6 +506,112 @@ func WriteTotalSessionsStatCSV(w io.Writer, stats []*pbm.SessionStat) error {
 	return cw.Error()
 }
 
+// segmentMetricsHeaders returns the CSV header row for SegmentMetrics records.
+func segmentMetricsHeaders() []string {
+	return []string{
+		"segment_metrics.cluster_id",
+		"segment_metrics.hostname",
+		"segment_metrics.collect_time",
+		"segment_metrics.segment_key.dbid",
+		"segment_metrics.segment_key.segindex",
+		"segment_metrics.query_status",
+		"segment_metrics.start_time",
+		"segment_metrics.end_time",
+
+		// GPMetrics — system stat
+		"segment_metrics.metrics.system_stat.running_time_seconds",
+		"segment_metrics.metrics.system_stat.user_time_seconds",
+		"segment_metrics.metrics.system_stat.kernel_time_seconds",
+		"segment_metrics.metrics.system_stat.vsize",
+		"segment_metrics.metrics.system_stat.rss",
+		"segment_metrics.metrics.system_stat.vm_peak_kb",
+		"segment_metrics.metrics.system_stat.rchar",
+		"segment_metrics.metrics.system_stat.wchar",
+		"segment_metrics.metrics.system_stat.syscr",
+		"segment_metrics.metrics.system_stat.syscw",
+		"segment_metrics.metrics.system_stat.read_bytes",
+		"segment_metrics.metrics.system_stat.write_bytes",
+		"segment_metrics.metrics.system_stat.cancelled_write_bytes",
+
+		// GPMetrics — instrumentation
+		"segment_metrics.metrics.instrumentation.ntuples",
+		"segment_metrics.metrics.instrumentation.nloops",
+		"segment_metrics.metrics.instrumentation.tuplecount",
+		"segment_metrics.metrics.instrumentation.firsttuple",
+		"segment_metrics.metrics.instrumentation.startup",
+		"segment_metrics.metrics.instrumentation.total",
+		"segment_metrics.metrics.instrumentation.shared_blks_hit",
+		"segment_metrics.metrics.instrumentation.shared_blks_read",
+		"segment_metrics.metrics.instrumentation.shared_blks_dirtied",
+		"segment_metrics.metrics.instrumentation.shared_blks_written",
+		"segment_metrics.metrics.instrumentation.local_blks_hit",
+		"segment_metrics.metrics.instrumentation.local_blks_read",
+		"segment_metrics.metrics.instrumentation.local_blks_dirtied",
+		"segment_metrics.metrics.instrumentation.local_blks_written",
+		"segment_metrics.metrics.instrumentation.temp_blks_read",
+		"segment_metrics.metrics.instrumentation.temp_blks_written",
+		"segment_metrics.metrics.instrumentation.blk_read_time",
+		"segment_metrics.metrics.instrumentation.blk_write_time",
+		"segment_metrics.metrics.instrumentation.startup_time",
+		"segment_metrics.metrics.instrumentation.inherited_calls",
+		"segment_metrics.metrics.instrumentation.inherited_time",
+		"segment_metrics.metrics.instrumentation.sent.total_bytes",
+		"segment_metrics.metrics.instrumentation.sent.tuple_bytes",
+		"segment_metrics.metrics.instrumentation.sent.chunks",
+		"segment_metrics.metrics.instrumentation.received.total_bytes",
+		"segment_metrics.metrics.instrumentation.received.tuple_bytes",
+		"segment_metrics.metrics.instrumentation.received.chunks",
+
+		// GPMetrics — spill
+		"segment_metrics.metrics.spill.file_count",
+		"segment_metrics.metrics.spill.total_bytes",
+	}
+}
+
+// segmentMetricsToRecord converts a SegmentMetrics proto message to a flat CSV record.
+func segmentMetricsToRecord(sm *pbm.SegmentMetrics) []string {
+	// 8 scalar/key fields + 42 GPMetrics fields = 50
+	if sm == nil {
+		return make([]string, 8+42)
+	}
+
+	record := make([]string, 0, 8+42)
+
+	record = append(record, sm.ClusterId, sm.Hostname)
+
+	if sm.CollectTime != nil {
+		record = append(record, sm.CollectTime.AsTime().Format("2006-01-02T15:04:05.000000000Z07:00"))
+	} else {
+		record = append(record, "")
+	}
+
+	if sk := sm.SegmentKey; sk != nil {
+		record = append(record,
+			fmt.Sprintf("%d", sk.Dbid),
+			fmt.Sprintf("%d", sk.Segindex),
+		)
+	} else {
+		record = append(record, "", "")
+	}
+
+	record = append(record, sm.QueryStatus.String())
+
+	if sm.StartTime != nil {
+		record = append(record, sm.StartTime.AsTime().Format("2006-01-02T15:04:05.000000000Z07:00"))
+	} else {
+		record = append(record, "")
+	}
+	if sm.EndTime != nil {
+		record = append(record, sm.EndTime.AsTime().Format("2006-01-02T15:04:05.000000000Z07:00"))
+	} else {
+		record = append(record, "")
+	}
+
+	record = append(record, gpMetricsFields(sm.SegmentMetrics)...)
+
+	return record
+}
+
 // queryDataHeaders returns the CSV header row for TotalQueryData (GetGPQuery).
 func queryDataHeaders() []string {
 	return []string{
@@ -675,18 +781,36 @@ func queryStatToRecord(qs *pbm.QueryStat) []string {
 	return record
 }
 
-// WriteQueryDataCSV writes a TotalQueryData as CSV (query stat row + segment metrics rows).
+// WriteQueryDataCSV writes a TotalQueryData as CSV.
+// The output contains two sections:
+//  1. QueryStat section: header row followed by the query_stat data row.
+//  2. SegmentMetrics section: header row followed by one row per segment in segment_query_metrics.
+//
+// Both sections are written to the same CSV stream. The segment_metrics header row
+// serves as the separator between sections.
 func WriteQueryDataCSV(w io.Writer, data *pbm.TotalQueryData) error {
 	cw := csv.NewWriter(w)
 	defer cw.Flush()
 
+	// Section 1: QueryStat
 	if err := cw.Write(queryDataHeaders()); err != nil {
-		return fmt.Errorf("write csv header: %w", err)
+		return fmt.Errorf("write query_stat header: %w", err)
 	}
-
 	if data != nil && data.QueryStat != nil {
 		if err := cw.Write(queryStatToRecord(data.QueryStat)); err != nil {
-			return fmt.Errorf("write csv record: %w", err)
+			return fmt.Errorf("write query_stat record: %w", err)
+		}
+	}
+
+	// Section 2: SegmentMetrics
+	if err := cw.Write(segmentMetricsHeaders()); err != nil {
+		return fmt.Errorf("write segment_metrics header: %w", err)
+	}
+	if data != nil {
+		for _, sm := range data.SegmentQueryMetrics {
+			if err := cw.Write(segmentMetricsToRecord(sm)); err != nil {
+				return fmt.Errorf("write segment_metrics record: %w", err)
+			}
 		}
 	}
 

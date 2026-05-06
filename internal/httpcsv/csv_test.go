@@ -342,15 +342,87 @@ func TestWriteQueryDataCSV(t *testing.T) {
 	err := WriteQueryDataCSV(&buf, data)
 	require.NoError(t, err)
 
+	// Parse with FieldsPerRecord=-1 to allow variable column counts across sections
 	reader := csv.NewReader(&buf)
+	reader.FieldsPerRecord = -1
 	records, err := reader.ReadAll()
 	require.NoError(t, err)
 
-	// Header + 1 data row
-	assert.Len(t, records, 2)
+	// query_stat header + query_stat row + segment_metrics header = 3 rows
+	// (no segment rows since data has none)
+	assert.Len(t, records, 3)
 	assert.Equal(t, "query_stat.cluster_id", records[0][0])
 	assert.Equal(t, "cluster1", records[1][0])
 	assert.Equal(t, "host1", records[1][1])
+	// Segment metrics header row
+	assert.Equal(t, "segment_metrics.cluster_id", records[2][0])
+}
+
+func TestWriteQueryDataCSVWithSegments(t *testing.T) {
+	ts := timestamppb.Now()
+	data := &pbm.TotalQueryData{
+		QueryStat: &pbm.QueryStat{
+			ClusterId: "cluster1",
+			Hostname:  "host1",
+		},
+		SegmentQueryMetrics: []*pbm.SegmentMetrics{
+			{
+				ClusterId: "cluster1",
+				Hostname:  "seg-host-0",
+				SegmentKey: &pbc.SegmentKey{
+					Dbid:     2,
+					Segindex: 0,
+				},
+				QueryStatus: pbc.QueryStatus_QUERY_STATUS_DONE,
+				StartTime:   ts,
+				SegmentMetrics: &pbc.GPMetrics{
+					SystemStat: &pbc.SystemStat{
+						RunningTimeSeconds: 1.5,
+					},
+				},
+			},
+			{
+				ClusterId: "cluster1",
+				Hostname:  "seg-host-1",
+				SegmentKey: &pbc.SegmentKey{
+					Dbid:     3,
+					Segindex: 1,
+				},
+				QueryStatus: pbc.QueryStatus_QUERY_STATUS_DONE,
+			},
+		},
+	}
+
+	var buf bytes.Buffer
+	err := WriteQueryDataCSV(&buf, data)
+	require.NoError(t, err)
+
+	reader := csv.NewReader(&buf)
+	reader.FieldsPerRecord = -1
+	records, err := reader.ReadAll()
+	require.NoError(t, err)
+
+	// query_stat header + query_stat row + segment_metrics header + 2 segment rows = 5
+	assert.Len(t, records, 5)
+
+	// Verify query_stat section
+	assert.Equal(t, "query_stat.cluster_id", records[0][0])
+	assert.Equal(t, "cluster1", records[1][0])
+
+	// Verify segment_metrics section header
+	assert.Equal(t, "segment_metrics.cluster_id", records[2][0])
+	assert.Equal(t, "segment_metrics.segment_key.dbid", records[2][3])
+
+	// Verify first segment row
+	assert.Equal(t, "cluster1", records[3][0])
+	assert.Equal(t, "seg-host-0", records[3][1])
+	assert.Equal(t, "2", records[3][3]) // dbid
+	assert.Equal(t, "0", records[3][4]) // segindex
+
+	// Verify second segment row
+	assert.Equal(t, "seg-host-1", records[4][1])
+	assert.Equal(t, "3", records[4][3]) // dbid
+	assert.Equal(t, "1", records[4][4]) // segindex
 }
 
 func TestWriteQueryDataCSVNil(t *testing.T) {
@@ -359,17 +431,31 @@ func TestWriteQueryDataCSVNil(t *testing.T) {
 	require.NoError(t, err)
 
 	reader := csv.NewReader(&buf)
+	reader.FieldsPerRecord = -1
 	records, err := reader.ReadAll()
 	require.NoError(t, err)
 
-	// Only header row
-	assert.Len(t, records, 1)
+	// query_stat header + segment_metrics header = 2 rows (no data rows since data is nil)
+	assert.Len(t, records, 2)
+	assert.Equal(t, "query_stat.cluster_id", records[0][0])
+	assert.Equal(t, "segment_metrics.cluster_id", records[1][0])
 }
 
 func TestQueryDataHeadersLength(t *testing.T) {
 	headers := queryDataHeaders()
 	// 25 query stat fields + 42 metrics fields + 6 aggregated metrics = 73
 	assert.Len(t, headers, 73)
+}
+
+func TestSegmentMetricsHeadersLength(t *testing.T) {
+	headers := segmentMetricsHeaders()
+	// 8 scalar/key fields + 42 GPMetrics fields = 50
+	assert.Len(t, headers, 50)
+}
+
+func TestSegmentMetricsToRecordNil(t *testing.T) {
+	record := segmentMetricsToRecord(nil)
+	assert.Len(t, record, 50)
 }
 
 func TestQueryStatToRecordNil(t *testing.T) {
