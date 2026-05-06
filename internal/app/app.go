@@ -23,6 +23,7 @@ import (
 	"github.com/open-gpdb/yagpcc/internal/gp/master_sentinel"
 	"github.com/open-gpdb/yagpcc/internal/gp/stat_activity"
 	"github.com/open-gpdb/yagpcc/internal/grpc"
+	"github.com/open-gpdb/yagpcc/internal/httpcsv"
 	"github.com/open-gpdb/yagpcc/internal/master"
 	"github.com/open-gpdb/yagpcc/internal/metrics"
 	"github.com/open-gpdb/yagpcc/internal/storage"
@@ -35,11 +36,13 @@ import (
 
 type AgentApp struct {
 	*baseapp.App
-	Config      *config.Config
-	GrpcServer  *gogrpc.Server
-	SetQIServer *grpc.SetQueryInfoServer
-	pingHttp    *http.Server
-	filelock    *flock.Flock
+	Config          *config.Config
+	GrpcServer      *gogrpc.Server
+	SetQIServer     *grpc.SetQueryInfoServer
+	GetMasterServer *grpc.GetMasterInfoServer
+	pingHttp        *http.Server
+	csvHttp         *http.Server
+	filelock        *flock.Flock
 }
 
 type keepAliveCheck struct {
@@ -266,6 +269,7 @@ func NewApp(
 		pb.RegisterAgentControlServer(s, &grpc.AgentControlServer{Logger: baseApp.L(), RQStorage: backgroundStorage.RQStorage})
 
 		getMasterInfo := grpc.NewGetMasterInfoServer(config.ClusterID, baseApp.L(), int(config.MaxOuterMessageSize), backgroundStorage)
+		agentApp.GetMasterServer = getMasterInfo
 		actionInfo := &grpc.ActionsServer{ClusterID: config.ClusterID, Logger: baseApp.L(), Timeout: 5 * time.Minute, BackgroundStorage: backgroundStorage}
 
 		pbm.RegisterGetGPInfoServer(s, getMasterInfo)
@@ -312,6 +316,18 @@ func (app *AgentApp) RunPingHandler(backgroundStorage *master.BackgroundStorage)
 	return nil
 }
 
+// RunCSVHandler starts the HTTP server that serves CSV endpoints mirroring the gRPC GetGPInfo service.
+func (app *AgentApp) RunCSVHandler() error {
+	csvHandler := httpcsv.NewHandler(app.L(), app.GetMasterServer)
+	csvAddr := fmt.Sprintf("[::1]:%d", app.Config.CSVPort)
+	app.csvHttp = httpcsv.NewCSVServer(csvAddr, csvHandler)
+	if err := baseapp.Serve(app.csvHttp, app.L()); err != nil {
+		app.L().Errorf("got error in serve csv %v", err)
+		return err
+	}
+	return nil
+}
+
 func (app *AgentApp) RunDebugHandler() {
 	debugAddr := fmt.Sprintf("[::1]:%d", app.Config.DebugPort)
 	dws := NewDebugWebServer(debugAddr, app.L())
@@ -342,16 +358,20 @@ func (app *AgentApp) RunDebugHandler() {
 
 func (app *AgentApp) Shutdown() {
 	if app.pingHttp != nil {
-
 		if err := baseapp.ShutdownHttp(app.pingHttp, PING_TIMEOUT); err != nil {
 			app.L().Error("error while shutting down ping server", zap.Error(err))
+		}
+	}
+
+	if app.csvHttp != nil {
+		if err := baseapp.ShutdownHttp(app.csvHttp, PING_TIMEOUT); err != nil {
+			app.L().Error("error while shutting down csv server", zap.Error(err))
 		}
 	}
 
 	if app.Config.ListenPort > 0 || app.Config.SocketFile != "" {
 		defer app.GrpcServer.Stop()
 	}
-
 }
 
 func Run(ctx context.Context, configFile string) error {
@@ -405,6 +425,13 @@ func Run(ctx context.Context, configFile string) error {
 
 	if agentApp.Config.PingPort > 0 {
 		err = agentApp.RunPingHandler(backgroundStorage)
+		if err != nil {
+			logger.Error(err.Error())
+			return err
+		}
+	}
+	if agentApp.Config.CSVPort > 0 {
+		err = agentApp.RunCSVHandler()
 		if err != nil {
 			logger.Error(err.Error())
 			return err

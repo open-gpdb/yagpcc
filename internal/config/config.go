@@ -40,6 +40,7 @@ type Config struct {
 	UDSBuffer                  uint32             `config:"uds_buffer" yaml:"uds_buffer"`
 	ListenPort                 uint32             `config:"listen_port" yaml:"listen_port"`
 	PingPort                   uint32             `config:"ping_port" yaml:"ping_port"`
+	CSVPort                    uint32             `config:"csv_port" yaml:"csv_port"`
 	DebugPort                  uint32             `config:"debug_port" yaml:"debug_port"`
 	DebugMinutes               int                `config:"debug_minutes" yaml:"debug_minutes"`
 	Lockfile                   string             `config:"lockfile"`
@@ -105,6 +106,7 @@ func DefaultConfig() (*Config, error) {
 		UDSBuffer:                  4 * 1024,
 		ListenPort:                 1432,
 		PingPort:                   1435,
+		CSVPort:                    1440,
 		Lockfile:                   "/var/run/yagpcc/yagpcc.lock",
 		Role:                       "segment",
 		ClearDeletedSessions:       true,

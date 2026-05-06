@@ -91,6 +91,21 @@ Master aggregates this with its own stored data to form a cluster-wide view.
 
 See [API description](API.md) for full request/response and metrics.
 
+### 5. External consumers → Master yagpcc (HTTP, CSV)
+
+| Aspect | Detail |
+|--------|--------|
+| **Transport** | TCP (`csv_port`, default 1440), binds to `[::1]` (localhost). |
+| **Protocol** | HTTP/1.1. |
+| **Content-Type** | `text/csv; charset=utf-8`. |
+| **Endpoints** | `GET /csv/sessions`, `GET /csv/session`, `GET /csv/queries`, `GET /csv/query`, `GET /csv/total_sessions_stat`. |
+| **Direction** | External clients → master yagpcc. |
+| **Implementation** | `internal/httpcsv/handler.go` — constructs protobuf requests and delegates to the same `GetMasterInfoServer` used by gRPC. No business logic duplication. |
+
+This HTTP service mirrors the gRPC **GetGPInfo** service but returns data in CSV format. It is useful for quick data export, spreadsheet integration, and scripting with `curl` or similar tools. Available only on the **master** role when `csv_port > 0`.
+
+See [API description — CSV HTTP API](API.md#csv-http-api) for endpoints, query parameters, and examples.
+
 ---
 
 ## Data flow summary
@@ -106,23 +121,49 @@ Master-host yagpcc
     ← [TCP gRPC GetQueryInfo.GetPidProcStat] Segment-host yagpcc instances (procfs per PID)
     → [in-memory merge, EMA 5/15/30-min, aggregate]
     → [TCP gRPC GetGPInfo / ActionService] External consumers
+    → [HTTP CSV /csv/*]                    External consumers (CSV export)
 ```
 
 - **Segment hosts:** Each segment-host yagpcc only has **local** data (its Segments). Data is **partial** per query.
-- **Master host:** Master yagpcc has **local** data (Master process) plus **pulled** data from all Segment hosts. It **aggregates** (e.g. sum metrics, join by query/session keys) and serves the **full** view to consumers.
+- **Master host:** Master yagpcc has **local** data (Master process) plus **pulled** data from all Segment hosts. It **aggregates** (e.g. sum metrics, join by query/session keys) and serves the **full** view to consumers via gRPC and HTTP CSV.
+
+---
+
+## Default listen ports and sockets
+
+The table below lists all network listeners that yagpcc opens, their default ports/paths, the config key to change them, and which roles use them. All TCP listeners bind to `[::1]` (IPv6 localhost) unless noted otherwise. Set a port to `0` to disable the corresponding listener.
+
+| Listener | Protocol | Default | Config key | Bind address | Role(s) | Purpose |
+|----------|----------|---------|------------|--------------|---------|---------|
+| **gRPC (TCP)** | gRPC over TCP | `1432` | `listen_port` | `:<port>` (all interfaces) | master, segment | Main gRPC API: GetGPInfo, ActionService (master); GetQueryInfo, SetQueryInfo, AgentControl (both). Segment-host yagpcc instances also serve GetPidProcStat here. |
+| **gRPC (UDS)** | gRPC over Unix socket | `/tmp/yagpcc_agent.sock` | `socket_file` | Unix socket path | master, segment | Same gRPC services as TCP, but over a local Unix Domain Socket. Used by yagp-hooks-collector on the same host. |
+| **UDS reader** | Custom protobuf over Unix socket | `/tmp/yagpcc_agent_uds.sock` | `uds_file` | Unix socket path | master, segment | Alternative low-level UDS interface for receiving telemetry from yagp-hooks-collector. |
+| **Ping (HTTP)** | HTTP/1.1 | `1435` | `ping_port` | `[::1]:<port>` | master | Health-check endpoint: `GET /ping`. Returns status based on background storage health. |
+| **CSV (HTTP)** | HTTP/1.1 | `1440` | `csv_port` | `[::1]:<port>` | master | CSV export of GetGPInfo data: `GET /csv/sessions`, `/csv/session`, `/csv/queries`, `/csv/query`, `/csv/total_sessions_stat`. See [CSV HTTP API](API.md#csv-http-api). |
+| **Debug (HTTP)** | HTTP/1.1 (pprof) | none | `debug_port` | `[::1]:<port>` | master, segment | Go pprof debug server. Activated on-demand via `SIGUSR2`; runs for `debug_minutes` then shuts down. |
+
+### Port summary (defaults)
+
+```
+Port 1432  — gRPC (all interfaces)     [master + segment]
+Port 1435  — HTTP ping                  [master only]
+Port 1440  — HTTP CSV export            [master only]
+UDS /tmp/yagpcc_agent.sock      — gRPC  [master + segment]
+UDS /tmp/yagpcc_agent_uds.sock  — UDS   [master + segment]
+```
 
 ---
 
 ## Storage and lifecycle
 
 - **Segment yagpcc:** Keeps received metrics in **memory** (and may support clearing after send via GetMetricQueries options). No persistent database in this project.
-- **Master yagpcc:** Keeps aggregated sessions, queries, and metrics in **memory**. External systems (e.g. dashboards, historical store) consume via GetGPInfo and may persist data themselves.
+- **Master yagpcc:** Keeps aggregated sessions, queries, and metrics in **memory**. External systems (e.g. dashboards, historical store) consume via GetGPInfo (gRPC or CSV) and may persist data themselves.
 
 ---
 
 ## Related documentation
 
 - [Architecture overview](architecture.md) — High-level diagram and flow (including Mermaid).
-- [API description](API.md) — GetGPInfo and ActionService RPCs, messages, and metrics.
+- [API description](API.md) — GetGPInfo, ActionService RPCs, CSV HTTP API, messages, and metrics.
 - [Per-process resource statistics](proc-stats-flow.md) — Procfs (`GetPidProcStat`) data flow and 5/15/30-minute top-style averages.
 - [README](../README.md) — Build, configuration, and run.
