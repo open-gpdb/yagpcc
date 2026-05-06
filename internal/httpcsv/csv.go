@@ -570,12 +570,14 @@ func segmentMetricsHeaders() []string {
 
 // segmentMetricsToRecord converts a SegmentMetrics proto message to a flat CSV record.
 func segmentMetricsToRecord(sm *pbm.SegmentMetrics) []string {
-	// 8 scalar/key fields + 42 GPMetrics fields = 50
+	// 8 scalar/key fields (cluster_id, hostname, collect_time, dbid, segindex,
+	// query_status, start_time, end_time) + 42 GPMetrics fields = 50
+	const scalarFields = 8
 	if sm == nil {
-		return make([]string, 8+42)
+		return make([]string, scalarFields+42)
 	}
 
-	record := make([]string, 0, 8+42)
+	record := make([]string, 0, scalarFields+42)
 
 	record = append(record, sm.ClusterId, sm.Hostname)
 
