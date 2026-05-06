@@ -37,6 +37,17 @@ func NewHandler(logger *zap.SugaredLogger, grpcServer *ygrpc.GetMasterInfoServer
 	}
 }
 
+// grpcServerReady reports whether the gRPC backend is available.
+// It writes an HTTP 503 response and returns false when the server is nil,
+// allowing callers to return immediately without panicking.
+func (h *Handler) grpcServerReady(w http.ResponseWriter) bool {
+	if h.grpcServer == nil {
+		http.Error(w, "CSV handler is not available: master server not initialized", http.StatusServiceUnavailable)
+		return false
+	}
+	return true
+}
+
 // RegisterRoutes registers all CSV endpoints on the given mux.
 func (h *Handler) RegisterRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("/csv/sessions", h.handleGetGPSessions)
@@ -117,6 +128,9 @@ func (h *Handler) handleGetGPSessions(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
 		return
 	}
+	if !h.grpcServerReady(w) {
+		return
+	}
 
 	q := r.URL.Query()
 
@@ -158,7 +172,7 @@ func (h *Handler) handleGetGPSessions(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	h.writeSessionsCSV(w, resp.SessionsState, resp.NextPageToken)
+	h.writeSessionsCSV(w, resp.SessionsState, resp.NextPageToken, "sessions.csv")
 }
 
 // handleGetGPSession handles GET /csv/session
@@ -183,6 +197,9 @@ func (h *Handler) handleGetGPSession(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "invalid sess_id parameter", http.StatusBadRequest)
 		return
 	}
+	if !h.grpcServerReady(w) {
+		return
+	}
 
 	req := &pbm.GetGPSessionReq{
 		SessionKey: &pbc.SessionKey{
@@ -202,7 +219,7 @@ func (h *Handler) handleGetGPSession(w http.ResponseWriter, r *http.Request) {
 		sessions = []*pbc.SessionState{resp.SessionsState}
 	}
 
-	h.writeSessionsCSV(w, sessions, "")
+	h.writeSessionsCSV(w, sessions, "", "session.csv")
 }
 
 // handleGetGPQueries handles GET /csv/queries
@@ -215,6 +232,9 @@ func (h *Handler) handleGetGPSession(w http.ResponseWriter, r *http.Request) {
 func (h *Handler) handleGetGPQueries(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
 		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	if !h.grpcServerReady(w) {
 		return
 	}
 
@@ -244,7 +264,7 @@ func (h *Handler) handleGetGPQueries(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	h.writeSessionsCSV(w, resp.SessionsState, resp.NextPageToken)
+	h.writeSessionsCSV(w, resp.SessionsState, resp.NextPageToken, "queries.csv")
 }
 
 // handleGetGPQuery handles GET /csv/query
@@ -277,6 +297,9 @@ func (h *Handler) handleGetGPQuery(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "invalid ccnt parameter", http.StatusBadRequest)
 		return
 	}
+	if !h.grpcServerReady(w) {
+		return
+	}
 
 	req := &pbm.GetGPQueryReq{
 		QueryKey: &pbc.QueryKey{
@@ -306,6 +329,9 @@ func (h *Handler) handleGetTotalSessionsStat(w http.ResponseWriter, r *http.Requ
 		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
 		return
 	}
+	if !h.grpcServerReady(w) {
+		return
+	}
 
 	req := &pbm.GetTotalSessionsReq{}
 
@@ -325,10 +351,11 @@ func (h *Handler) handleGetTotalSessionsStat(w http.ResponseWriter, r *http.Requ
 }
 
 // writeSessionsCSV writes the sessions as CSV with appropriate headers.
+// The filename parameter sets the Content-Disposition attachment filename.
 // If nextPageToken is non-empty, it is included as an X-Next-Page-Token response header.
-func (h *Handler) writeSessionsCSV(w http.ResponseWriter, sessions []*pbc.SessionState, nextPageToken string) {
+func (h *Handler) writeSessionsCSV(w http.ResponseWriter, sessions []*pbc.SessionState, nextPageToken, filename string) {
 	w.Header().Set("Content-Type", "text/csv; charset=utf-8")
-	w.Header().Set("Content-Disposition", "attachment; filename=sessions.csv")
+	w.Header().Set("Content-Disposition", "attachment; filename="+filename)
 	if nextPageToken != "" {
 		w.Header().Set("X-Next-Page-Token", nextPageToken)
 	}

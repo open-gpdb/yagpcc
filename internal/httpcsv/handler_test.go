@@ -216,3 +216,41 @@ func TestNewCSVServer(t *testing.T) {
 	assert.NotNil(t, srv)
 	assert.Equal(t, "[::1]:0", srv.Addr)
 }
+
+func TestNilGRPCServerReturns503(t *testing.T) {
+	logger := zap.NewNop().Sugar()
+	handler := NewHandler(logger, nil)
+
+	mux := http.NewServeMux()
+	handler.RegisterRoutes(mux)
+
+	// Endpoints that reach the nil guard without required params
+	noParamEndpoints := []string{
+		"/csv/sessions",
+		"/csv/queries",
+		"/csv/total_sessions_stat",
+	}
+	for _, endpoint := range noParamEndpoints {
+		t.Run(endpoint, func(t *testing.T) {
+			req := httptest.NewRequest(http.MethodGet, endpoint, nil)
+			rec := httptest.NewRecorder()
+			mux.ServeHTTP(rec, req)
+			assert.Equal(t, http.StatusServiceUnavailable, rec.Code)
+		})
+	}
+
+	// Endpoints that require valid params before reaching the nil guard
+	t.Run("/csv/session with valid sess_id", func(t *testing.T) {
+		req := httptest.NewRequest(http.MethodGet, "/csv/session?sess_id=42", nil)
+		rec := httptest.NewRecorder()
+		mux.ServeHTTP(rec, req)
+		assert.Equal(t, http.StatusServiceUnavailable, rec.Code)
+	})
+
+	t.Run("/csv/query with valid params", func(t *testing.T) {
+		req := httptest.NewRequest(http.MethodGet, "/csv/query?ssid=42&ccnt=1", nil)
+		rec := httptest.NewRecorder()
+		mux.ServeHTTP(rec, req)
+		assert.Equal(t, http.StatusServiceUnavailable, rec.Code)
+	})
+}
