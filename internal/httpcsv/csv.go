@@ -235,16 +235,6 @@ func sessionStateHeaders() []string {
 	}
 }
 
-// formatTimestamp formats a protobuf Timestamp to RFC3339Nano string, or empty if nil.
-func formatTimestamp(ts interface {
-	AsTime() interface{ Format(string) string }
-}) string {
-	if ts == nil {
-		return ""
-	}
-	return ts.AsTime().Format("2006-01-02T15:04:05.000000000Z07:00")
-}
-
 // gpMetricsFields returns the flattened CSV fields for a GPMetrics message.
 func gpMetricsFields(m *pbc.GPMetrics) []string {
 	if m == nil {
