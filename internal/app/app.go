@@ -431,7 +431,7 @@ func Run(ctx context.Context, configFile string) error {
 		}
 	}
 	if agentApp.Config.CSVPort > 0 {
-		if agentApp.GetMasterServer == nil {
+		if agentApp.getMasterServer == nil {
 			logger.Warn("csv handler is configured but master server is not initialized; skipping csv startup")
 		} else {
 			err = agentApp.RunCSVHandler()
