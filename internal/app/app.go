@@ -39,7 +39,7 @@ type AgentApp struct {
 	Config          *config.Config
 	GrpcServer      *gogrpc.Server
 	SetQIServer     *grpc.SetQueryInfoServer
-	GetMasterServer *grpc.GetMasterInfoServer
+	getMasterServer *grpc.GetMasterInfoServer
 	pingHttp        *http.Server
 	csvHttp         *http.Server
 	filelock        *flock.Flock
@@ -269,7 +269,7 @@ func NewApp(
 		pb.RegisterAgentControlServer(s, &grpc.AgentControlServer{Logger: baseApp.L(), RQStorage: backgroundStorage.RQStorage})
 
 		getMasterInfo := grpc.NewGetMasterInfoServer(config.ClusterID, baseApp.L(), int(config.MaxOuterMessageSize), backgroundStorage)
-		agentApp.GetMasterServer = getMasterInfo
+		agentApp.getMasterServer = getMasterInfo
 		actionInfo := &grpc.ActionsServer{ClusterID: config.ClusterID, Logger: baseApp.L(), Timeout: 5 * time.Minute, BackgroundStorage: backgroundStorage}
 
 		pbm.RegisterGetGPInfoServer(s, getMasterInfo)
@@ -318,7 +318,7 @@ func (app *AgentApp) RunPingHandler(backgroundStorage *master.BackgroundStorage)
 
 // RunCSVHandler starts the HTTP server that serves CSV endpoints mirroring the gRPC GetGPInfo service.
 func (app *AgentApp) RunCSVHandler() error {
-	csvHandler := httpcsv.NewHandler(app.L(), app.GetMasterServer)
+	csvHandler := httpcsv.NewHandler(app.L(), app.getMasterServer)
 	csvAddr := fmt.Sprintf("[::1]:%d", app.Config.CSVPort)
 	app.csvHttp = httpcsv.NewCSVServer(csvAddr, csvHandler)
 	if err := baseapp.Serve(app.csvHttp, app.L()); err != nil {
