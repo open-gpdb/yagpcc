@@ -3,10 +3,9 @@ package master
 import (
 	"context"
 	"fmt"
+	"strings"
 	"sync"
 	"time"
-
-	"golang.org/x/sync/errgroup"
 
 	"google.golang.org/grpc"
 
@@ -111,29 +110,44 @@ func (ps *ProcfsGatherStorage) GatherProcfsStat(ctx context.Context, nPullers in
 	}
 	hostJobs := ps.getJobsMap(sessions)
 
+	if len(hostJobs) == 0 {
+		return nil, nil
+	}
+
 	ctxT, ctxTC := context.WithTimeout(ctx, gatherTimeout)
 	defer ctxTC()
 
-	g, ctxG := errgroup.WithContext(ctxT)
-
 	var mu sync.Mutex
 	var collected []*pbc.GpPidProcInfo
+	var errs []string
+	totalJobs := len(hostJobs)
+
+	sem := make(chan struct{}, nPullers)
+	var wg sync.WaitGroup
 
 	for hostname, procfsProcesses := range hostJobs {
-		g.Go(func() error {
-			result, errR := ps.processProcfsRequests(ctxG, hostname, portn, gatherTimeout, maxMsgSize, procfsProcesses)
-			if errR != nil {
-				return errR
-			}
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			sem <- struct{}{}
+			defer func() { <-sem }()
+
+			result, errR := ps.processProcfsRequests(ctxT, hostname, portn, gatherTimeout, maxMsgSize, procfsProcesses)
 			mu.Lock()
+			defer mu.Unlock()
+			if errR != nil {
+				ps.l.Warnf("failed to gather procfs from host %s: %v", hostname, errR)
+				errs = append(errs, fmt.Sprintf("host %s: %v", hostname, errR))
+				return
+			}
 			collected = append(collected, result...)
-			mu.Unlock()
-			return nil
-		})
+		}()
 	}
 
-	if err := g.Wait(); err != nil {
-		return nil, err
+	wg.Wait()
+
+	if len(errs) == totalJobs {
+		return nil, fmt.Errorf("all %d hosts failed: %s", totalJobs, strings.Join(errs, "; "))
 	}
 	return collected, nil
 }

@@ -457,7 +457,7 @@ func TestGatherProcfsStat_ContextCancelled(t *testing.T) {
 	_ = err // may or may not error
 }
 
-func TestGatherProcfsStat_GrpcFailure(t *testing.T) {
+func TestGatherProcfsStat_GrpcFailure_AllHostsFail(t *testing.T) {
 	failSrv := &failingProcStatServer{}
 	lis := setupBufconnServer(t, failSrv)
 	hostname := injectBufconn(t, lis)
@@ -473,7 +473,73 @@ func TestGatherProcfsStat_GrpcFailure(t *testing.T) {
 
 	result, err := ps.GatherProcfsStat(context.Background(), 2, 0, 5*time.Second, 4*1024*1024)
 	require.Error(t, err)
+	assert.Contains(t, err.Error(), "all 1 hosts failed")
 	assert.Contains(t, err.Error(), "simulated gRPC error")
+	assert.Nil(t, result)
+}
+
+func TestGatherProcfsStat_PartialFailure_ReturnsSuccessfulResults(t *testing.T) {
+	// Set up a successful server
+	dataSrv := &dataProcStatServer{}
+	lisOk := setupBufconnServer(t, dataSrv)
+	hostnameOk := injectBufconn(t, lisOk)
+
+	// Set up a failing server
+	failSrv := &failingProcStatServer{}
+	lisFail := setupBufconnServer(t, failSrv)
+	hostnameFail := injectBufconn(t, lisFail)
+
+	storage.SetHostnameForSegindex(70, hostnameOk)
+	storage.SetHostnameForSegindex(71, hostnameFail)
+
+	mock := &mockStatActivityLister{
+		sessions: []stat_activity.SessionPid{
+			{GpSegmentId: 70, Pid: 100, SessId: 1},
+			{GpSegmentId: 70, Pid: 200, SessId: 2},
+			{GpSegmentId: 71, Pid: 300, SessId: 3},
+		},
+	}
+	ps := newTestProcfsGatherStorage(mock)
+
+	result, err := ps.GatherProcfsStat(context.Background(), 4, 0, 5*time.Second, 4*1024*1024)
+	// Should NOT return error because only one host failed, not all
+	require.NoError(t, err)
+	assert.True(t, mock.listCalled)
+
+	// Should have results from the successful host
+	require.Len(t, result, 2)
+	pids := make(map[int64]bool)
+	for _, r := range result {
+		pids[r.Pid] = true
+	}
+	assert.True(t, pids[100], "expected pid 100 from successful host")
+	assert.True(t, pids[200], "expected pid 200 from successful host")
+}
+
+func TestGatherProcfsStat_AllHostsFail_MultipleHosts(t *testing.T) {
+	// Set up two failing servers
+	failSrv1 := &failingProcStatServer{}
+	lisFail1 := setupBufconnServer(t, failSrv1)
+	hostnameFail1 := injectBufconn(t, lisFail1)
+
+	failSrv2 := &failingProcStatServer{}
+	lisFail2 := setupBufconnServer(t, failSrv2)
+	hostnameFail2 := injectBufconn(t, lisFail2)
+
+	storage.SetHostnameForSegindex(80, hostnameFail1)
+	storage.SetHostnameForSegindex(81, hostnameFail2)
+
+	mock := &mockStatActivityLister{
+		sessions: []stat_activity.SessionPid{
+			{GpSegmentId: 80, Pid: 100, SessId: 1},
+			{GpSegmentId: 81, Pid: 200, SessId: 2},
+		},
+	}
+	ps := newTestProcfsGatherStorage(mock)
+
+	result, err := ps.GatherProcfsStat(context.Background(), 4, 0, 5*time.Second, 4*1024*1024)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "all 2 hosts failed")
 	assert.Nil(t, result)
 }
 

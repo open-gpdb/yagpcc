@@ -133,6 +133,17 @@ func Init(ctx context.Context, log *zap.SugaredLogger, config *config.PGConfig, 
 	}
 }
 
+// PopulateHostnameMap updates the segment hostname map from the given configuration.
+// Only primary segments (Role == "p") are stored, since each content ID has both
+// a primary and a mirror row in gp_segment_configuration.
+func PopulateHostnameMap(segmentConfig GpSegmentsConfiguration) {
+	for _, segmentNode := range segmentConfig {
+		if segmentNode.Role == "p" {
+			storage.SetHostnameForSegindex(int32(segmentNode.Content), segmentNode.Hostname)
+		}
+	}
+}
+
 func GetSegmentConfig(ctx context.Context, durability time.Duration) (GpSegmentsConfiguration, error) {
 	cachedItem, ok := CachedItems[SegmentConfig]
 	if ok && checkCacheItem(cachedItem, durability) {
@@ -151,9 +162,7 @@ func GetSegmentConfig(ctx context.Context, durability time.Duration) (GpSegments
 		Status:      CacheOk,
 		RefreshDate: time.Now(),
 	}
-	for _, segmentNode := range segmentConfig {
-		storage.SetHostnameForSegindex(int32(segmentNode.Content), segmentNode.Hostname)
-	}
+	PopulateHostnameMap(segmentConfig)
 	return segmentConfig, nil
 }
 
