@@ -83,7 +83,7 @@ func (ps *ProcfsGatherStorage) processProcfsRequests(ctx context.Context, hostna
 			if len(msgReq.SegmentProcess) >= jobsPerQuery {
 				segResponse, errGet := cGet.GetPidProcStat(ctxTimeout, msgReq, maxSizeOption)
 				if errGet != nil {
-					return nil, fmt.Errorf("grpc get pid proc stat error: %v", errGet)
+					return nil, fmt.Errorf("grpc get pid proc stat error: hostname %v port %v error %v", hostname, portn, errGet)
 				}
 				result = append(result, segResponse.GetPidProcData()...)
 				msgReq.SegmentProcess = make([]*pb.SegmentProcess, 0, 10)
@@ -93,7 +93,7 @@ func (ps *ProcfsGatherStorage) processProcfsRequests(ctx context.Context, hostna
 	if len(msgReq.SegmentProcess) > 0 {
 		segResponse, errGet := cGet.GetPidProcStat(ctxTimeout, msgReq, maxSizeOption)
 		if errGet != nil {
-			return nil, fmt.Errorf("grpc get pid proc stat error: %v", errGet)
+			return nil, fmt.Errorf("grpc get pid proc stat error: hostname %v port %v error %v", hostname, portn, errGet)
 		}
 		result = append(result, segResponse.GetPidProcData()...)
 	}
