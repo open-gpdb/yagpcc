@@ -436,6 +436,121 @@ Session and query attributes used as field names:
 
 ---
 
+## CSV HTTP API
+
+The master yagpcc also exposes an **HTTP service** that mirrors the gRPC **GetGPInfo** service but returns data in **CSV format**. This is useful for quick data export, spreadsheet integration, and scripting with tools like `curl`.
+
+The CSV HTTP server listens on the port configured by `csv_port` (default **1440**) and binds to `[::1]` (localhost IPv6). It is available only on the **master** role.
+
+All endpoints accept only **GET** requests. Business logic (filtering, sorting, pagination) is delegated to the same `GetMasterInfoServer` implementation used by gRPC, so results are identical.
+
+### Endpoints
+
+| Endpoint | gRPC equivalent | Description |
+|----------|-----------------|-------------|
+| `GET /csv/sessions` | `GetGPSessions` | List sessions with optional filters, sorting, and pagination. |
+| `GET /csv/session` | `GetGPSession` | Get a single session by session key. |
+| `GET /csv/queries` | `GetGPQueries` | List sessions in query-centric mode. |
+| `GET /csv/query` | `GetGPQuery` | Get full query data (query stat + per-segment metrics) by query key. |
+| `GET /csv/total_sessions_stat` | `GetTotalSessionsStat` | Get aggregate session count by state. |
+
+### Query parameters
+
+#### GET /csv/sessions
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `show_system` | bool | `false` | Include system sessions. |
+| `show_query_type` | string | `RQT_UNSPECIFIED` | `RQT_TOP` (top query) or `RQT_LAST` (last executed query). |
+| `hide_empty_queries` | bool | `false` | Hide sessions with no running query. |
+| `page_size` | int | `100` | Number of sessions per page. |
+| `page_token` | string | | Token from previous response for next page. |
+| `sort` | string | | Repeatable. Format: `FIELD_NAME:ASC` or `FIELD_NAME:DESC`. Field names match `SessionField` enum (e.g. `TOTAL_RUNNINGTIMESECONDS:DESC`). |
+| `filter_host` | string | | Filter by hostname. |
+| `filter_user` | string | | Filter by username. |
+| `filter_database` | string | | Filter by database. |
+| `filter_application_name` | string | | Filter by application name. |
+| `filter_client_hostname` | string | | Filter by client hostname. |
+| `filter_state` | string | | Filter by session state. |
+| `filter_rsgname` | string | | Filter by resource group name. |
+| `filter_sess_id` | string | | Filter by session ID. |
+| `filter_tm_id` | string | | Filter by transaction manager ID. |
+
+#### GET /csv/session
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `sess_id` | int64 | **yes** | Session ID to look up. |
+
+#### GET /csv/queries
+
+Same parameters as `/csv/sessions` except `show_system`, `show_query_type`, and `hide_empty_queries` are not applicable.
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `page_size` | int | `100` | Number of results per page. |
+| `page_token` | string | | Pagination token. |
+| `sort` | string | | Repeatable. Same format as `/csv/sessions`. |
+| `filter_*` | string | | Same filter parameters as `/csv/sessions`. |
+
+#### GET /csv/query
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `ssid` | int32 | **yes** | Session ID component of the query key. |
+| `ccnt` | int32 | **yes** | Command count component of the query key. |
+
+#### GET /csv/total_sessions_stat
+
+No parameters. Returns aggregate session counts by state.
+
+### Response format
+
+All endpoints return `Content-Type: text/csv; charset=utf-8` with a `Content-Disposition: attachment` header.
+
+- **Sessions endpoints** (`/csv/sessions`, `/csv/session`, `/csv/queries`): Each row is a flattened `SessionState` with ~220 columns covering session info, query info, and all metrics (total, last, query). If pagination produces a next page, the response includes an `X-Next-Page-Token` header.
+- **Query endpoint** (`/csv/query`): Returns `TotalQueryData` as two sections in the same CSV stream. The first section has a `QueryStat` header row followed by the query statistics row. The second section starts immediately after with a `SegmentMetrics` header row followed by one row per segment in `segment_query_metrics`.
+- **Total sessions stat** (`/csv/total_sessions_stat`): Two columns: `state` and `count`.
+
+### Example usage
+
+```bash
+# List all sessions sorted by CPU time descending
+curl 'http://[::1]:1440/csv/sessions?sort=TOTAL_RUNNINGTIMESECONDS:DESC'
+
+# Get a specific session
+curl 'http://[::1]:1440/csv/session?sess_id=42'
+
+# Get query details
+curl 'http://[::1]:1440/csv/query?ssid=42&ccnt=1'
+
+# Get session state summary
+curl 'http://[::1]:1440/csv/total_sessions_stat'
+
+# Paginate through sessions
+curl 'http://[::1]:1440/csv/sessions?page_size=50'
+# Use X-Next-Page-Token header from response for next page:
+curl 'http://[::1]:1440/csv/sessions?page_size=50&page_token=TOKEN_FROM_HEADER'
+```
+
+### Error responses
+
+| HTTP Status | Condition |
+|-------------|-----------|
+| `400 Bad Request` | Missing or invalid required parameters. |
+| `405 Method Not Allowed` | Non-GET request. |
+| `500 Internal Server Error` | gRPC method returned an error. |
+
+### Configuration
+
+Set `csv_port` in `yagpcc.yaml` to enable the CSV HTTP server. Set to `0` to disable.
+
+```yaml
+csv_port: 1440   # default
+```
+
+---
+
 ## Proto file layout
 
 ```

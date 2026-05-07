@@ -7,14 +7,15 @@
 - Collects query and session telemetry from the database (via the **yagp-hooks-collector** extension).
 - Aggregates it across Master and Segment hosts.
 - Exposes it over gRPC for real-time and historical use.
+- Provides an HTTP CSV export API mirroring the gRPC GetGPInfo service for easy scripting and spreadsheet integration.
 
 ## Documentation
 
 | Document | Description |
 |----------|-------------|
-| [**Service architecture**](docs/service-architecture.md) | Services, roles, interfaces (UDS, TCP, libpq), and data flow. |
+| [**Service architecture**](docs/service-architecture.md) | Services, roles, interfaces (UDS, TCP, libpq, HTTP), data flow, and default listen ports. |
 | [Architecture overview](docs/architecture.md) | High-level design and system diagram (with Mermaid). |
-| [API description](docs/API.md) | gRPC API reference (GetGPInfo, ActionService, messages, metrics). |
+| [API description](docs/API.md) | gRPC API reference (GetGPInfo, ActionService), CSV HTTP API, messages, and metrics. |
 | [Per-process resource statistics](docs/proc-stats-flow.md) | Procfs (`GetPidProcStat`) data flow per running query and proposed master-only 5/15/30-minute top-style averages (per-session and cluster-wide rollup). |
 
 ## Building
