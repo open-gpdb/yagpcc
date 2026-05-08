@@ -568,7 +568,7 @@ func TestProcfsStatToLastStat_WithProcIO(t *testing.T) {
 
 func TestProcfsStatToLastStat_WithBothProcStatAndProcIO(t *testing.T) {
 	info := &pbc.GpPidProcInfo{
-		ProcStat: &pbc.ProcStat{Utime: 42, Stime: 21, Vsize: 100, Rss: 50},
+		ProcStat: &pbc.ProcStat{Utime: 42, Stime: 21, Vsize: 2048, Rss: 50},
 		ProcIo:   &pbc.ProcIO{ReadBytes: 999, WriteBytes: 888},
 	}
 	result, err := procfsStatToLastStat(info)
@@ -577,7 +577,7 @@ func TestProcfsStatToLastStat_WithBothProcStatAndProcIO(t *testing.T) {
 	assert.Equal(t, float64(42+21), result.SystemStat.RunningTimeSeconds) // Utime + Stime
 	assert.Equal(t, float64(42), result.SystemStat.UserTimeSeconds)
 	assert.Equal(t, float64(21), result.SystemStat.KernelTimeSeconds)
-	assert.Equal(t, uint64(100/1024), result.SystemStat.VmPeakKb) // Vsize / 1024
+	assert.Equal(t, uint64(2048/1024), result.SystemStat.VmPeakKb) // Vsize / 1024
 	assert.Equal(t, uint64(999), result.SystemStat.ReadBytes)
 	assert.Equal(t, uint64(888), result.SystemStat.WriteBytes)
 }
