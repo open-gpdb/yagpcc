@@ -589,10 +589,13 @@ func procfsStatToLastStat(procfsStat *pbc.GpPidProcInfo) (*pbc.GPMetrics, error)
 			UserTimeSeconds:    float64(procfsStat.ProcStat.Utime),
 			KernelTimeSeconds:  float64(procfsStat.ProcStat.Stime),
 			Vsize:              uint64(procfsStat.ProcStat.Vsize),
-			VmPeakKb:           uint64(procfsStat.ProcStat.Vsize) / 1024,
 			VmSizeKb:           uint64(procfsStat.ProcStat.Vsize) / 1024,
 			Rss:                uint64(procfsStat.ProcStat.Rss),
 		}
+	}
+	if procfsStat.ProcStatus != nil {
+		result.SystemStat.VmPeakKb = uint64(procfsStat.ProcStatus.VmPeak)
+		result.SystemStat.VmSizeKb = uint64(procfsStat.ProcStatus.VmSize)
 	}
 	if procfsStat.ProcIo != nil {
 		result.SystemStat.Rchar = uint64(procfsStat.ProcIo.Rchar)
