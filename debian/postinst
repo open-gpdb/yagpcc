@@ -3,6 +3,8 @@
 set -e
 
 # this capabilities needed to read /proc/<pid>/io stat, see https://manpages.ubuntu.com/manpages/noble/man5/proc.5.html
-setcap cap_sys_ptrace+ep /usr/bin/yagpcc
-setcap cap_perfmon+ep /usr/bin/yagpc
+if command -v setcap >/dev/null 2>&1 && [ -e /usr/bin/yagpcc ]; then
+    setcap cap_sys_ptrace+ep /usr/bin/yagpcc || true
+    setcap cap_perfmon+ep /usr/bin/yagpcc || true
+fi
 
