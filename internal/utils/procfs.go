@@ -132,12 +132,27 @@ func getProcInfo(proc procfs.Proc, pid, gpSegmentID, sessID int64) (*pb.GpPidPro
 // isProcessGone returns true when the error indicates the target PID
 // no longer exists (ENOENT / ESRCH or errors wrapping them).
 func isProcessGone(err error) bool {
-	return errors.Is(err, os.ErrNotExist) || errors.Is(err, syscall.ESRCH)
+	if err == nil {
+		return false
+	}
+	if errors.Is(err, os.ErrNotExist) || errors.Is(err, syscall.ESRCH) {
+		return true
+	}
+	// Also check for error strings containing "no such file" or "no such process"
+	errStr := err.Error()
+	return strings.Contains(errStr, "no such file") || strings.Contains(errStr, "no such process")
 }
 
 // isPermissionDenied returns true when the error indicates a permission denied error (EACCES)
 func isPermissionDenied(err error) bool {
-	return errors.Is(err, os.ErrPermission) || errors.Is(err, syscall.EACCES)
+	if err == nil {
+		return false
+	}
+	if errors.Is(err, os.ErrPermission) || errors.Is(err, syscall.EACCES) {
+		return true
+	}
+	// Also check for error strings containing "permission denied"
+	return strings.Contains(err.Error(), "permission denied")
 }
 
 // convertProcStat maps prometheus/procfs.ProcStat → protobuf ProcStat.

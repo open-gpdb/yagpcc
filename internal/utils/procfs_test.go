@@ -25,6 +25,10 @@ func TestIsPermissionDenied(t *testing.T) {
 		assert.True(t, isPermissionDenied(fmt.Errorf("open /proc/1234/io: %w", os.ErrPermission)))
 	})
 
+	t.Run("permission denied in string", func(t *testing.T) {
+		assert.True(t, isPermissionDenied(errors.New("open /proc/1234/io: permission denied")))
+	})
+
 	t.Run("other error", func(t *testing.T) {
 		assert.False(t, isPermissionDenied(errors.New("file not found")))
 	})
@@ -41,6 +45,14 @@ func TestIsProcessGone(t *testing.T) {
 
 	t.Run("no such file or directory", func(t *testing.T) {
 		assert.True(t, isProcessGone(fmt.Errorf("open /proc/999999/stat: %w", os.ErrNotExist)))
+	})
+
+	t.Run("no such file in string", func(t *testing.T) {
+		assert.True(t, isProcessGone(errors.New("open /proc/999999/stat: no such file or directory")))
+	})
+
+	t.Run("no such process in string", func(t *testing.T) {
+		assert.True(t, isProcessGone(errors.New("open /proc/999999/stat: no such process")))
 	})
 
 	t.Run("other error", func(t *testing.T) {
