@@ -12,6 +12,24 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+func TestIsPermissionDenied(t *testing.T) {
+	t.Run("nil error", func(t *testing.T) {
+		assert.False(t, isPermissionDenied(nil))
+	})
+
+	t.Run("permission denied", func(t *testing.T) {
+		assert.True(t, isPermissionDenied(fmt.Errorf("open /proc/1234/io: %w", syscall.EACCES)))
+	})
+
+	t.Run("operation not permitted", func(t *testing.T) {
+		assert.True(t, isPermissionDenied(fmt.Errorf("open /proc/1234/io: %w", os.ErrPermission)))
+	})
+
+	t.Run("other error", func(t *testing.T) {
+		assert.False(t, isPermissionDenied(errors.New("file not found")))
+	})
+}
+
 func TestIsProcessGone(t *testing.T) {
 	t.Run("nil error", func(t *testing.T) {
 		assert.False(t, isProcessGone(nil))
