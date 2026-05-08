@@ -34,44 +34,45 @@ type ArchiverConfigType struct {
 
 // Config contains all yagpcc configuration
 type Config struct {
-	App                        BaseConfig         `json:"app" yaml:"app"`
-	SocketFile                 string             `config:"socket_file" yaml:"socket_file"`
-	UDSFile                    string             `config:"uds_file" yaml:"uds_file"`
-	UDSBuffer                  uint32             `config:"uds_buffer" yaml:"uds_buffer"`
-	ListenPort                 uint32             `config:"listen_port" yaml:"listen_port"`
-	PingPort                   uint32             `config:"ping_port" yaml:"ping_port"`
-	CSVPort                    uint32             `config:"csv_port" yaml:"csv_port"`
-	DebugPort                  uint32             `config:"debug_port" yaml:"debug_port"`
-	DebugMinutes               int                `config:"debug_minutes" yaml:"debug_minutes"`
-	Lockfile                   string             `config:"lockfile"`
-	Role                       string             `config:"role" yaml:"role"`
-	ClearDeletedSessions       bool               `config:"clear_deleted_sessions" yaml:"clear_deleted_sessions"`
-	MasterConnection           PGConfig           `config:"master_connection" yaml:"master_connection"`
-	MasterConnectionTries      uint32             `config:"master_connection_tries" yaml:"master_connection_tries"`
-	MasterConnectionFirstTries uint32             `config:"master_connection_first_tries" yaml:"master_connection_first_tries"`
-	IgnoreDatabaseError        bool               `config:"ignore_database_error" yaml:"ignore_database_error"`
-	MinimumQueryDurationSec    uint32             `config:"minimum_query_duration_sec" yaml:"minimum_query_duration_sec"`
-	MaxShortQueriesPerUser     uint32             `config:"max_short_queris_per_user" yaml:"max_short_queris_per_user"`
-	ShortAggInterval           time.Duration      `config:"short_agg_interval" yaml:"short_agg_interval"`
-	SessionRefreshInterval     time.Duration      `config:"session_refresh_interval" yaml:"session_refresh_interval"`
-	QueriesRefreshInterval     time.Duration      `config:"session_refresh_interval" yaml:"queries_refresh_interval"`
-	ProcfsRefreshInterval      time.Duration      `config:"procfs_refresh_interval" yaml:"procfs_refresh_interval"`
-	SessionSendMetricInterval  time.Duration      `config:"session_send_metric_interval" yaml:"session_send_metric_interval"`
-	MinFreePercent             uint32             `config:"min_free_percent" yaml:"min_free_percent"`
-	CustomSegmentList          *SegmentList       `config:"custom_segment_list" yaml:"custom_segment_list"`
-	SegmentPullRateSec         float64            `config:"segment_pull_rate_sec" yaml:"segment_pull_rate_sec"`
-	SegmentPullThreads         uint32             `config:"segment_pull_threads" yaml:"segment_pull_threads"`
-	SegmentConnectTimeoutSec   float64            `config:"segment_connect_timeout_sec" yaml:"segment_connect_timeout_sec"`
-	SegmentGetTimeoutSec       float64            `config:"segment_get_timeout_sec" yaml:"segment_get_timeout_sec"`
-	SegmentLogWorkAmount       bool               `config:"segment_log_work_amount" yaml:"segment_log_work_amount"`
-	ConfigCacheDurabilitySec   float64            `config:"config_cache_durability_sec" yaml:"config_cache_durability_sec"`
-	StatActivityDurabilitySec  float64            `config:"stat_activity_durability_sec" yaml:"stat_activity_durability_sec"`
-	ArchiverConfig             ArchiverConfigType `json:"arch_config" yaml:"arch_config"`
-	ClusterID                  string             `config:"cluster_id" yaml:"cluster_id"`
-	ConnectorEnabled           bool               `config:"connector_enabled" yaml:"connector_enabled"`
-	MaxMessageSize             int64              `config:"max_message_size" yaml:"max_message_size"`
-	MaxOuterMessageSize        int64              `config:"max_outer_message_size" yaml:"max_outer_message_size"`
-	MaximumStoredQueries       uint32             `config:"maximum_stored_queries" yaml:"maximum_stored_queries"`
+	App                          BaseConfig         `json:"app" yaml:"app"`
+	SocketFile                   string             `config:"socket_file" yaml:"socket_file"`
+	UDSFile                      string             `config:"uds_file" yaml:"uds_file"`
+	UDSBuffer                    uint32             `config:"uds_buffer" yaml:"uds_buffer"`
+	ListenPort                   uint32             `config:"listen_port" yaml:"listen_port"`
+	PingPort                     uint32             `config:"ping_port" yaml:"ping_port"`
+	CSVPort                      uint32             `config:"csv_port" yaml:"csv_port"`
+	DebugPort                    uint32             `config:"debug_port" yaml:"debug_port"`
+	DebugMinutes                 int                `config:"debug_minutes" yaml:"debug_minutes"`
+	Lockfile                     string             `config:"lockfile"`
+	Role                         string             `config:"role" yaml:"role"`
+	ClearDeletedSessions         bool               `config:"clear_deleted_sessions" yaml:"clear_deleted_sessions"`
+	MasterConnection             PGConfig           `config:"master_connection" yaml:"master_connection"`
+	MasterConnectionTries        uint32             `config:"master_connection_tries" yaml:"master_connection_tries"`
+	MasterConnectionFirstTries   uint32             `config:"master_connection_first_tries" yaml:"master_connection_first_tries"`
+	IgnoreDatabaseError          bool               `config:"ignore_database_error" yaml:"ignore_database_error"`
+	MinimumQueryDurationSec      uint32             `config:"minimum_query_duration_sec" yaml:"minimum_query_duration_sec"`
+	MaxShortQueriesPerUser       uint32             `config:"max_short_queris_per_user" yaml:"max_short_queris_per_user"`
+	ShortAggInterval             time.Duration      `config:"short_agg_interval" yaml:"short_agg_interval"`
+	SessionRefreshInterval       time.Duration      `config:"session_refresh_interval" yaml:"session_refresh_interval"`
+	QueriesRefreshInterval       time.Duration      `config:"session_refresh_interval" yaml:"queries_refresh_interval"`
+	ProcfsRefreshInterval        time.Duration      `config:"procfs_refresh_interval" yaml:"procfs_refresh_interval"`
+	SessionSendMetricInterval    time.Duration      `config:"session_send_metric_interval" yaml:"session_send_metric_interval"`
+	MinFreePercent               uint32             `config:"min_free_percent" yaml:"min_free_percent"`
+	CustomSegmentList            *SegmentList       `config:"custom_segment_list" yaml:"custom_segment_list"`
+	SegmentPullRateSec           float64            `config:"segment_pull_rate_sec" yaml:"segment_pull_rate_sec"`
+	SegmentPullThreads           uint32             `config:"segment_pull_threads" yaml:"segment_pull_threads"`
+	SegmentConnectTimeoutSec     float64            `config:"segment_connect_timeout_sec" yaml:"segment_connect_timeout_sec"`
+	SegmentGetTimeoutSec         float64            `config:"segment_get_timeout_sec" yaml:"segment_get_timeout_sec"`
+	SegmentLogWorkAmount         bool               `config:"segment_log_work_amount" yaml:"segment_log_work_amount"`
+	ConfigCacheDurabilitySec     float64            `config:"config_cache_durability_sec" yaml:"config_cache_durability_sec"`
+	StatActivityDurabilitySec    float64            `config:"stat_activity_durability_sec" yaml:"stat_activity_durability_sec"`
+	ExtensionsCacheDurabilitySec float64            `config:"extensions_cache_durability_sec" yaml:"extensions_cache_durability_sec"`
+	ArchiverConfig               ArchiverConfigType `json:"arch_config" yaml:"arch_config"`
+	ClusterID                    string             `config:"cluster_id" yaml:"cluster_id"`
+	ConnectorEnabled             bool               `config:"connector_enabled" yaml:"connector_enabled"`
+	MaxMessageSize               int64              `config:"max_message_size" yaml:"max_message_size"`
+	MaxOuterMessageSize          int64              `config:"max_outer_message_size" yaml:"max_outer_message_size"`
+	MaximumStoredQueries         uint32             `config:"maximum_stored_queries" yaml:"maximum_stored_queries"`
 }
 
 var _ AppConfig = &Config{}
@@ -100,41 +101,42 @@ func DefaultConfig() (*Config, error) {
 		User:  "gpadmin",
 	}
 	config := Config{
-		App:                        DefaultBaseConfig(),
-		SocketFile:                 "/tmp/yagpcc_agent.sock",
-		UDSFile:                    "/tmp/yagpcc_agent_uds.sock",
-		UDSBuffer:                  4 * 1024,
-		ListenPort:                 1432,
-		PingPort:                   1435,
-		CSVPort:                    1440,
-		Lockfile:                   "/var/run/yagpcc/yagpcc.lock",
-		Role:                       "segment",
-		ClearDeletedSessions:       true,
-		MasterConnection:           masterConnection,
-		MasterConnectionTries:      3,
-		MasterConnectionFirstTries: 86400,
-		IgnoreDatabaseError:        false,
-		MinimumQueryDurationSec:    10 * 60,
-		MaxShortQueriesPerUser:     2000,
-		ShortAggInterval:           time.Duration(time.Minute * 10),
-		SessionRefreshInterval:     time.Duration(time.Second * 30),
-		QueriesRefreshInterval:     time.Duration(time.Second * 1),
-		ProcfsRefreshInterval:      time.Duration(time.Second * 60),
-		SessionSendMetricInterval:  time.Duration(time.Second * 60),
-		MinFreePercent:             10,
-		CustomSegmentList:          nil,
-		SegmentPullRateSec:         2,
-		SegmentPullThreads:         15,
-		SegmentConnectTimeoutSec:   5.0,
-		SegmentGetTimeoutSec:       10.0,
-		ConfigCacheDurabilitySec:   60,
-		StatActivityDurabilitySec:  1,
-		ArchiverConfig:             DefaultArchiverConfig(),
-		ClusterID:                  "unknown",
-		ConnectorEnabled:           false,
-		MaxMessageSize:             12 * 1024 * 1024,
-		MaxOuterMessageSize:        4 * 1024 * 1024,
-		MaximumStoredQueries:       50 * 1000,
+		App:                          DefaultBaseConfig(),
+		SocketFile:                   "/tmp/yagpcc_agent.sock",
+		UDSFile:                      "/tmp/yagpcc_agent_uds.sock",
+		UDSBuffer:                    4 * 1024,
+		ListenPort:                   1432,
+		PingPort:                     1435,
+		CSVPort:                      1440,
+		Lockfile:                     "/var/run/yagpcc/yagpcc.lock",
+		Role:                         "segment",
+		ClearDeletedSessions:         true,
+		MasterConnection:             masterConnection,
+		MasterConnectionTries:        3,
+		MasterConnectionFirstTries:   86400,
+		IgnoreDatabaseError:          false,
+		MinimumQueryDurationSec:      10 * 60,
+		MaxShortQueriesPerUser:       2000,
+		ShortAggInterval:             time.Duration(time.Minute * 10),
+		SessionRefreshInterval:       time.Duration(time.Second * 30),
+		QueriesRefreshInterval:       time.Duration(time.Second * 1),
+		ProcfsRefreshInterval:        time.Duration(time.Second * 60),
+		SessionSendMetricInterval:    time.Duration(time.Second * 60),
+		MinFreePercent:               10,
+		CustomSegmentList:            nil,
+		SegmentPullRateSec:           2,
+		SegmentPullThreads:           15,
+		SegmentConnectTimeoutSec:     5.0,
+		SegmentGetTimeoutSec:         10.0,
+		ConfigCacheDurabilitySec:     60,
+		StatActivityDurabilitySec:    1,
+		ExtensionsCacheDurabilitySec: 900, // 15 minutes
+		ArchiverConfig:               DefaultArchiverConfig(),
+		ClusterID:                    "unknown",
+		ConnectorEnabled:             false,
+		MaxMessageSize:               12 * 1024 * 1024,
+		MaxOuterMessageSize:          4 * 1024 * 1024,
+		MaximumStoredQueries:         50 * 1000,
 	}
 	return &config, nil
 }

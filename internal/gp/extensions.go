@@ -1,0 +1,153 @@
+package gp
+
+import (
+	"context"
+	"fmt"
+	"time"
+
+	"github.com/jmoiron/sqlx"
+	"github.com/open-gpdb/yagpcc/internal/config"
+	"go.uber.org/zap"
+)
+
+// PgExtension represents a single row from pg_extension
+type PgExtension struct {
+	ExtName        string `db:"extname"`
+	ExtOwner       string `db:"extowner"`     // resolved to role name via JOIN
+	ExtNamespace   string `db:"extnamespace"` // resolved to schema name via JOIN
+	ExtRelocatable bool   `db:"extrelocatable"`
+	ExtVersion     string `db:"extversion"`
+}
+
+// DatabaseExtensions holds extensions for a single database
+type DatabaseExtensions struct {
+	DatabaseName string
+	Extensions   []PgExtension
+	Error        string // non-empty if query failed for this DB
+}
+
+// AllDatabaseExtensions is the top-level cached result
+type AllDatabaseExtensions []DatabaseExtensions
+
+const (
+	// DatabaseListQ queries the list of user databases
+	DatabaseListQ = "SELECT datname FROM pg_database WHERE datistemplate = false AND datallowconn = true ORDER BY datname"
+
+	// ExtensionsQ queries extensions in a specific database with JOINs to resolve names
+	ExtensionsQ = `
+SELECT e.extname,
+       r.rolname AS extowner,
+       n.nspname AS extnamespace,
+       e.extrelocatable,
+       e.extversion
+FROM pg_extension e
+JOIN pg_roles r ON r.oid = e.extowner
+JOIN pg_namespace n ON n.oid = e.extnamespace
+ORDER BY e.extname`
+)
+
+// connectToDatabase creates a temporary connection to a specific database
+func connectToDatabase(ctx context.Context, log *zap.SugaredLogger, pgconfig *config.PGConfig, dbName string) (*Connection, error) {
+	// Create a copy of the config with the target database name
+	dbConfig := *pgconfig
+	dbConfig.DB = dbName
+
+	// Build connection string with the target database
+	connString := config.ConnString(
+		dbConfig.Addrs[0], // Use the first address
+		dbConfig.DB,
+		dbConfig.User,
+		dbConfig.Password,
+		dbConfig.SSLMode,
+		dbConfig.SSLRootCert,
+		dbConfig.StatementTimeout,
+	)
+
+	// Register the config
+	configKey, err := config.RegisterConfigForConnString(connString, dbConfig)
+	if err != nil {
+		return nil, fmt.Errorf("failed to register config for database %s: %w", dbName, err)
+	}
+
+	// Create a new database connection directly
+	db, err := sqlx.ConnectContext(ctx, "pgx", configKey)
+	if err != nil {
+		return nil, fmt.Errorf("failed to connect to database %s: %w", dbName, err)
+	}
+
+	// Set connection limits
+	db.SetMaxOpenConns(1)
+	db.SetMaxIdleConns(1)
+
+	// Set the bypass option
+	_, err = db.ExecContext(ctx, "set session gp_resource_group_bypass = on")
+	if err != nil {
+		// Close the connection before returning error
+		_ = db.Close()
+		return nil, fmt.Errorf("error setting up bypass option for database %s: %w", dbName, err)
+	}
+
+	// Create and return a Connection wrapper
+	return NewConnection(log, &dbConfig, db), nil
+}
+
+// GetExtensions retrieves extension information from all user databases
+func GetExtensions(ctx context.Context, durability time.Duration) (AllDatabaseExtensions, error) {
+	// Check cache first
+	cachedItem, ok := CachedItems[ExtensionsConfig]
+	if ok && checkCacheItem(cachedItem, durability) {
+		return cachedItem.ItemValue.(AllDatabaseExtensions), nil
+	}
+
+	// Get list of databases
+	databaseNames := make([]string, 0)
+	err := db.ExecQuery(ctx, DatabaseListQ, &databaseNames)
+	if err != nil {
+		return nil, fmt.Errorf("failed to query database list: %w", err)
+	}
+
+	// Query extensions for each database
+	allExtensions := make(AllDatabaseExtensions, 0, len(databaseNames))
+
+	for _, dbName := range databaseNames {
+		dbExtensions := DatabaseExtensions{
+			DatabaseName: dbName,
+			Extensions:   make([]PgExtension, 0),
+		}
+
+		// Create a temporary connection to this database
+		dbConn, err := connectToDatabase(ctx, db.log, db.config, dbName)
+		if err != nil {
+			// Log the error but continue with other databases
+			dbExtensions.Error = err.Error()
+			allExtensions = append(allExtensions, dbExtensions)
+			continue
+		}
+
+		// Query extensions in this database
+		extensions := make([]PgExtension, 0)
+		err = dbConn.ExecQueryNoRetry(ctx, ExtensionsQ, &extensions)
+		if err != nil {
+			// Log the error but continue with other databases
+			dbExtensions.Error = err.Error()
+		} else {
+			dbExtensions.Extensions = extensions
+		}
+
+		// Close the temporary connection
+		if dbConn.db != nil {
+			_ = dbConn.db.Close()
+		}
+
+		allExtensions = append(allExtensions, dbExtensions)
+	}
+
+	// Cache the result
+	CachedItems[ExtensionsConfig] = &CacheItem{
+		ItemValue:   allExtensions,
+		Status:      CacheOk,
+		RefreshDate: time.Now(),
+	}
+
+	return allExtensions, nil
+}

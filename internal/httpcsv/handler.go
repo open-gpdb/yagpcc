@@ -55,6 +55,7 @@ func (h *Handler) RegisterRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("/csv/queries", h.handleGetGPQueries)
 	mux.HandleFunc("/csv/query", h.handleGetGPQuery)
 	mux.HandleFunc("/csv/total_sessions_stat", h.handleGetTotalSessionsStat)
+	mux.HandleFunc("/csv/extensions", h.handleGetGPExtensions)
 }
 
 // parseSessionFilters parses filter query parameters.
@@ -346,6 +347,33 @@ func (h *Handler) handleGetTotalSessionsStat(w http.ResponseWriter, r *http.Requ
 	w.Header().Set("Content-Disposition", "attachment; filename=total_sessions_stat.csv")
 
 	if err := WriteTotalSessionsStatCSV(w, resp.SessionsStat); err != nil {
+		h.logger.Errorf("error writing CSV: %v", err)
+	}
+}
+
+// handleGetGPExtensions handles GET /csv/extensions
+func (h *Handler) handleGetGPExtensions(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	if !h.grpcServerReady(w) {
+		return
+	}
+
+	req := &pbm.GetGPExtensionsReq{}
+
+	resp, err := h.grpcServer.GetGPExtensions(r.Context(), req)
+	if err != nil {
+		h.logger.Errorf("CSV GetGPExtensions error: %v", err)
+		http.Error(w, fmt.Sprintf("error: %v", err), http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "text/csv; charset=utf-8")
+	w.Header().Set("Content-Disposition", "attachment; filename=extensions.csv")
+
+	if err := WriteExtensionsCSV(w, resp.Databases); err != nil {
 		h.logger.Errorf("error writing CSV: %v", err)
 	}
 }

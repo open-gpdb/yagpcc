@@ -24,18 +24,20 @@ import (
 
 type GetMasterInfoServer struct {
 	pbm.UnimplementedGetGPInfoServer
-	clusterID         string
-	logger            *zap.SugaredLogger
-	maxMessageSize    int
-	backgroundStorage *master.BackgroundStorage
+	clusterID                 string
+	logger                    *zap.SugaredLogger
+	maxMessageSize            int
+	backgroundStorage         *master.BackgroundStorage
+	extensionsCacheDurability time.Duration
 }
 
-func NewGetMasterInfoServer(clusterID string, logger *zap.SugaredLogger, maxMessageSize int, backgroundStorage *master.BackgroundStorage) *GetMasterInfoServer {
+func NewGetMasterInfoServer(clusterID string, logger *zap.SugaredLogger, maxMessageSize int, backgroundStorage *master.BackgroundStorage, extensionsCacheDurability time.Duration) *GetMasterInfoServer {
 	return &GetMasterInfoServer{
-		clusterID:         clusterID,
-		logger:            logger,
-		maxMessageSize:    maxMessageSize,
-		backgroundStorage: backgroundStorage,
+		clusterID:                 clusterID,
+		logger:                    logger,
+		maxMessageSize:            maxMessageSize,
+		backgroundStorage:         backgroundStorage,
+		extensionsCacheDurability: extensionsCacheDurability,
 	}
 }
 
@@ -2788,4 +2790,48 @@ func (s *GetMasterInfoServer) GetGPQuery(ctx context.Context, in *pbm.GetGPQuery
 		metrics.YagpccMetrics.HandleLatencies.With(map[string]string{"method": "GetGPQuery"}).Observe(time.Since(start).Seconds())
 	}
 	return &queryResponse, nil
+}
+
+func (s *GetMasterInfoServer) GetGPExtensions(ctx context.Context, in *pbm.GetGPExtensionsReq) (*pbm.GetGPExtensionsResponse, error) {
+	s.logger.Debugf("got get extensions request")
+	start := time.Now()
+
+	// Get extensions data from all databases
+	allExtensions, err := gp.GetExtensions(ctx, s.extensionsCacheDurability)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get extensions: %w", err)
+	}
+
+	// Convert to protobuf response
+	response := &pbm.GetGPExtensionsResponse{
+		Databases: make([]*pbm.DatabaseExtensionsInfo, 0, len(allExtensions)),
+	}
+
+	for _, dbExtensions := range allExtensions {
+		dbInfo := &pbm.DatabaseExtensionsInfo{
+			DatabaseName: dbExtensions.DatabaseName,
+			Error:        dbExtensions.Error,
+		}
+
+		// Convert extensions
+		extensions := make([]*pbm.PgExtensionInfo, 0, len(dbExtensions.Extensions))
+		for _, ext := range dbExtensions.Extensions {
+			extInfo := &pbm.PgExtensionInfo{
+				ExtName:        ext.ExtName,
+				ExtOwner:       ext.ExtOwner,
+				ExtNamespace:   ext.ExtNamespace,
+				ExtRelocatable: ext.ExtRelocatable,
+				ExtVersion:     ext.ExtVersion,
+			}
+			extensions = append(extensions, extInfo)
+		}
+		dbInfo.Extensions = extensions
+		response.Databases = append(response.Databases, dbInfo)
+	}
+
+	s.logger.Debugf("Get extensions took %v", time.Since(start))
+	if metrics.YagpccMetrics != nil {
+		metrics.YagpccMetrics.HandleLatencies.With(map[string]string{"method": "GetGPExtensions"}).Observe(time.Since(start).Seconds())
+	}
+	return response, nil
 }

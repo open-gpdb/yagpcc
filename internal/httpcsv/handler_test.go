@@ -229,6 +229,7 @@ func TestNilGRPCServerReturns503(t *testing.T) {
 		"/csv/sessions",
 		"/csv/queries",
 		"/csv/total_sessions_stat",
+		"/csv/extensions",
 	}
 	for _, endpoint := range noParamEndpoints {
 		t.Run(endpoint, func(t *testing.T) {

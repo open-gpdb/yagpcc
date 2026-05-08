@@ -32,6 +32,7 @@ Service for querying Greenplum sessions, queries, and aggregate statistics.
 | **GetGPQuery** | `GetGPQueryReq` | `GetGPQueryResponse` | Get full query data (query stat + per-segment metrics) by query key. |
 | **GetGPSession** | `GetGPSessionReq` | `GetGPSessionResponse` | Get a single session by session key. |
 | **GetTotalSessionsStat** | `GetTotalSessionsReq` | `GetTotalSessionsResponse` | Get aggregate session count by state. |
+| **GetGPExtensions** | `GetGPExtensionsReq` | `GetGPExtensionsResponse` | Get installed extensions for all databases. |
 
 ### Request/response types
 
@@ -75,6 +76,11 @@ Service for querying Greenplum sessions, queries, and aggregate statistics.
 
 - **GetTotalSessionsReq**: empty.
 - **GetTotalSessionsResponse**: `sessions_stat` — `repeated SessionStat` (each has `state` string and `count` double).
+
+#### GetGPExtensionsReq / GetGPExtensionsResponse
+
+- **GetGPExtensionsReq**: empty.
+- **GetGPExtensionsResponse**: `databases` — `repeated DatabaseExtensionsInfo`.
 
 ### Enums used by GetGPInfo
 
@@ -434,6 +440,28 @@ Session and query attributes used as field names:
 
 **SessionFilterEnum**: `SESSION_FILTER_ENUM_UNSPECIFIED`, `SESSION_FILTER_HOST`, `SESSION_FILTER_USER`, `SESSION_FILTER_DATABASE`, `SESSION_FILTER_APPLICATION_NAME`, `SESSION_FILTER_CLIENT_HOSTNAME`, `SESSION_FILTER_STATE`, `SESSION_FILTER_RSGNAME`, `SESSION_FILTER_SESS_ID`, `SESSION_FILTER_TM_ID`.
 
+### DatabaseExtensionsInfo
+
+Information about extensions in a specific database.
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `database_name` | `string` | Name of the database. |
+| `extensions` | `repeated PgExtensionInfo` | List of extensions in this database. |
+| `error` | `string` | Error message if extension query failed for this database. |
+
+### PgExtensionInfo
+
+Information about a single PostgreSQL extension.
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `ext_name` | `string` | Extension name. |
+| `ext_owner` | `string` | Extension owner. |
+| `ext_namespace` | `string` | Extension namespace. |
+| `ext_relocatable` | `bool` | Whether the extension is relocatable. |
+| `ext_version` | `string` | Extension version. |
+
 ---
 
 ## CSV HTTP API
@@ -453,6 +481,7 @@ All endpoints accept only **GET** requests. Business logic (filtering, sorting, 
 | `GET /csv/queries` | `GetGPQueries` | List sessions in query-centric mode. |
 | `GET /csv/query` | `GetGPQuery` | Get full query data (query stat + per-segment metrics) by query key. |
 | `GET /csv/total_sessions_stat` | `GetTotalSessionsStat` | Get aggregate session count by state. |
+| `GET /csv/extensions` | `GetGPExtensions` | Get installed extensions for all databases. |
 
 ### Query parameters
 
@@ -511,6 +540,7 @@ All endpoints return `Content-Type: text/csv; charset=utf-8` with a `Content-Dis
 - **Sessions endpoints** (`/csv/sessions`, `/csv/session`, `/csv/queries`): Each row is a flattened `SessionState` with ~220 columns covering session info, query info, and all metrics (total, last, query). If pagination produces a next page, the response includes an `X-Next-Page-Token` header.
 - **Query endpoint** (`/csv/query`): Returns `TotalQueryData` as two sections in the same CSV stream. The first section has a `QueryStat` header row followed by the query statistics row. The second section starts immediately after with a `SegmentMetrics` header row followed by one row per segment in `segment_query_metrics`.
 - **Total sessions stat** (`/csv/total_sessions_stat`): Two columns: `state` and `count`.
+- **Extensions** (`/csv/extensions`): Each row represents an extension in a database with columns: `database_name`, `ext_name`, `ext_owner`, `ext_namespace`, `ext_relocatable`, `ext_version`, `error`.
 
 ### Example usage
 
@@ -531,6 +561,9 @@ curl 'http://[::1]:1440/csv/total_sessions_stat'
 curl 'http://[::1]:1440/csv/sessions?page_size=50'
 # Use X-Next-Page-Token header from response for next page:
 curl 'http://[::1]:1440/csv/sessions?page_size=50&page_token=TOKEN_FROM_HEADER'
+
+# Get extensions for all databases
+curl 'http://[::1]:1440/csv/extensions'
 ```
 
 ### Error responses
@@ -547,6 +580,12 @@ Set `csv_port` in `yagpcc.yaml` to enable the CSV HTTP server. Set to `0` to dis
 
 ```yaml
 csv_port: 1440   # default
+```
+
+The `extensions_cache_durability_sec` parameter controls how long extension information is cached (default: 900 seconds = 15 minutes):
+
+```yaml
+extensions_cache_durability_sec: 900   # default
 ```
 
 ---

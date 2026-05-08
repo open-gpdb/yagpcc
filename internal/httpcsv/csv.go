@@ -818,3 +818,78 @@ func WriteQueryDataCSV(w io.Writer, data *pbm.TotalQueryData) error {
 
 	return cw.Error()
 }
+
+// extensionsHeaders returns the CSV header row for extensions records.
+func extensionsHeaders() []string {
+	return []string{
+		"database_name",
+		"ext_name",
+		"ext_owner",
+		"ext_namespace",
+		"ext_relocatable",
+		"ext_version",
+		"error",
+	}
+}
+
+// WriteExtensionsCSV writes DatabaseExtensionsInfo records as CSV to the given writer.
+func WriteExtensionsCSV(w io.Writer, databases []*pbm.DatabaseExtensionsInfo) error {
+	cw := csv.NewWriter(w)
+	defer cw.Flush()
+
+	if err := cw.Write(extensionsHeaders()); err != nil {
+		return fmt.Errorf("write csv header: %w", err)
+	}
+
+	for _, db := range databases {
+		if len(db.Extensions) == 0 && db.Error == "" {
+			// Write a row with just the database name and no extensions
+			record := []string{
+				db.DatabaseName,
+				"", // ext_name
+				"", // ext_owner
+				"", // ext_namespace
+				"", // ext_relocatable
+				"", // ext_version
+				"", // error
+			}
+			if err := cw.Write(record); err != nil {
+				return fmt.Errorf("write csv record: %w", err)
+			}
+		} else {
+			// Write a row for each extension
+			for _, ext := range db.Extensions {
+				record := []string{
+					db.DatabaseName,
+					ext.ExtName,
+					ext.ExtOwner,
+					ext.ExtNamespace,
+					fmt.Sprintf("%t", ext.ExtRelocatable),
+					ext.ExtVersion,
+					db.Error,
+				}
+				if err := cw.Write(record); err != nil {
+					return fmt.Errorf("write csv record: %w", err)
+				}
+			}
+
+			// If there was an error but no extensions, write a row with just the error
+			if len(db.Extensions) == 0 && db.Error != "" {
+				record := []string{
+					db.DatabaseName,
+					"", // ext_name
+					"", // ext_owner
+					"", // ext_namespace
+					"", // ext_relocatable
+					"", // ext_version
+					db.Error,
+				}
+				if err := cw.Write(record); err != nil {
+					return fmt.Errorf("write csv record: %w", err)
+				}
+			}
+		}
+	}
+
+	return cw.Error()
+}
