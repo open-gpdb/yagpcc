@@ -3,10 +3,9 @@ package master
 import (
 	"context"
 	"fmt"
+	"strings"
 	"sync"
 	"time"
-
-	"golang.org/x/sync/errgroup"
 
 	"google.golang.org/grpc"
 
@@ -83,7 +82,7 @@ func (ps *ProcfsGatherStorage) processProcfsRequests(ctx context.Context, hostna
 			if len(msgReq.SegmentProcess) >= jobsPerQuery {
 				segResponse, errGet := cGet.GetPidProcStat(ctxTimeout, msgReq, maxSizeOption)
 				if errGet != nil {
-					return nil, fmt.Errorf("grpc get pid proc stat error: %v", errGet)
+					return nil, fmt.Errorf("grpc get pid proc stat error: hostname %v port %v error %v", hostname, portn, errGet)
 				}
 				result = append(result, segResponse.GetPidProcData()...)
 				msgReq.SegmentProcess = make([]*pb.SegmentProcess, 0, 10)
@@ -93,7 +92,7 @@ func (ps *ProcfsGatherStorage) processProcfsRequests(ctx context.Context, hostna
 	if len(msgReq.SegmentProcess) > 0 {
 		segResponse, errGet := cGet.GetPidProcStat(ctxTimeout, msgReq, maxSizeOption)
 		if errGet != nil {
-			return nil, fmt.Errorf("grpc get pid proc stat error: %v", errGet)
+			return nil, fmt.Errorf("grpc get pid proc stat error: hostname %v port %v error %v", hostname, portn, errGet)
 		}
 		result = append(result, segResponse.GetPidProcData()...)
 	}
@@ -111,29 +110,44 @@ func (ps *ProcfsGatherStorage) GatherProcfsStat(ctx context.Context, nPullers in
 	}
 	hostJobs := ps.getJobsMap(sessions)
 
+	if len(hostJobs) == 0 {
+		return nil, nil
+	}
+
 	ctxT, ctxTC := context.WithTimeout(ctx, gatherTimeout)
 	defer ctxTC()
 
-	g, ctxG := errgroup.WithContext(ctxT)
-
 	var mu sync.Mutex
 	var collected []*pbc.GpPidProcInfo
+	var errs []string
+	totalJobs := len(hostJobs)
+
+	sem := make(chan struct{}, nPullers)
+	var wg sync.WaitGroup
 
 	for hostname, procfsProcesses := range hostJobs {
-		g.Go(func() error {
-			result, errR := ps.processProcfsRequests(ctxG, hostname, portn, gatherTimeout, maxMsgSize, procfsProcesses)
-			if errR != nil {
-				return errR
-			}
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			sem <- struct{}{}
+			defer func() { <-sem }()
+
+			result, errR := ps.processProcfsRequests(ctxT, hostname, portn, gatherTimeout, maxMsgSize, procfsProcesses)
 			mu.Lock()
+			defer mu.Unlock()
+			if errR != nil {
+				ps.l.Warnf("failed to gather procfs from host %s: %v", hostname, errR)
+				errs = append(errs, fmt.Sprintf("host %s: %v", hostname, errR))
+				return
+			}
 			collected = append(collected, result...)
-			mu.Unlock()
-			return nil
-		})
+		}()
 	}
 
-	if err := g.Wait(); err != nil {
-		return nil, err
+	wg.Wait()
+
+	if len(errs) == totalJobs {
+		return nil, fmt.Errorf("all %d hosts failed: %s", totalJobs, strings.Join(errs, "; "))
 	}
 	return collected, nil
 }

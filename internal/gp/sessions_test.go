@@ -529,14 +529,20 @@ func TestProcfsStatToLastStat_WithProcStat(t *testing.T) {
 			Vsize: 2048,
 			Rss:   1024,
 		},
+		ProcStatus: &pbc.ProcStatus{
+			VmPeak: 4096,
+			VmSize: 2048,
+		},
 	}
 	result, err := procfsStatToLastStat(info)
 	require.NoError(t, err)
 	require.NotNil(t, result.SystemStat)
+	assert.Equal(t, float64(100+50), result.SystemStat.RunningTimeSeconds) // Utime + Stime
 	assert.Equal(t, float64(100), result.SystemStat.UserTimeSeconds)
 	assert.Equal(t, float64(50), result.SystemStat.KernelTimeSeconds)
 	assert.Equal(t, uint64(2048), result.SystemStat.Vsize)
-	assert.Equal(t, uint64(2048/1024), result.SystemStat.VmSizeKb)
+	assert.Equal(t, uint64(4096), result.SystemStat.VmPeakKb) // From ProcStatus.VmPeak
+	assert.Equal(t, uint64(2048), result.SystemStat.VmSizeKb) // From ProcStatus.VmSize
 	assert.Equal(t, uint64(1024), result.SystemStat.Rss)
 }
 
@@ -566,16 +572,46 @@ func TestProcfsStatToLastStat_WithProcIO(t *testing.T) {
 
 func TestProcfsStatToLastStat_WithBothProcStatAndProcIO(t *testing.T) {
 	info := &pbc.GpPidProcInfo{
-		ProcStat: &pbc.ProcStat{Utime: 42, Stime: 21, Vsize: 100, Rss: 50},
+		ProcStat: &pbc.ProcStat{Utime: 42, Stime: 21, Vsize: 2048, Rss: 50},
 		ProcIo:   &pbc.ProcIO{ReadBytes: 999, WriteBytes: 888},
+		ProcStatus: &pbc.ProcStatus{
+			VmPeak: 4096,
+			VmSize: 2048,
+		},
 	}
 	result, err := procfsStatToLastStat(info)
 	require.NoError(t, err)
 	require.NotNil(t, result.SystemStat)
+	assert.Equal(t, float64(42+21), result.SystemStat.RunningTimeSeconds) // Utime + Stime
 	assert.Equal(t, float64(42), result.SystemStat.UserTimeSeconds)
 	assert.Equal(t, float64(21), result.SystemStat.KernelTimeSeconds)
+	assert.Equal(t, uint64(4096), result.SystemStat.VmPeakKb) // From ProcStatus.VmPeak
 	assert.Equal(t, uint64(999), result.SystemStat.ReadBytes)
 	assert.Equal(t, uint64(888), result.SystemStat.WriteBytes)
+}
+
+func TestProcfsStatToLastStat_RunningTimeSecondsAndVmPeakKb(t *testing.T) {
+	// Test specific values for the new fields
+	info := &pbc.GpPidProcInfo{
+		ProcStat: &pbc.ProcStat{
+			Utime: 1000,    // User time
+			Stime: 500,     // Kernel time
+			Vsize: 4096000, // Virtual memory size in bytes
+		},
+		ProcStatus: &pbc.ProcStatus{
+			VmPeak: 8192, // Peak virtual memory size in KB
+			VmSize: 4096, // Virtual memory size in KB
+		},
+	}
+	result, err := procfsStatToLastStat(info)
+	require.NoError(t, err)
+	require.NotNil(t, result.SystemStat)
+
+	// RunningTimeSeconds should be the sum of Utime and Stime
+	assert.Equal(t, float64(1000+500), result.SystemStat.RunningTimeSeconds)
+
+	// VmPeakKb should come from ProcStatus.VmPeak
+	assert.Equal(t, uint64(8192), result.SystemStat.VmPeakKb)
 }
 
 // --- RecalculateProcfsUsage ---

@@ -379,6 +379,35 @@ func TestGetProcInfo_PassThroughFields(t *testing.T) {
 	}
 }
 
+func TestGetProcInfo_IOPermissionDenied(t *testing.T) {
+	const pid = 17
+	fake := newFakeProcDir(t, pid)
+	fake.writeFile(t, "cmdline", "postgres:  5432, gpadmin postgres localhost(33326) con21 cmd1 idle")
+	fake.writeFile(t, "stat", sampleStat(pid))
+	fake.writeFile(t, "status", sampleStatus(pid))
+	// Create the io file but make it unreadable to simulate permission denied
+	ioPath := filepath.Join(fake.root, strconv.Itoa(pid), "io")
+	err := os.WriteFile(ioPath, []byte(sampleIO()), 0o200) // write-only permissions
+	require.NoError(t, err)
+
+	proc := fake.proc(t)
+	info, err := getProcInfo(proc, int64(pid), 8, 800)
+
+	require.NoError(t, err)
+	require.NotNil(t, info)
+
+	// Cmdline and state should be populated
+	assert.NotEmpty(t, info.Cmdline)
+	assert.Equal(t, "idle", info.State)
+
+	// ProcStat and ProcStatus should be populated
+	require.NotNil(t, info.ProcStat)
+	require.NotNil(t, info.ProcStatus)
+
+	// ProcIO should be nil when io file access is denied (permission denied)
+	assert.Nil(t, info.ProcIo)
+}
+
 func TestGetProcInfo_MultiWordCmdline(t *testing.T) {
 	// procfs cmdline uses null bytes as separators; the function joins them
 	// with spaces.

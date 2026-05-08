@@ -341,7 +341,8 @@ func (bs *BackgroundStorage) TryRefreshSessionsFromGP(
 
 	err = bs.SessionStorage.RecalculateProcfsUsage()
 	if err != nil {
-		return fmt.Errorf("error recalculating procfs usage: %w", err)
+		// do not stop working, just store error
+		bs.l.Warnf("error recalculating procfs usage: %v", err)
 	}
 	bs.l.Debugf("refreshed session list")
 	return nil
