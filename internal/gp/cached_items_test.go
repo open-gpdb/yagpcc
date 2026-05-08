@@ -30,7 +30,7 @@ func TestPopulateHostnameMapOnlyPrimary(t *testing.T) {
 		{DBID: 3, Content: 1, Role: "m", PreferredRole: "m", Hostname: "seg1-mirror.db.yandex.net"},
 	}
 
-	PopulateHostnameMap(segConfig)
+	populateHostnameMap(segConfig)
 
 	// Primary hostnames should be stored
 	assert.Equal(t, "master-primary.db.yandex.net", storage.GetHostnameForSegindex(-1))
@@ -52,7 +52,7 @@ func TestPopulateHostnameMapMirrorDoesNotOverwritePrimary(t *testing.T) {
 		{DBID: 2, Content: 0, Role: "m", PreferredRole: "m", Hostname: "mirror-host.db.yandex.net"},
 	}
 
-	PopulateHostnameMap(segConfig)
+	populateHostnameMap(segConfig)
 
 	assert.Equal(t, "primary-host.db.yandex.net", storage.GetHostnameForSegindex(0))
 }
@@ -68,7 +68,7 @@ func TestPopulateHostnameMapMirrorBeforePrimary(t *testing.T) {
 		{DBID: 4, Content: 0, Role: "p", PreferredRole: "p", Hostname: "primary-host.db.yandex.net"},
 	}
 
-	PopulateHostnameMap(segConfig)
+	populateHostnameMap(segConfig)
 
 	assert.Equal(t, "primary-host.db.yandex.net", storage.GetHostnameForSegindex(0))
 }
@@ -80,7 +80,7 @@ func TestPopulateHostnameMapEmptyConfig(t *testing.T) {
 
 	segConfig := GpSegmentsConfiguration{}
 
-	PopulateHostnameMap(segConfig)
+	populateHostnameMap(segConfig)
 
 	// No entries — should return segindex as string
 	assert.Equal(t, "0", storage.GetHostnameForSegindex(0))
@@ -97,7 +97,7 @@ func TestPopulateHostnameMapOnlyMirrors(t *testing.T) {
 		{DBID: 3, Content: 1, Role: "m", PreferredRole: "m", Hostname: "mirror-host2.db.yandex.net"},
 	}
 
-	PopulateHostnameMap(segConfig)
+	populateHostnameMap(segConfig)
 
 	assert.Equal(t, "0", storage.GetHostnameForSegindex(0))
 	assert.Equal(t, "1", storage.GetHostnameForSegindex(1))
@@ -113,7 +113,7 @@ func TestPopulateHostnameMapUpdatesOnRefresh(t *testing.T) {
 		{DBID: 4, Content: 0, Role: "p", PreferredRole: "p", Hostname: "old-primary.db.yandex.net"},
 		{DBID: 2, Content: 0, Role: "m", PreferredRole: "m", Hostname: "old-mirror.db.yandex.net"},
 	}
-	PopulateHostnameMap(segConfig)
+	populateHostnameMap(segConfig)
 	assert.Equal(t, "old-primary.db.yandex.net", storage.GetHostnameForSegindex(0))
 
 	// Refreshed config — primary hostname changed (e.g., failover happened)
@@ -121,6 +121,6 @@ func TestPopulateHostnameMapUpdatesOnRefresh(t *testing.T) {
 		{DBID: 4, Content: 0, Role: "p", PreferredRole: "p", Hostname: "new-primary.db.yandex.net"},
 		{DBID: 2, Content: 0, Role: "m", PreferredRole: "m", Hostname: "new-mirror.db.yandex.net"},
 	}
-	PopulateHostnameMap(segConfig2)
+	populateHostnameMap(segConfig2)
 	assert.Equal(t, "new-primary.db.yandex.net", storage.GetHostnameForSegindex(0))
 }
