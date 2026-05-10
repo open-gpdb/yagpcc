@@ -67,8 +67,7 @@ func connectToDatabase(ctx context.Context, log *zap.SugaredLogger, pgconfig *co
 		dbConfig.StatementTimeout,
 	)
 
-	// Register the config
-	configKey, err := config.RegisterConfigForConnString(connString, dbConfig)
+	configKey, err := getConfigKey(connString, dbConfig)
 	if err != nil {
 		return nil, fmt.Errorf("failed to register config for database %s: %w", dbName, err)
 	}
@@ -95,6 +94,37 @@ func connectToDatabase(ctx context.Context, log *zap.SugaredLogger, pgconfig *co
 	return NewConnection(log, &dbConfig, db), nil
 }
 
+func getConfigKey(connString string, dbConfig config.PGConfig) (string, error) {
+	dbMutex.Lock()
+	defer dbMutex.Unlock()
+
+	configKey, ok := configKeyMap[connString]
+	if ok {
+		return configKey, nil
+	}
+
+	configKey, err := config.RegisterConfigForConnString(connString, dbConfig)
+	if err != nil {
+		return "", err
+	}
+	configKeyMap[connString] = configKey
+	return configKey, nil
+}
+
+func execQueryOnCurrentDB(ctx context.Context, conn *Connection, query string, dest interface{}) error {
+	if conn == nil || conn.db == nil {
+		return fmt.Errorf("not initialized connection")
+	}
+
+	conn.log.Debugf("will execute query %v", query)
+	err := conn.db.SelectContext(ctx, dest, query)
+	if err != nil {
+		conn.log.Warnf("got error %v while select %v", err, query)
+		return err
+	}
+	return nil
+}
+
 // GetExtensions retrieves extension information from all user databases
 func GetExtensions(ctx context.Context, durability time.Duration) (AllDatabaseExtensions, error) {
 	// Check cache first
@@ -103,9 +133,16 @@ func GetExtensions(ctx context.Context, durability time.Duration) (AllDatabaseEx
 		return cachedItem.ItemValue.(AllDatabaseExtensions), nil
 	}
 
+	dbMutex.Lock()
+	currentDB := db
+	dbMutex.Unlock()
+	if currentDB == nil {
+		return nil, fmt.Errorf("internal - DB not initialized")
+	}
+
 	// Get list of databases
 	databaseNames := make([]string, 0)
-	err := db.ExecQuery(ctx, DatabaseListQ, &databaseNames)
+	err := currentDB.ExecQuery(ctx, DatabaseListQ, &databaseNames)
 	if err != nil {
 		return nil, fmt.Errorf("failed to query database list: %w", err)
 	}
@@ -120,7 +157,7 @@ func GetExtensions(ctx context.Context, durability time.Duration) (AllDatabaseEx
 		}
 
 		// Create a temporary connection to this database
-		dbConn, err := connectToDatabase(ctx, db.log, db.config, dbName)
+		dbConn, err := connectToDatabase(ctx, currentDB.log, currentDB.config, dbName)
 		if err != nil {
 			// Log the error but continue with other databases
 			dbExtensions.Error = err.Error()
@@ -130,7 +167,7 @@ func GetExtensions(ctx context.Context, durability time.Duration) (AllDatabaseEx
 
 		// Query extensions in this database
 		extensions := make([]PgExtension, 0)
-		err = dbConn.ExecQueryNoRetry(ctx, ExtensionsQ, &extensions)
+		err = execQueryOnCurrentDB(ctx, dbConn, ExtensionsQ, &extensions)
 		if err != nil {
 			// Log the error but continue with other databases
 			dbExtensions.Error = err.Error()

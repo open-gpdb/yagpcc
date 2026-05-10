@@ -21,6 +21,87 @@ func TestConnectToDatabase_EmptyAddrs(t *testing.T) {
 	require.Contains(t, err.Error(), "failed to connect to database postgres: no addresses configured")
 }
 
+func TestGetConfigKey_ReusesCachedEntry(t *testing.T) {
+	dbMutex.Lock()
+	oldConfigKeyMap := configKeyMap
+	configKeyMap = make(map[string]string)
+	dbMutex.Unlock()
+	t.Cleanup(func() {
+		dbMutex.Lock()
+		configKeyMap = oldConfigKeyMap
+		dbMutex.Unlock()
+	})
+
+	pgConfig := config.PGConfig{
+		Addrs:   []string{"localhost:5432"},
+		DB:      "postgres",
+		User:    "gpadmin",
+		SSLMode: "disable",
+	}
+	connString := config.ConnString(
+		pgConfig.Addrs[0],
+		pgConfig.DB,
+		pgConfig.User,
+		pgConfig.Password,
+		pgConfig.SSLMode,
+		pgConfig.SSLRootCert,
+		pgConfig.StatementTimeout,
+	)
+
+	configKey1, err := getConfigKey(connString, pgConfig)
+	require.NoError(t, err)
+	configKey2, err := getConfigKey(connString, pgConfig)
+	require.NoError(t, err)
+
+	dbMutex.Lock()
+	configKeyMapLen := len(configKeyMap)
+	dbMutex.Unlock()
+
+	require.Equal(t, configKey1, configKey2)
+	require.Equal(t, 1, configKeyMapLen)
+}
+
+func TestGetExtensions_DBNotInitialized(t *testing.T) {
+	dbMutex.Lock()
+	oldDB := db
+	db = nil
+	oldCachedItem, hadCachedItem := CachedItems[ExtensionsConfig]
+	delete(CachedItems, ExtensionsConfig)
+	dbMutex.Unlock()
+	t.Cleanup(func() {
+		dbMutex.Lock()
+		db = oldDB
+		if hadCachedItem {
+			CachedItems[ExtensionsConfig] = oldCachedItem
+		} else {
+			delete(CachedItems, ExtensionsConfig)
+		}
+		dbMutex.Unlock()
+	})
+
+	_, err := GetExtensions(context.Background(), 0)
+
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "internal - DB not initialized")
+}
+
+func TestExecQueryOnCurrentDB_NilConnection(t *testing.T) {
+	err := execQueryOnCurrentDB(context.Background(), nil, ExtensionsQ, &[]PgExtension{})
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "not initialized connection")
+}
+
+func TestExecQueryOnCurrentDB_NilDB(t *testing.T) {
+	err := execQueryOnCurrentDB(
+		context.Background(),
+		NewConnection(zap.NewNop().Sugar(), &config.PGConfig{}, nil),
+		ExtensionsQ,
+		&[]PgExtension{},
+	)
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "not initialized connection")
+}
+
 func TestDatabaseExtensionsStruct(t *testing.T) {
 	// Test that we can create a DatabaseExtensions struct
 	ext := DatabaseExtensions{
