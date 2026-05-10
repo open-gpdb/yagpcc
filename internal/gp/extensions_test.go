@@ -4,24 +4,6 @@ import (
 	"testing"
 )
 
-func TestGetExtensions(t *testing.T) {
-	// This is a placeholder test since we need a real database connection to test the functionality
-	// In a real test environment, we would:
-	// 1. Set up a mock database with test data
-	// 2. Initialize the gp package with the mock database connection
-	// 3. Call GetExtensions and verify the results
-
-	// For now, we'll just verify that the function signature is correct
-	_ = GetExtensions
-
-	// Verify that the constants are defined
-	_ = ExtensionsConfig
-	_ = DatabaseListQ
-	_ = ExtensionsQ
-
-	t.Log("Extensions test placeholder - no real tests implemented yet")
-}
-
 func TestDatabaseExtensionsStruct(t *testing.T) {
 	// Test that we can create a DatabaseExtensions struct
 	ext := DatabaseExtensions{
