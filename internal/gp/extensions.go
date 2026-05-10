@@ -52,6 +52,10 @@ func connectToDatabase(ctx context.Context, log *zap.SugaredLogger, pgconfig *co
 	dbConfig := *pgconfig
 	dbConfig.DB = dbName
 
+	if len(dbConfig.Addrs) == 0 {
+		return nil, fmt.Errorf("failed to connect to database %s: no addresses configured", dbName)
+	}
+
 	// Build connection string with the target database
 	connString := config.ConnString(
 		dbConfig.Addrs[0], // Use the first address

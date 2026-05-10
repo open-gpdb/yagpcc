@@ -1,8 +1,25 @@
 package gp
 
 import (
+	"context"
 	"testing"
+
+	"github.com/open-gpdb/yagpcc/internal/config"
+	"github.com/stretchr/testify/require"
+	"go.uber.org/zap"
 )
+
+func TestConnectToDatabase_EmptyAddrs(t *testing.T) {
+	_, err := connectToDatabase(
+		context.Background(),
+		zap.NewNop().Sugar(),
+		&config.PGConfig{},
+		"postgres",
+	)
+
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "failed to connect to database postgres: no addresses configured")
+}
 
 func TestDatabaseExtensionsStruct(t *testing.T) {
 	// Test that we can create a DatabaseExtensions struct
