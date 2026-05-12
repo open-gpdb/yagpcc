@@ -128,7 +128,7 @@ func getProcInfo(logger *zap.SugaredLogger, proc procfs.Proc, pid, gpSegmentID, 
 	} else if isPermissionDenied(err) {
 		// log permission denied for convenience
 		if logger != nil {
-			logger.Debugf("Permission denied reading io stat for %v error %v ", pid, err)
+			logger.Debugf("Permission denied reading /proc/%d/io: %v", pid, err)
 		}
 	}
 
