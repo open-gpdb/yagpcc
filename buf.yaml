@@ -1,0 +1,11 @@
+version: v2
+modules:
+  - path: .
+    includes:
+      - api/proto
+lint:
+  use:
+    - STANDARD
+breaking:
+  use:
+    - FILE

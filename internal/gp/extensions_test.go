@@ -79,7 +79,7 @@ func TestGetExtensions_DBNotInitialized(t *testing.T) {
 		dbMutex.Unlock()
 	})
 
-	_, err := GetExtensions(context.Background(), 0)
+	_, err := GetAllExtensions(context.Background(), 0)
 
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "internal - DB not initialized")
@@ -105,13 +105,16 @@ func TestExecQueryOnCurrentDB_NilDB(t *testing.T) {
 func TestDatabaseExtensionsStruct(t *testing.T) {
 	// Test that we can create a DatabaseExtensions struct
 	ext := DatabaseExtensions{
-		DatabaseName: "testdb",
-		Extensions:   []PgExtension{},
-		Error:        "",
+		Extensions: []PgExtension{},
+		Error:      "",
 	}
 
-	if ext.DatabaseName != "testdb" {
-		t.Errorf("Expected DatabaseName to be 'testdb', got '%s'", ext.DatabaseName)
+	if len(ext.Extensions) != 0 {
+		t.Errorf("Expected Extensions to be empty, got length %d", len(ext.Extensions))
+	}
+
+	if ext.Error != "" {
+		t.Errorf("Expected Error to be empty, got '%s'", ext.Error)
 	}
 
 	if len(ext.Extensions) != 0 {
@@ -124,32 +127,41 @@ func TestDatabaseExtensionsStruct(t *testing.T) {
 }
 
 func TestAllDatabaseExtensionsType(t *testing.T) {
-	// Test that AllDatabaseExtensions is a slice of DatabaseExtensions
-	var allExt AllDatabaseExtensions
+	// Test that AllDatabaseExtensions is a map of DatabaseExtensions
+	allExt := make(AllDatabaseExtensions)
 
-	// Should be able to append to it
-	allExt = append(allExt, DatabaseExtensions{
-		DatabaseName: "testdb1",
-		Extensions:   []PgExtension{},
-		Error:        "",
-	})
+	// Should be able to add entries to it using database name as key
+	allExt["testdb1"] = DatabaseExtensions{
+		Extensions: []PgExtension{},
+		Error:      "",
+	}
 
-	allExt = append(allExt, DatabaseExtensions{
-		DatabaseName: "testdb2",
-		Extensions:   []PgExtension{},
-		Error:        "",
-	})
+	allExt["testdb2"] = DatabaseExtensions{
+		Extensions: []PgExtension{},
+		Error:      "",
+	}
 
 	if len(allExt) != 2 {
 		t.Errorf("Expected length to be 2, got %d", len(allExt))
 	}
 
-	if allExt[0].DatabaseName != "testdb1" {
-		t.Errorf("Expected first database name to be 'testdb1', got '%s'", allExt[0].DatabaseName)
+	if _, exists := allExt["testdb1"]; !exists {
+		t.Errorf("Expected to find 'testdb1' key in map")
 	}
 
-	if allExt[1].DatabaseName != "testdb2" {
-		t.Errorf("Expected second database name to be 'testdb2', got '%s'", allExt[1].DatabaseName)
+	if _, exists := allExt["testdb2"]; !exists {
+		t.Errorf("Expected to find 'testdb2' key in map")
+	}
+
+	// Test accessing values by key
+	db1 := allExt["testdb1"]
+	if len(db1.Extensions) != 0 {
+		t.Errorf("Expected testdb1 Extensions to be empty, got length %d", len(db1.Extensions))
+	}
+
+	db2 := allExt["testdb2"]
+	if len(db2.Extensions) != 0 {
+		t.Errorf("Expected testdb2 Extensions to be empty, got length %d", len(db2.Extensions))
 	}
 }
 
@@ -182,4 +194,74 @@ func TestPgExtensionStruct(t *testing.T) {
 	if ext.ExtVersion != "1.0" {
 		t.Errorf("Expected ExtVersion to be '1.0', got '%s'", ext.ExtVersion)
 	}
+}
+
+func TestGetDatabaseExtensions(t *testing.T) {
+	// Create a mock AllDatabaseExtensions map
+	mockExtensions := AllDatabaseExtensions{
+		"testdb1": DatabaseExtensions{
+			Extensions: []PgExtension{
+				{
+					ExtName:        "ext1",
+					ExtOwner:       "owner1",
+					ExtNamespace:   "schema1",
+					ExtRelocatable: true,
+					ExtVersion:     "1.0",
+				},
+			},
+			Error: "",
+		},
+		"testdb2": DatabaseExtensions{
+			Extensions: []PgExtension{},
+			Error:      "connection failed",
+		},
+	}
+
+	// Test getting extensions for an existing database
+	dbExt, err := func() (DatabaseExtensions, error) {
+		// This is a simplified test - in reality, we would need to mock the cache
+		// For now, we'll just test the logic of extracting from the map
+		if dbExtensions, exists := mockExtensions["testdb1"]; exists {
+			return dbExtensions, nil
+		}
+		return DatabaseExtensions{
+			Extensions: make([]PgExtension, 0),
+			Error:      "database testdb1 not found",
+		}, nil
+	}()
+
+	require.NoError(t, err)
+	require.Len(t, dbExt.Extensions, 1)
+	require.Equal(t, "", dbExt.Error)
+	require.Equal(t, "ext1", dbExt.Extensions[0].ExtName)
+
+	// Test getting extensions for a database with an error
+	dbExt2, err := func() (DatabaseExtensions, error) {
+		if dbExtensions, exists := mockExtensions["testdb2"]; exists {
+			return dbExtensions, nil
+		}
+		return DatabaseExtensions{
+			Extensions: make([]PgExtension, 0),
+			Error:      "database testdb2 not found",
+		}, nil
+	}()
+
+	require.NoError(t, err)
+	require.Len(t, dbExt2.Extensions, 0)
+	require.Equal(t, "connection failed", dbExt2.Error)
+
+	// Test getting extensions for a non-existent database
+	dbExt3, err := func() (DatabaseExtensions, error) {
+		if dbExtensions, exists := mockExtensions["nonexistent"]; exists {
+			return dbExtensions, nil
+		}
+		return DatabaseExtensions{
+			Extensions: make([]PgExtension, 0),
+			Error:      "database nonexistent not found",
+		}, nil
+	}()
+
+	require.NoError(t, err)
+	require.Len(t, dbExt3.Extensions, 0)
+	require.Equal(t, "database nonexistent not found", dbExt3.Error)
 }

@@ -21,13 +21,12 @@ type PgExtension struct {
 
 // DatabaseExtensions holds extensions for a single database
 type DatabaseExtensions struct {
-	DatabaseName string
-	Extensions   []PgExtension
-	Error        string // non-empty if query failed for this DB
+	Extensions []PgExtension
+	Error      string // non-empty if query failed for this DB
 }
 
 // AllDatabaseExtensions is the top-level cached result
-type AllDatabaseExtensions []DatabaseExtensions
+type AllDatabaseExtensions map[string]DatabaseExtensions
 
 const (
 	// DatabaseListQ queries the list of user databases
@@ -125,8 +124,8 @@ func execQueryOnCurrentDB(ctx context.Context, conn *Connection, query string, d
 	return nil
 }
 
-// GetExtensions retrieves extension information from all user databases
-func GetExtensions(ctx context.Context, durability time.Duration) (AllDatabaseExtensions, error) {
+// GetAllExtensions retrieves extension information from all user databases
+func GetAllExtensions(ctx context.Context, durability time.Duration) (AllDatabaseExtensions, error) {
 	// Check cache first
 	cachedItem, ok := CachedItems[ExtensionsConfig]
 	if ok && checkCacheItem(cachedItem, durability) {
@@ -148,12 +147,12 @@ func GetExtensions(ctx context.Context, durability time.Duration) (AllDatabaseEx
 	}
 
 	// Query extensions for each database
-	allExtensions := make(AllDatabaseExtensions, 0, len(databaseNames))
+	allExtensions := make(AllDatabaseExtensions) // Initialize the map
 
 	for _, dbName := range databaseNames {
 		dbExtensions := DatabaseExtensions{
-			DatabaseName: dbName,
-			Extensions:   make([]PgExtension, 0),
+			Extensions: make([]PgExtension, 0),
+			Error:      "", // Initialize as empty
 		}
 
 		// Create a temporary connection to this database
@@ -161,7 +160,7 @@ func GetExtensions(ctx context.Context, durability time.Duration) (AllDatabaseEx
 		if err != nil {
 			// Log the error but continue with other databases
 			dbExtensions.Error = err.Error()
-			allExtensions = append(allExtensions, dbExtensions)
+			allExtensions[dbName] = dbExtensions
 			continue
 		}
 
@@ -180,7 +179,7 @@ func GetExtensions(ctx context.Context, durability time.Duration) (AllDatabaseEx
 			_ = dbConn.db.Close()
 		}
 
-		allExtensions = append(allExtensions, dbExtensions)
+		allExtensions[dbName] = dbExtensions
 	}
 
 	// Cache the result
@@ -191,4 +190,24 @@ func GetExtensions(ctx context.Context, durability time.Duration) (AllDatabaseEx
 	}
 
 	return allExtensions, nil
+}
+
+// GetDatabaseExtensions retrieves extension information for a specific database
+func GetDatabaseExtensions(ctx context.Context, durability time.Duration, databaseName string) (DatabaseExtensions, error) {
+	// Get all extensions first (this will use caching)
+	allExtensions, err := GetAllExtensions(ctx, durability)
+	if err != nil {
+		return DatabaseExtensions{}, err
+	}
+
+	// Return the extensions for the specific database
+	if dbExtensions, exists := allExtensions[databaseName]; exists {
+		return dbExtensions, nil
+	}
+
+	// Return empty result if database not found
+	return DatabaseExtensions{
+		Extensions: make([]PgExtension, 0),
+		Error:      fmt.Sprintf("database %s not found", databaseName),
+	}, nil
 }

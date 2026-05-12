@@ -2797,41 +2797,98 @@ func (s *GetMasterInfoServer) GetGPExtensions(ctx context.Context, in *pbm.GetGP
 	start := time.Now()
 
 	// Get extensions data from all databases
-	allExtensions, err := gp.GetExtensions(ctx, s.extensionsCacheDurability)
+	allExtensions, err := gp.GetAllExtensions(ctx, s.extensionsCacheDurability)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get extensions: %w", err)
 	}
 
 	// Convert to protobuf response
 	response := &pbm.GetGPExtensionsResponse{
-		Databases: make([]*pbm.DatabaseExtensionsInfo, 0, len(allExtensions)),
+		Databases: make([]*pbm.DatabaseExtensionsInfo, 0),
 	}
 
-	for _, dbExtensions := range allExtensions {
-		dbInfo := &pbm.DatabaseExtensionsInfo{
-			DatabaseName: dbExtensions.DatabaseName,
-			Error:        dbExtensions.Error,
-		}
-
-		// Convert extensions
-		extensions := make([]*pbm.PgExtensionInfo, 0, len(dbExtensions.Extensions))
-		for _, ext := range dbExtensions.Extensions {
-			extInfo := &pbm.PgExtensionInfo{
-				ExtName:        ext.ExtName,
-				ExtOwner:       ext.ExtOwner,
-				ExtNamespace:   ext.ExtNamespace,
-				ExtRelocatable: ext.ExtRelocatable,
-				ExtVersion:     ext.ExtVersion,
+	// If a specific database is requested, only include that database
+	if in.GetDatabaseName() != "" {
+		if dbExtensions, exists := allExtensions[in.GetDatabaseName()]; exists {
+			dbInfo := &pbm.DatabaseExtensionsInfo{
+				DatabaseName: in.GetDatabaseName(),
+				Error:        dbExtensions.Error,
 			}
-			extensions = append(extensions, extInfo)
+
+			// Convert extensions
+			extensions := make([]*pbm.PgExtensionInfo, 0, len(dbExtensions.Extensions))
+			for _, ext := range dbExtensions.Extensions {
+				extInfo := &pbm.PgExtensionInfo{
+					ExtName:        ext.ExtName,
+					ExtOwner:       ext.ExtOwner,
+					ExtNamespace:   ext.ExtNamespace,
+					ExtRelocatable: ext.ExtRelocatable,
+					ExtVersion:     ext.ExtVersion,
+				}
+				extensions = append(extensions, extInfo)
+			}
+			dbInfo.Extensions = extensions
+			response.Databases = append(response.Databases, dbInfo)
 		}
-		dbInfo.Extensions = extensions
-		response.Databases = append(response.Databases, dbInfo)
+	} else {
+		// Include all databases
+		for dbName, dbExtensions := range allExtensions {
+			dbInfo := &pbm.DatabaseExtensionsInfo{
+				DatabaseName: dbName,
+				Error:        dbExtensions.Error,
+			}
+
+			// Convert extensions
+			extensions := make([]*pbm.PgExtensionInfo, 0, len(dbExtensions.Extensions))
+			for _, ext := range dbExtensions.Extensions {
+				extInfo := &pbm.PgExtensionInfo{
+					ExtName:        ext.ExtName,
+					ExtOwner:       ext.ExtOwner,
+					ExtNamespace:   ext.ExtNamespace,
+					ExtRelocatable: ext.ExtRelocatable,
+					ExtVersion:     ext.ExtVersion,
+				}
+				extensions = append(extensions, extInfo)
+			}
+			dbInfo.Extensions = extensions
+			response.Databases = append(response.Databases, dbInfo)
+		}
 	}
 
 	s.logger.Debugf("Get extensions took %v", time.Since(start))
 	if metrics.YagpccMetrics != nil {
 		metrics.YagpccMetrics.HandleLatencies.With(map[string]string{"method": "GetGPExtensions"}).Observe(time.Since(start).Seconds())
+	}
+	return response, nil
+}
+
+func (s *GetMasterInfoServer) ListDatabases(ctx context.Context, in *pbm.ListDatabasesReq) (*pbm.ListDatabasesResponse, error) {
+	s.logger.Debugf("got list databases request")
+	start := time.Now()
+
+	// Get extensions data from all databases (this includes the list of databases)
+	allExtensions, err := gp.GetAllExtensions(ctx, s.extensionsCacheDurability)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get database list: %w", err)
+	}
+
+	// Extract database names from the map keys
+	databaseNames := make([]string, 0, len(allExtensions))
+	for dbName := range allExtensions {
+		databaseNames = append(databaseNames, dbName)
+	}
+
+	// Sort the database names for consistent output
+	sort.Strings(databaseNames)
+
+	// Create response
+	response := &pbm.ListDatabasesResponse{
+		DatabaseNames: databaseNames,
+	}
+
+	s.logger.Debugf("List databases took %v", time.Since(start))
+	if metrics.YagpccMetrics != nil {
+		metrics.YagpccMetrics.HandleLatencies.With(map[string]string{"method": "ListDatabases"}).Observe(time.Since(start).Seconds())
 	}
 	return response, nil
 }
