@@ -10,7 +10,7 @@ import (
 
 func TestGetPidProcInfo_CurrentProcess(t *testing.T) {
 	pid := int64(os.Getpid())
-	info, err := GetPidProcInfo(pid, 7, 42)
+	info, err := GetPidProcInfo(nil, pid, 7, 42)
 
 	require.NoError(t, err)
 	require.NotNil(t, info)
