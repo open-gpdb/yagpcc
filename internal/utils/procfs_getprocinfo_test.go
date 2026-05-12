@@ -10,6 +10,7 @@ import (
 	"github.com/prometheus/procfs"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"go.uber.org/zap"
 )
 
 // fakeProcDir is a helper that creates a temporary directory mimicking
@@ -108,6 +109,7 @@ cancelled_write_bytes: 512
 func TestGetProcInfo_AllFiles(t *testing.T) {
 	const pid = 42
 	fake := newFakeProcDir(t, pid)
+	logger := zap.NewNop().Sugar()
 
 	// Session backend cmdline with "idle" status.
 	cmdline := "postgres:  5432, gpadmin postgres localhost(33326) con21 cmd237786 idle"
@@ -117,7 +119,7 @@ func TestGetProcInfo_AllFiles(t *testing.T) {
 	fake.writeFile(t, "io", sampleIO())
 
 	proc := fake.proc(t)
-	info, err := getProcInfo(proc, int64(pid), 7, 100)
+	info, err := getProcInfo(logger, proc, int64(pid), 7, 100)
 
 	require.NoError(t, err)
 	require.NotNil(t, info)
@@ -176,6 +178,7 @@ func TestGetProcInfo_AllFiles(t *testing.T) {
 }
 
 func TestGetProcInfo_SessionStateExtraction(t *testing.T) {
+	logger := zap.NewNop().Sugar()
 	tests := []struct {
 		name          string
 		cmdline       string
@@ -213,7 +216,7 @@ func TestGetProcInfo_SessionStateExtraction(t *testing.T) {
 			fake.writeFile(t, "io", sampleIO())
 
 			proc := fake.proc(t)
-			info, err := getProcInfo(proc, int64(pid), 1, 1)
+			info, err := getProcInfo(logger, proc, int64(pid), 1, 1)
 
 			require.NoError(t, err)
 			require.NotNil(t, info)
@@ -225,13 +228,14 @@ func TestGetProcInfo_SessionStateExtraction(t *testing.T) {
 func TestGetProcInfo_MissingCmdline(t *testing.T) {
 	const pid = 10
 	fake := newFakeProcDir(t, pid)
+	logger := zap.NewNop().Sugar()
 	// No cmdline file written.
 	fake.writeFile(t, "stat", sampleStat(pid))
 	fake.writeFile(t, "status", sampleStatus(pid))
 	fake.writeFile(t, "io", sampleIO())
 
 	proc := fake.proc(t)
-	info, err := getProcInfo(proc, int64(pid), 2, 200)
+	info, err := getProcInfo(logger, proc, int64(pid), 2, 200)
 
 	require.NoError(t, err)
 	require.NotNil(t, info)
@@ -251,13 +255,14 @@ func TestGetProcInfo_MissingCmdline(t *testing.T) {
 func TestGetProcInfo_MissingStat(t *testing.T) {
 	const pid = 11
 	fake := newFakeProcDir(t, pid)
+	logger := zap.NewNop().Sugar()
 	fake.writeFile(t, "cmdline", "postgres:  5432, gpadmin postgres localhost(33326) con21 cmd1 idle")
 	// No stat file written.
 	fake.writeFile(t, "status", sampleStatus(pid))
 	fake.writeFile(t, "io", sampleIO())
 
 	proc := fake.proc(t)
-	info, err := getProcInfo(proc, int64(pid), 3, 300)
+	info, err := getProcInfo(logger, proc, int64(pid), 3, 300)
 
 	require.NoError(t, err)
 	require.NotNil(t, info)
@@ -277,13 +282,14 @@ func TestGetProcInfo_MissingStat(t *testing.T) {
 func TestGetProcInfo_MissingStatus(t *testing.T) {
 	const pid = 12
 	fake := newFakeProcDir(t, pid)
+	logger := zap.NewNop().Sugar()
 	fake.writeFile(t, "cmdline", "postgres:  5432, gpadmin postgres localhost(33326) con21 cmd1 idle")
 	fake.writeFile(t, "stat", sampleStat(pid))
 	// No status file written.
 	fake.writeFile(t, "io", sampleIO())
 
 	proc := fake.proc(t)
-	info, err := getProcInfo(proc, int64(pid), 4, 400)
+	info, err := getProcInfo(logger, proc, int64(pid), 4, 400)
 
 	require.NoError(t, err)
 	require.NotNil(t, info)
@@ -300,13 +306,14 @@ func TestGetProcInfo_MissingStatus(t *testing.T) {
 func TestGetProcInfo_MissingIO(t *testing.T) {
 	const pid = 13
 	fake := newFakeProcDir(t, pid)
+	logger := zap.NewNop().Sugar()
 	fake.writeFile(t, "cmdline", "postgres:  5432, gpadmin postgres localhost(33326) con21 cmd1 idle")
 	fake.writeFile(t, "stat", sampleStat(pid))
 	fake.writeFile(t, "status", sampleStatus(pid))
 	// No io file written.
 
 	proc := fake.proc(t)
-	info, err := getProcInfo(proc, int64(pid), 5, 500)
+	info, err := getProcInfo(logger, proc, int64(pid), 5, 500)
 
 	require.NoError(t, err)
 	require.NotNil(t, info)
@@ -322,11 +329,12 @@ func TestGetProcInfo_MissingIO(t *testing.T) {
 func TestGetProcInfo_AllFilesMissing(t *testing.T) {
 	const pid = 14
 	fake := newFakeProcDir(t, pid)
+	logger := zap.NewNop().Sugar()
 	// No files written at all — simulates a process that exists in the
 	// directory listing but whose proc files have all vanished.
 
 	proc := fake.proc(t)
-	info, err := getProcInfo(proc, int64(pid), 6, 600)
+	info, err := getProcInfo(logger, proc, int64(pid), 6, 600)
 
 	require.NoError(t, err)
 	require.NotNil(t, info)
@@ -347,6 +355,7 @@ func TestGetProcInfo_AllFilesMissing(t *testing.T) {
 func TestGetProcInfo_PassThroughFields(t *testing.T) {
 	// Verify that gpSegmentID and sessID are correctly passed through
 	// for various values including zero and negative.
+	logger := zap.NewNop().Sugar()
 	tests := []struct {
 		name        string
 		gpSegmentID int64
@@ -368,7 +377,7 @@ func TestGetProcInfo_PassThroughFields(t *testing.T) {
 			fake.writeFile(t, "io", sampleIO())
 
 			proc := fake.proc(t)
-			info, err := getProcInfo(proc, int64(pid), tt.gpSegmentID, tt.sessID)
+			info, err := getProcInfo(logger, proc, int64(pid), tt.gpSegmentID, tt.sessID)
 
 			require.NoError(t, err)
 			require.NotNil(t, info)
@@ -382,6 +391,7 @@ func TestGetProcInfo_PassThroughFields(t *testing.T) {
 func TestGetProcInfo_IOPermissionDenied(t *testing.T) {
 	const pid = 17
 	fake := newFakeProcDir(t, pid)
+	logger := zap.NewNop().Sugar()
 	fake.writeFile(t, "cmdline", "postgres:  5432, gpadmin postgres localhost(33326) con21 cmd1 idle")
 	fake.writeFile(t, "stat", sampleStat(pid))
 	fake.writeFile(t, "status", sampleStatus(pid))
@@ -391,7 +401,7 @@ func TestGetProcInfo_IOPermissionDenied(t *testing.T) {
 	require.NoError(t, err)
 
 	proc := fake.proc(t)
-	info, err := getProcInfo(proc, int64(pid), 8, 800)
+	info, err := getProcInfo(logger, proc, int64(pid), 8, 800)
 
 	require.NoError(t, err)
 	require.NotNil(t, info)
@@ -413,6 +423,7 @@ func TestGetProcInfo_MultiWordCmdline(t *testing.T) {
 	// with spaces.
 	const pid = 16
 	fake := newFakeProcDir(t, pid)
+	logger := zap.NewNop().Sugar()
 	// Simulate a cmdline with null-separated arguments.
 	fake.writeFile(t, "cmdline", "/usr/bin/postgres\x00-D\x00/data")
 	fake.writeFile(t, "stat", sampleStat(pid))
@@ -420,7 +431,7 @@ func TestGetProcInfo_MultiWordCmdline(t *testing.T) {
 	fake.writeFile(t, "io", sampleIO())
 
 	proc := fake.proc(t)
-	info, err := getProcInfo(proc, int64(pid), 1, 1)
+	info, err := getProcInfo(logger, proc, int64(pid), 1, 1)
 
 	require.NoError(t, err)
 	require.NotNil(t, info)
