@@ -17,6 +17,7 @@
 | [Architecture overview](docs/architecture.md) | High-level design and system diagram (with Mermaid). |
 | [API description](docs/API.md) | gRPC API reference (GetGPInfo, ActionService), CSV HTTP API, messages, and metrics. |
 | [Per-process resource statistics](docs/proc-stats-flow.md) | Procfs (`GetPidProcStat`) data flow per running query and proposed master-only 5/15/30-minute top-style averages (per-session and cluster-wide rollup). |
+| [**Performance tuning**](docs/performance-tuning.md) | Memory limits (`GOMEMLIMIT`), config knobs (procfs, segment pull, stored queries, aggregation), Prometheus metrics reference, and pprof profiling guide. |
 
 ## Building
 
