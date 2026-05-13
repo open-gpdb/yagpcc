@@ -582,10 +582,10 @@ Set `csv_port` in `yagpcc.yaml` to enable the CSV HTTP server. Set to `0` to dis
 csv_port: 1440   # default
 ```
 
-The `extensions_cache_durability_sec` parameter controls how long extension information is cached (default: 900 seconds = 15 minutes):
+The `extensions_cache_ttl_sec` parameter controls how long extension information is cached (default: 900 seconds = 15 minutes):
 
 ```yaml
-extensions_cache_durability_sec: 900   # default
+extensions_cache_ttl_sec: 900   # default
 ```
 
 ---

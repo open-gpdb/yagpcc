@@ -524,20 +524,20 @@ func TestWriteExtensionsCSV(t *testing.T) {
 	databases := []*pbm.DatabaseExtensionsInfo{
 		{
 			DatabaseName: "testdb1",
-			Extensions: []*pbm.PgExtensionInfo{
+			Extensions: []*pbm.Extension{
 				{
-					ExtName:        "plpgsql",
-					ExtOwner:       "postgres",
-					ExtNamespace:   "pg_catalog",
-					ExtRelocatable: false,
-					ExtVersion:     "1.0",
+					Name:        "plpgsql",
+					Owner:       "postgres",
+					Namespace:   "pg_catalog",
+					Relocatable: false,
+					Version:     "1.0",
 				},
 				{
-					ExtName:        "uuid-ossp",
-					ExtOwner:       "postgres",
-					ExtNamespace:   "public",
-					ExtRelocatable: true,
-					ExtVersion:     "1.1",
+					Name:        "uuid-ossp",
+					Owner:       "postgres",
+					Namespace:   "public",
+					Relocatable: true,
+					Version:     "1.1",
 				},
 			},
 			Error: "",
@@ -545,13 +545,13 @@ func TestWriteExtensionsCSV(t *testing.T) {
 		// Test with a database that has no extensions but no error
 		{
 			DatabaseName: "emptydb",
-			Extensions:   []*pbm.PgExtensionInfo{},
+			Extensions:   []*pbm.Extension{},
 			Error:        "",
 		},
 		// Test with a database that has an error
 		{
 			DatabaseName: "errordb",
-			Extensions:   []*pbm.PgExtensionInfo{},
+			Extensions:   []*pbm.Extension{},
 			Error:        "connection failed",
 		},
 	}

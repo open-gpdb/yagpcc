@@ -861,11 +861,11 @@ func WriteExtensionsCSV(w io.Writer, databases []*pbm.DatabaseExtensionsInfo) er
 			for _, ext := range db.Extensions {
 				record := []string{
 					db.DatabaseName,
-					ext.ExtName,
-					ext.ExtOwner,
-					ext.ExtNamespace,
-					fmt.Sprintf("%t", ext.ExtRelocatable),
-					ext.ExtVersion,
+					ext.Name,
+					ext.Owner,
+					ext.Namespace,
+					fmt.Sprintf("%t", ext.Relocatable),
+					ext.Version,
 					db.Error,
 				}
 				if err := cw.Write(record); err != nil {

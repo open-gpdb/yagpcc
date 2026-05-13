@@ -2,7 +2,7 @@ role: master
 listen_port: 1432
 segment_pull_rate_sec: 3
 segment_pull_threads: 2
-extensions_cache_durability_sec: 900
+extensions_cache_ttl_sec: 900
 master_connection:
   addrs:
     - iva-imbdpsgenmk30i4g.db.yandex.net:6432

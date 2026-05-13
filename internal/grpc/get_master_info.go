@@ -22,20 +22,20 @@ import (
 
 type GetMasterInfoServer struct {
 	pbm.UnimplementedGetGPInfoServer
-	clusterID                 string
-	logger                    *zap.SugaredLogger
-	maxMessageSize            int
-	backgroundStorage         *master.BackgroundStorage
-	extensionsCacheDurability time.Duration
+	clusterID          string
+	logger             *zap.SugaredLogger
+	maxMessageSize     int
+	backgroundStorage  *master.BackgroundStorage
+	extensionsCacheTTL time.Duration
 }
 
-func NewGetMasterInfoServer(clusterID string, logger *zap.SugaredLogger, maxMessageSize int, backgroundStorage *master.BackgroundStorage, extensionsCacheDurability time.Duration) *GetMasterInfoServer {
+func NewGetMasterInfoServer(clusterID string, logger *zap.SugaredLogger, maxMessageSize int, backgroundStorage *master.BackgroundStorage, extensionsCacheTTL time.Duration) *GetMasterInfoServer {
 	return &GetMasterInfoServer{
-		clusterID:                 clusterID,
-		logger:                    logger,
-		maxMessageSize:            maxMessageSize,
-		backgroundStorage:         backgroundStorage,
-		extensionsCacheDurability: extensionsCacheDurability,
+		clusterID:          clusterID,
+		logger:             logger,
+		maxMessageSize:     maxMessageSize,
+		backgroundStorage:  backgroundStorage,
+		extensionsCacheTTL: extensionsCacheTTL,
 	}
 }
 
@@ -385,7 +385,7 @@ func (s *GetMasterInfoServer) GetGPExtensions(ctx context.Context, in *pbm.GetGP
 	}
 
 	// Get extensions data from all databases
-	allExtensions, err := gp.GetAllExtensions(ctx, s.extensionsCacheDurability)
+	allExtensions, err := gp.GetAllExtensions(ctx, s.extensionsCacheTTL)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get extensions: %w", err)
 	}
@@ -403,14 +403,14 @@ func (s *GetMasterInfoServer) GetGPExtensions(ctx context.Context, in *pbm.GetGP
 		}
 
 		// Convert extensions
-		extensions := make([]*pbm.PgExtensionInfo, 0, len(dbExtensions.Extensions))
+		extensions := make([]*pbm.Extension, 0, len(dbExtensions.Extensions))
 		for _, ext := range dbExtensions.Extensions {
-			extInfo := &pbm.PgExtensionInfo{
-				ExtName:        ext.ExtName,
-				ExtOwner:       ext.ExtOwner,
-				ExtNamespace:   ext.ExtNamespace,
-				ExtRelocatable: ext.ExtRelocatable,
-				ExtVersion:     ext.ExtVersion,
+			extInfo := &pbm.Extension{
+				Name:        ext.ExtName,
+				Owner:       ext.ExtOwner,
+				Namespace:   ext.ExtNamespace,
+				Relocatable: ext.ExtRelocatable,
+				Version:     ext.ExtVersion,
 			}
 			extensions = append(extensions, extInfo)
 		}
@@ -430,7 +430,7 @@ func (s *GetMasterInfoServer) ListDatabases(ctx context.Context, in *pbm.ListDat
 	start := time.Now()
 
 	// Get extensions data from all databases (this includes the list of databases)
-	allExtensions, err := gp.GetAllExtensions(ctx, s.extensionsCacheDurability)
+	allExtensions, err := gp.GetAllExtensions(ctx, s.extensionsCacheTTL)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get database list: %w", err)
 	}
@@ -444,9 +444,17 @@ func (s *GetMasterInfoServer) ListDatabases(ctx context.Context, in *pbm.ListDat
 	// Sort the database names for consistent output
 	sort.Strings(databaseNames)
 
+	// Create DatabaseInfo objects
+	databases := make([]*pbm.DatabaseInfo, 0, len(databaseNames))
+	for _, dbName := range databaseNames {
+		databases = append(databases, &pbm.DatabaseInfo{
+			Name: dbName,
+		})
+	}
+
 	// Create response
 	response := &pbm.ListDatabasesResponse{
-		DatabaseNames: databaseNames,
+		Databases: databases,
 	}
 
 	s.logger.Debugf("List databases took %v", time.Since(start))
