@@ -58,6 +58,18 @@ func TestValidate_NegativeProcfsRefreshInterval(t *testing.T) {
 	assert.Contains(t, err.Error(), "procfs_refresh_interval")
 }
 
+func TestValidate_ProcfsDisabled_ZeroIntervalOK(t *testing.T) {
+	cfg := defaultValidConfig()
+	cfg.ProcfsEnabled = false
+	cfg.ProcfsRefreshInterval = 0
+	require.NoError(t, cfg.Validate())
+}
+
+func TestValidate_ProcfsEnabledByDefault(t *testing.T) {
+	cfg := defaultValidConfig()
+	assert.True(t, cfg.ProcfsEnabled)
+}
+
 func TestValidate_ZeroSessionSendMetricInterval(t *testing.T) {
 	cfg := defaultValidConfig()
 	cfg.SessionSendMetricInterval = 0

@@ -609,12 +609,16 @@ func InitBG(
 		return err
 	},
 	)
-	errG.Go(func() error {
-		err := backgroundStorage.RefreshProcfs(ctxI, cfg.ProcfsRefreshInterval, int(cfg.SegmentPullThreads), cfg.ListenPort, int(cfg.MaxMessageSize))
-		l.Errorf("got %v in RefreshProcfs", err)
-		return err
-	},
-	)
+	if cfg.ProcfsEnabled {
+		errG.Go(func() error {
+			err := backgroundStorage.RefreshProcfs(ctxI, cfg.ProcfsRefreshInterval, int(cfg.SegmentPullThreads), cfg.ListenPort, int(cfg.MaxMessageSize))
+			l.Errorf("got %v in RefreshProcfs", err)
+			return err
+		},
+		)
+	} else {
+		l.Info("Procfs gathering is disabled")
+	}
 	err = errG.Wait()
 	if err != nil {
 		backgroundStorage.statActivityLister.Stop()
