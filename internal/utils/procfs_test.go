@@ -331,7 +331,7 @@ func TestParseCmdLineSessionStatus(t *testing.T) {
 
 func TestGetPidProcInfo_NonExistentPid(t *testing.T) {
 	// A very large PID is guaranteed not to exist.
-	info, err := GetPidProcInfo(4194305000000, 1, 100)
+	info, err := GetPidProcInfo(nil, 4194305000000, 1, 100)
 	assert.ErrorIs(t, err, ErrProcessNotFound)
 	assert.Nil(t, info)
 }
@@ -348,7 +348,7 @@ func TestGetPidProcInfo_OutOfRangePid(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			info, err := GetPidProcInfo(tt.pid, 1, 100)
+			info, err := GetPidProcInfo(nil, tt.pid, 1, 100)
 			assert.ErrorIs(t, err, ErrProcessNotFound)
 			assert.Nil(t, info)
 		})

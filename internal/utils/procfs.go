@@ -9,6 +9,7 @@ import (
 	"syscall"
 
 	"github.com/prometheus/procfs"
+	"go.uber.org/zap"
 
 	pb "github.com/open-gpdb/yagpcc/api/proto/common"
 )
@@ -66,7 +67,7 @@ func ParseCmdLineSessionStatus(cmdline string) string {
 // returns an error wrapping ErrProcessNotFound. Callers should use
 // errors.Is(err, ErrProcessNotFound) to distinguish vanished PIDs from
 // unexpected failures.
-func GetPidProcInfo(pid int64, gpSegmentID, sessID int64) (*pb.GpPidProcInfo, error) {
+func GetPidProcInfo(logger *zap.SugaredLogger, pid int64, gpSegmentID, sessID int64) (*pb.GpPidProcInfo, error) {
 	// Guard against int64 values that cannot be represented as a platform-native
 	// int (required by procfs.NewProc). On 32-bit systems int is 32 bits wide, so
 	// an int64 PID larger than math.MaxInt would overflow on conversion. PIDs
@@ -83,14 +84,14 @@ func GetPidProcInfo(pid int64, gpSegmentID, sessID int64) (*pb.GpPidProcInfo, er
 		return nil, err
 	}
 
-	return getProcInfo(proc, pid, gpSegmentID, sessID)
+	return getProcInfo(logger, proc, pid, gpSegmentID, sessID)
 }
 
 // getProcInfo reads /proc/<pid>/{stat,status,cmdline,io} from the given
 // procfs.Proc handle and returns a populated GpPidProcInfo protobuf message.
 // It is separated from GetPidProcInfo to allow testing with a fake procfs
 // directory.
-func getProcInfo(proc procfs.Proc, pid, gpSegmentID, sessID int64) (*pb.GpPidProcInfo, error) {
+func getProcInfo(logger *zap.SugaredLogger, proc procfs.Proc, pid, gpSegmentID, sessID int64) (*pb.GpPidProcInfo, error) {
 	info := &pb.GpPidProcInfo{
 		GpSegmentId: gpSegmentID,
 		SessId:      sessID,
@@ -124,6 +125,11 @@ func getProcInfo(proc procfs.Proc, pid, gpSegmentID, sessID int64) (*pb.GpPidPro
 		info.ProcIo = convertProcIO(&pio)
 	} else if !isProcessGone(err) && !isPermissionDenied(err) {
 		return nil, err
+	} else if isPermissionDenied(err) {
+		// log permission denied for convenience
+		if logger != nil {
+			logger.Debugf("Permission denied reading /proc/%d/io: %v", pid, err)
+		}
 	}
 
 	return info, nil
