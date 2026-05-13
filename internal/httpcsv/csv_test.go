@@ -504,3 +504,137 @@ func TestCSVSpecialCharacters(t *testing.T) {
 	assert.Equal(t, "db with, comma", records[1][6])
 	assert.Equal(t, "user\"with\"quotes", records[1][7])
 }
+
+func TestExtensionsHeaders(t *testing.T) {
+	headers := extensionsHeaders()
+	assert.NotEmpty(t, headers)
+	// Verify the headers match what we expect
+	assert.Equal(t, "database_name", headers[0])
+	assert.Equal(t, "ext_name", headers[1])
+	assert.Equal(t, "ext_owner", headers[2])
+	assert.Equal(t, "ext_namespace", headers[3])
+	assert.Equal(t, "ext_relocatable", headers[4])
+	assert.Equal(t, "ext_version", headers[5])
+	assert.Equal(t, "error", headers[6])
+	assert.Len(t, headers, 7)
+}
+
+func TestWriteExtensionsCSV(t *testing.T) {
+	// Test with a database that has extensions
+	databases := []*pbm.DatabaseExtensionsInfo{
+		{
+			DatabaseName: "testdb1",
+			Extensions: []*pbm.Extension{
+				{
+					Name:        "plpgsql",
+					Owner:       "postgres",
+					Namespace:   "pg_catalog",
+					Relocatable: false,
+					Version:     "1.0",
+				},
+				{
+					Name:        "uuid-ossp",
+					Owner:       "postgres",
+					Namespace:   "public",
+					Relocatable: true,
+					Version:     "1.1",
+				},
+			},
+			Error: "",
+		},
+		// Test with a database that has no extensions but no error
+		{
+			DatabaseName: "emptydb",
+			Extensions:   []*pbm.Extension{},
+			Error:        "",
+		},
+		// Test with a database that has an error
+		{
+			DatabaseName: "errordb",
+			Extensions:   []*pbm.Extension{},
+			Error:        "connection failed",
+		},
+	}
+
+	var buf bytes.Buffer
+	err := WriteExtensionsCSV(&buf, databases)
+	require.NoError(t, err)
+
+	reader := csv.NewReader(&buf)
+	reader.FieldsPerRecord = -1
+	records, err := reader.ReadAll()
+	require.NoError(t, err)
+
+	// We should have:
+	// 1 header row
+	// 2 rows for the extensions in testdb1
+	// 1 row for emptydb (no extensions, no error)
+	// 1 row for errordb (no extensions, but with error)
+	assert.Len(t, records, 5)
+
+	// Check header row
+	assert.Equal(t, "database_name", records[0][0])
+	assert.Equal(t, "ext_name", records[0][1])
+	assert.Equal(t, "ext_owner", records[0][2])
+	assert.Equal(t, "ext_namespace", records[0][3])
+	assert.Equal(t, "ext_relocatable", records[0][4])
+	assert.Equal(t, "ext_version", records[0][5])
+	assert.Equal(t, "error", records[0][6])
+
+	// Check first extension row
+	assert.Equal(t, "testdb1", records[1][0])
+	assert.Equal(t, "plpgsql", records[1][1])
+	assert.Equal(t, "postgres", records[1][2])
+	assert.Equal(t, "pg_catalog", records[1][3])
+	assert.Equal(t, "false", records[1][4])
+	assert.Equal(t, "1.0", records[1][5])
+	assert.Equal(t, "", records[1][6]) // error field from database
+
+	// Check second extension row
+	assert.Equal(t, "testdb1", records[2][0])
+	assert.Equal(t, "uuid-ossp", records[2][1])
+	assert.Equal(t, "postgres", records[2][2])
+	assert.Equal(t, "public", records[2][3])
+	assert.Equal(t, "true", records[2][4])
+	assert.Equal(t, "1.1", records[2][5])
+	assert.Equal(t, "", records[2][6]) // error field from database
+
+	// Check empty database row
+	assert.Equal(t, "emptydb", records[3][0])
+	assert.Equal(t, "", records[3][1]) // ext_name
+	assert.Equal(t, "", records[3][2]) // ext_owner
+	assert.Equal(t, "", records[3][3]) // ext_namespace
+	assert.Equal(t, "", records[3][4]) // ext_relocatable
+	assert.Equal(t, "", records[3][5]) // ext_version
+	assert.Equal(t, "", records[3][6]) // error
+
+	// Check error database row
+	assert.Equal(t, "errordb", records[4][0])
+	assert.Equal(t, "", records[4][1])                  // ext_name
+	assert.Equal(t, "", records[4][2])                  // ext_owner
+	assert.Equal(t, "", records[4][3])                  // ext_namespace
+	assert.Equal(t, "", records[4][4])                  // ext_relocatable
+	assert.Equal(t, "", records[4][5])                  // ext_version
+	assert.Equal(t, "connection failed", records[4][6]) // error
+}
+
+func TestWriteExtensionsCSVNil(t *testing.T) {
+	var buf bytes.Buffer
+	err := WriteExtensionsCSV(&buf, nil)
+	require.NoError(t, err)
+
+	reader := csv.NewReader(&buf)
+	reader.FieldsPerRecord = -1
+	records, err := reader.ReadAll()
+	require.NoError(t, err)
+
+	// Only header row
+	assert.Len(t, records, 1)
+	assert.Equal(t, "database_name", records[0][0])
+	assert.Equal(t, "ext_name", records[0][1])
+	assert.Equal(t, "ext_owner", records[0][2])
+	assert.Equal(t, "ext_namespace", records[0][3])
+	assert.Equal(t, "ext_relocatable", records[0][4])
+	assert.Equal(t, "ext_version", records[0][5])
+	assert.Equal(t, "error", records[0][6])
+}

@@ -48,6 +48,17 @@ jobs:
         uses: actions/setup-go@v6
         with:
           go-version: ${{ matrix.go-version }}
+      - name: Install buf
+        uses: bufbuild/buf-action@v1
+        with:
+          setup_only: true
+      - name: Check generated proto files are up to date
+        run: |
+          make genproto
+          git diff --exit-code -- '*.pb.go' || {
+            echo "::error::Generated proto files are out of date. Run 'make genproto' and commit the result."
+            exit 1
+          }
       - name: Download modules
         run: go mod download
       - name: Check if builds successfully

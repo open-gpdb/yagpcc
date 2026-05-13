@@ -67,6 +67,7 @@ type Config struct {
 	SegmentLogWorkAmount       bool               `config:"segment_log_work_amount" yaml:"segment_log_work_amount"`
 	ConfigCacheDurabilitySec   float64            `config:"config_cache_durability_sec" yaml:"config_cache_durability_sec"`
 	StatActivityDurabilitySec  float64            `config:"stat_activity_durability_sec" yaml:"stat_activity_durability_sec"`
+	ExtensionsCacheTTL         float64            `config:"extensions_cache_ttl_sec" yaml:"extensions_cache_ttl_sec"`
 	ArchiverConfig             ArchiverConfigType `json:"arch_config" yaml:"arch_config"`
 	ClusterID                  string             `config:"cluster_id" yaml:"cluster_id"`
 	ConnectorEnabled           bool               `config:"connector_enabled" yaml:"connector_enabled"`
@@ -131,6 +132,7 @@ func DefaultConfig() (*Config, error) {
 		SegmentGetTimeoutSec:       10.0,
 		ConfigCacheDurabilitySec:   60,
 		StatActivityDurabilitySec:  1,
+		ExtensionsCacheTTL:         900, // 15 minutes
 		ArchiverConfig:             DefaultArchiverConfig(),
 		ClusterID:                  "unknown",
 		ConnectorEnabled:           false,

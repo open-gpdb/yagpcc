@@ -77,8 +77,9 @@ type (
 )
 
 const (
-	SegmentConfig = "SegmentConfig"
-	VersionConfig = "VersionConfig"
+	SegmentConfig    = "SegmentConfig"
+	VersionConfig    = "VersionConfig"
+	ExtensionsConfig = "ExtensionsConfig"
 )
 
 const (

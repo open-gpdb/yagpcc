@@ -7,6 +7,7 @@ import (
 	"os"
 	"sort"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/require"
 	"go.uber.org/mock/gomock"
@@ -88,7 +89,7 @@ func setupGRPCDialer(t *testing.T, backgroundStorage *master.BackgroundStorage) 
 	pb.RegisterSetQueryInfoServer(server, &grpc.SetQueryInfoServer{Logger: zLogger, UpdateSessionMetrics: true, RQStorage: backgroundStorage.RQStorage, SessionsStorage: backgroundStorage.SessionStorage})
 	pb.RegisterGetQueryInfoServer(server, &grpc.GetQueryInfoServer{Logger: zLogger, MaxMessageSize: 100 * 1024 * 1024, RQStorage: backgroundStorage.RQStorage})
 	pb.RegisterAgentControlServer(server, &grpc.AgentControlServer{Logger: zLogger, RQStorage: backgroundStorage.RQStorage})
-	pbm.RegisterGetGPInfoServer(server, grpc.NewGetMasterInfoServer("test", zLogger, 100*1024*1024, backgroundStorage))
+	pbm.RegisterGetGPInfoServer(server, grpc.NewGetMasterInfoServer("test", zLogger, 100*1024*1024, backgroundStorage, 15*time.Minute))
 
 	go func() {
 		if err := server.Serve(listener); err != nil {

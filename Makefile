@@ -11,17 +11,15 @@ else
 endif
 
 GINKGO_CLI=github.com/onsi/ginkgo/v2/ginkgo@v2.28.0
+PROTOC_GEN_GO=google.golang.org/protobuf/cmd/protoc-gen-go@v1.36.11
+PROTOC_GEN_GO_GRPC=google.golang.org/grpc/cmd/protoc-gen-go-grpc@v1.6.1
 
 ####################### BUILD #######################
 
 genproto:
-	protoc --proto_path=. --go_out=. --go_opt=paths=source_relative api/proto/common/yagpcc_metrics.proto
-	protoc --proto_path=. --go_out=. --go_opt=paths=source_relative api/proto/common/yagpcc_session.proto
-	protoc --proto_path=. --go_out=. --go-grpc_out=. --go_opt=paths=source_relative --go-grpc_opt=paths=source_relative api/proto/agent_segment/yagpcc_control_service.proto
-	protoc --proto_path=. --go_out=. --go-grpc_out=. --go_opt=paths=source_relative --go-grpc_opt=paths=source_relative api/proto/agent_segment/yagpcc_get_service.proto
-	protoc --proto_path=. --go_out=. --go-grpc_out=. --go_opt=paths=source_relative --go-grpc_opt=paths=source_relative api/proto/agent_segment/yagpcc_set_service.proto
-	protoc --proto_path=. --go_out=. --go-grpc_out=. --go_opt=paths=source_relative --go-grpc_opt=paths=source_relative api/proto/agent_master/yagpcc_action_service.proto
-	protoc --proto_path=. --go_out=. --go-grpc_out=. --go_opt=paths=source_relative --go-grpc_opt=paths=source_relative api/proto/agent_master/yagpcc_get_service.proto
+	go install $(PROTOC_GEN_GO)
+	go install $(PROTOC_GEN_GO_GRPC)
+	buf generate
 
 genbin:
 	mkdir -p devbin
