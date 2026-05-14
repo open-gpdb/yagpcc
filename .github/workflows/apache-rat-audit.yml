@@ -35,7 +35,7 @@ on:
   workflow_dispatch:
 
 env:
-  RAT_VERSION: "0.16.1"
+  RAT_VERSION: "0.18"
 
 jobs:
   rat-check:
@@ -43,6 +43,12 @@ jobs:
 
     steps:
       - uses: actions/checkout@v5
+
+      - name: Set up JDK
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
 
       - name: Cache Apache RAT JAR
         uses: actions/cache@v4
@@ -55,20 +61,20 @@ jobs:
           if [ ! -f apache-rat.jar ]; then
             curl -sSfL \
               "https://dlcdn.apache.org/creadur/apache-rat-${RAT_VERSION}/apache-rat-${RAT_VERSION}-bin.tar.gz" \
-              | tar xz --strip-components=1 "apache-rat-${RAT_VERSION}/apache-rat-${RAT_VERSION}.jar"
+              | tar xz "apache-rat-${RAT_VERSION}/apache-rat-${RAT_VERSION}.jar" --strip-components=1
             mv "apache-rat-${RAT_VERSION}.jar" apache-rat.jar
           fi
 
       - name: Run Apache RAT
         run: |
           java -jar apache-rat.jar \
-            --dir . \
             --exclude-file .rat-excludes \
+            -- . \
             | tee rat-report.txt
 
           # Fail if there are unapproved files
           if grep -q "^== Files with unapproved licenses:" rat-report.txt; then
-            UNAPPROVED=$(sed -n '/^== Files with unapproved licenses:/,/^==/p' rat-report.txt | grep -c '^\s\+!')
+            UNAPPROVED=$(sed -n '/^== Files with unapproved licenses:/,/^==/p' rat-report.txt | grep -c '^\s\+!' || true)
             if [ "$UNAPPROVED" -gt 0 ]; then
               echo "::error::Found $UNAPPROVED file(s) with missing or unapproved license headers."
               sed -n '/^== Files with unapproved licenses:/,/^==/p' rat-report.txt
