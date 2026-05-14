@@ -83,7 +83,7 @@ func NewBackgroundStorage(l *zap.SugaredLogger,
 }
 
 func (bs *BackgroundStorage) SendSegmentRefreshMessages(ctx context.Context, pullRateSec float64, configCacheDurability time.Duration, portn uint32, customSegmentList *config.SegmentList) error {
-	durationBetweenLoop := time.Second * time.Duration(pullRateSec)
+	durationBetweenLoop := time.Duration(pullRateSec * float64(time.Second))
 	for {
 		start := time.Now()
 		select {
@@ -328,7 +328,7 @@ func queryCompleted(qKey *storage.QueryKey, qVal *storage.RunningQuery, segmentG
 			l.Debugf("Query %v comleted and got metrics from all segments", *qKey)
 			return 1
 		}
-		if now.Sub(qValEnded) > time.Second*time.Duration(segmentGetTimeoutSec) {
+		if now.Sub(qValEnded) > time.Duration(segmentGetTimeoutSec*float64(time.Second)) {
 			l.Debugf("Query %v comleted and exceeded segment timeout", *qKey)
 			return 1
 		}
