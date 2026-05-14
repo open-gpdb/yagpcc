@@ -325,11 +325,11 @@ func queryCompleted(qKey *storage.QueryKey, qVal *storage.RunningQuery, segmentG
 		sCount := segCount
 		segCountLock.Unlock()
 		if qLenNodes >= sCount {
-			l.Debugf("Query %v comleted and got metrics from all segments", *qKey)
+			l.Debugf("Query %v completed and got metrics from all segments", *qKey)
 			return 1
 		}
 		if now.Sub(qValEnded) > time.Duration(segmentGetTimeoutSec*float64(time.Second)) {
-			l.Debugf("Query %v comleted and exceeded segment timeout", *qKey)
+			l.Debugf("Query %v completed and exceeded segment timeout", *qKey)
 			return 1
 		}
 	}
