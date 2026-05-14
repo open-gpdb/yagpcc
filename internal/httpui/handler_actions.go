@@ -18,7 +18,10 @@ package httpui
 
 import (
 	"fmt"
+	"mime"
 	"net/http"
+	"net/url"
+	"strings"
 
 	pbm "github.com/open-gpdb/yagpcc/api/proto/agent_master"
 	pbc "github.com/open-gpdb/yagpcc/api/proto/common"
@@ -50,6 +53,32 @@ type moveQueryRSGRequest struct {
 	ResourceGroupName string `json:"resource_group_name"`
 }
 
+func validateActionRequest(w http.ResponseWriter, r *http.Request) bool {
+	mediaType, _, err := mime.ParseMediaType(r.Header.Get("Content-Type"))
+	if err != nil || mediaType != "application/json" {
+		writeJSONError(w, http.StatusUnsupportedMediaType, "Content-Type must be application/json")
+		return false
+	}
+
+	origin := r.Header.Get("Origin")
+	if origin == "" {
+		return true
+	}
+
+	originURL, err := url.Parse(origin)
+	if err != nil || originURL.Host == "" || (originURL.Scheme != "http" && originURL.Scheme != "https") {
+		writeJSONError(w, http.StatusForbidden, "invalid origin")
+		return false
+	}
+
+	if !strings.EqualFold(originURL.Host, r.Host) {
+		writeJSONError(w, http.StatusForbidden, "cross-origin request forbidden")
+		return false
+	}
+
+	return true
+}
+
 // handleTerminateSession handles POST /api/action/terminate-session
 func (s *Server) handleTerminateSession(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
@@ -57,6 +86,9 @@ func (s *Server) handleTerminateSession(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 	if !s.actionServerReady(w) {
+		return
+	}
+	if !validateActionRequest(w, r) {
 		return
 	}
 
@@ -96,6 +128,9 @@ func (s *Server) handleTerminateQuery(w http.ResponseWriter, r *http.Request) {
 	if !s.actionServerReady(w) {
 		return
 	}
+	if !validateActionRequest(w, r) {
+		return
+	}
 
 	var body terminateQueryRequest
 	if !decodeJSONBody(w, r, &body) {
@@ -133,6 +168,9 @@ func (s *Server) handleTerminateSessions(w http.ResponseWriter, r *http.Request)
 	if !s.actionServerReady(w) {
 		return
 	}
+	if !validateActionRequest(w, r) {
+		return
+	}
 
 	var body terminateSessionsRequest
 	if !decodeJSONBody(w, r, &body) {
@@ -162,6 +200,9 @@ func (s *Server) handleMoveQueryToResourceGroup(w http.ResponseWriter, r *http.R
 		return
 	}
 	if !s.actionServerReady(w) {
+		return
+	}
+	if !validateActionRequest(w, r) {
 		return
 	}
 

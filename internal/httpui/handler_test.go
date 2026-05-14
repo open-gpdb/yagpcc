@@ -314,6 +314,50 @@ func TestActionEndpointsRejectInvalidJSON(t *testing.T) {
 	}
 }
 
+func TestValidateActionRequest(t *testing.T) {
+	t.Run("accepts json without origin", func(t *testing.T) {
+		req := httptest.NewRequest(http.MethodPost, "/api/action/terminate-session", strings.NewReader(`{}`))
+		req.Header.Set("Content-Type", "application/json")
+		rec := httptest.NewRecorder()
+
+		ok := validateActionRequest(rec, req)
+		assert.True(t, ok)
+	})
+
+	t.Run("rejects non-json content type", func(t *testing.T) {
+		req := httptest.NewRequest(http.MethodPost, "/api/action/terminate-session", strings.NewReader(`{}`))
+		req.Header.Set("Content-Type", "text/plain")
+		rec := httptest.NewRecorder()
+
+		ok := validateActionRequest(rec, req)
+		assert.False(t, ok)
+		assert.Equal(t, http.StatusUnsupportedMediaType, rec.Code)
+		assert.Contains(t, rec.Body.String(), "Content-Type must be application/json")
+	})
+
+	t.Run("accepts same-origin request", func(t *testing.T) {
+		req := httptest.NewRequest(http.MethodPost, "/api/action/terminate-session", strings.NewReader(`{}`))
+		req.Header.Set("Content-Type", "application/json")
+		req.Header.Set("Origin", "http://example.com")
+		rec := httptest.NewRecorder()
+
+		ok := validateActionRequest(rec, req)
+		assert.True(t, ok)
+	})
+
+	t.Run("rejects cross-origin request", func(t *testing.T) {
+		req := httptest.NewRequest(http.MethodPost, "/api/action/terminate-session", strings.NewReader(`{}`))
+		req.Header.Set("Content-Type", "application/json")
+		req.Header.Set("Origin", "http://evil.example")
+		rec := httptest.NewRecorder()
+
+		ok := validateActionRequest(rec, req)
+		assert.False(t, ok)
+		assert.Equal(t, http.StatusForbidden, rec.Code)
+		assert.Contains(t, rec.Body.String(), "cross-origin request forbidden")
+	})
+}
+
 // --- parseSessionFilters tests ---
 
 func TestParseSessionFilters(t *testing.T) {

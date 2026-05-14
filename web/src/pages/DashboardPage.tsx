@@ -1,4 +1,5 @@
 import { Card, Col, Row, Statistic, Spin, Typography, Table } from "antd";
+import type { ReactNode } from "react";
 import {
   UserOutlined,
   ThunderboltOutlined,
@@ -12,7 +13,7 @@ import SessionStateBadge from "../components/SessionStateBadge";
 
 const { Title } = Typography;
 
-const stateIcons: Record<string, React.ReactNode> = {
+const stateIcons: Record<string, ReactNode> = {
   active: <ThunderboltOutlined style={{ color: "#52c41a" }} />,
   idle: <PauseCircleOutlined style={{ color: "#8c8c8c" }} />,
   "idle in transaction": <ClockCircleOutlined style={{ color: "#faad14" }} />,

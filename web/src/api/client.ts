@@ -134,7 +134,7 @@ export function terminateSessions(params: {
   username?: string;
   queryId?: number;
 }) {
-  return post<TerminateResponse>("/api/action/terminate-sessions", {
+  return post<TerminateResponses>("/api/action/terminate-sessions", {
     database: params.database ?? "",
     username: params.username ?? "",
     query_id: params.queryId ?? 0,
@@ -265,6 +265,10 @@ export interface DatabasesResponse {
 }
 
 export interface TerminateResponse {
-  success: boolean;
-  message: string;
+  statusCode: string;
+  statusText: string;
+}
+
+export interface TerminateResponses {
+  terminateResponse: TerminateResponse[];
 }
