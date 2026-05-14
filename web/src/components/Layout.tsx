@@ -36,7 +36,8 @@ export default function Layout() {
           background: "#001529",
         }}
       >
-        <div
+        <button
+          type="button"
           style={{
             color: "#fff",
             fontSize: 18,
@@ -44,11 +45,14 @@ export default function Layout() {
             marginRight: 40,
             cursor: "pointer",
             whiteSpace: "nowrap",
+            background: "transparent",
+            border: "none",
+            padding: 0,
           }}
           onClick={() => navigate("/")}
         >
           🐘 YAGPCC
-        </div>
+        </button>
         <Menu
           theme="dark"
           mode="horizontal"
