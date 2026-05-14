@@ -1,8 +1,25 @@
+// Licensed to the Apache Software Foundation (ASF) under one or more
+// contributor license agreements. See the NOTICE file distributed
+// with this work for additional information regarding copyright
+// ownership. The ASF licenses this file to You under the Apache
+// License, Version 2.0 (the "License"); you may not use this file
+// except in compliance with the License. You may obtain a copy of the
+// License at
+//
+//    http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or
+// implied. See the License for the specific language governing
+// permissions and limitations under the License.
+
 package uds
 
 import (
 	"context"
 	"encoding/binary"
+	"errors"
 	"fmt"
 	"io"
 	"time"
@@ -36,7 +53,7 @@ func (p *Processor) Process(ctx context.Context, conn connection) error {
 			tmpBuffer := make([]byte, p.bufferSize)
 			bytesRead, err := conn.Read(tmpBuffer)
 
-			if err == io.EOF {
+			if errors.Is(err, io.EOF) {
 				// cannot continue if got an EOF
 				if bytesRead > 0 || totalBytes > 0 {
 					return fmt.Errorf("unexpected EOF: read %d bytes and got EOF", bytesRead+totalBytes)

@@ -1,3 +1,19 @@
+// Licensed to the Apache Software Foundation (ASF) under one or more
+// contributor license agreements. See the NOTICE file distributed
+// with this work for additional information regarding copyright
+// ownership. The ASF licenses this file to You under the Apache
+// License, Version 2.0 (the "License"); you may not use this file
+// except in compliance with the License. You may obtain a copy of the
+// License at
+//
+//    http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or
+// implied. See the License for the specific language governing
+// permissions and limitations under the License.
+
 package gp
 
 import (
@@ -229,33 +245,29 @@ func GetStatus(blockSessID *int, waiting *bool, reason *string) string {
 func emptyStrForNil(s *string) string {
 	if s == nil {
 		return ""
-	} else {
-		return *s
 	}
+	return *s
 }
 
 func emptyIntForNil(i *int) int64 {
 	if i == nil {
 		return 0
-	} else {
-		return int64(*i)
 	}
+	return int64(*i)
 }
 
 func emptyTimestampForNil(t *time.Time) *timestamppb.Timestamp {
 	if t == nil {
 		return &timestamppb.Timestamp{}
-	} else {
-		return utils.GetTimestampFromTime(*t)
 	}
+	return utils.GetTimestampFromTime(*t)
 }
 
 func falseBoolForNil(b *bool) bool {
 	if b == nil {
 		return false
-	} else {
-		return *b
 	}
+	return *b
 }
 
 func getSessInfo(gpStatInfo *GpStatActivity) *pbc.SessionInfo {
@@ -362,7 +374,6 @@ func (s *SessionsStorage) GetRunningSessionQuery(keyS SessionKey, ccnt int32) (*
 		if queryData.QueryStat.QueryInfo.SubmitTime != nil {
 			qSubmit = queryData.QueryStat.QueryInfo.SubmitTime.AsTime()
 		}
-
 	}
 	return &storage.RunningQueryInfo{
 		TotalQueryMetrics: queryData.QueryStat.TotalQueryMetrics,
@@ -375,7 +386,6 @@ func (s *SessionsStorage) GetRunningSessionQuery(keyS SessionKey, ccnt int32) (*
 		QuerySubmit:       qSubmit,
 		QueryEnd:          qEnd,
 	}, nil
-
 }
 
 func (s *SessionsStorage) getRunningQueryStack(sKey SessionKey, ccnts []int32) ([]*pbc.QueryDesc, error) {
@@ -401,7 +411,6 @@ func (s *SessionsStorage) getRunningQueryStack(sKey SessionKey, ccnts []int32) (
 }
 
 func (s *SessionsStorage) GetQueryDesc(qKey *storage.QueryKey, showStack bool) (*pbc.SessionState, error) {
-
 	if qKey == nil {
 		return nil, fmt.Errorf("nil query key given")
 	}
@@ -419,11 +428,11 @@ func (s *SessionsStorage) GetQueryDesc(qKey *storage.QueryKey, showStack bool) (
 
 	sessState := pbc.SessionState{
 		Time:                utils.GetTimestampFromTime(now),
-		SessionKey:          &pbc.SessionKey{SessId: int64(qKey.Ssid), TmId: int64(DiscoveredTmID)},
+		SessionKey:          &pbc.SessionKey{SessId: int64(qKey.Ssid), TmId: DiscoveredTmID},
 		SessionInfo:         &pbc.SessionInfo{},
 		RunningQuery:        getRunningQKey(qKey),
 		RunningQueryInfo:    getRunningQInfo(queryData.QueryStat.QueryInfo),
-		RunningQueryStatus:  pbc.QueryStatus(queryData.QueryStat.QueryStatus),
+		RunningQueryStatus:  queryData.QueryStat.QueryStatus,
 		TotalMetrics:        &pbc.GPMetrics{},
 		LastMetrics:         &pbc.GPMetrics{},
 		QueryMetrics:        proto.Clone(queryData.QueryStat.TotalQueryMetrics).(*pbc.GPMetrics),
@@ -464,7 +473,6 @@ func (s *SessionsStorage) GetSessionDesc(
 	runningQType pbm.RunningQueryType,
 	ccnt int32,
 ) (*pbc.SessionState, error) {
-
 	now := time.Now()
 	valS.SessionLock.RLock()
 	if ccnt == -1 {
@@ -483,7 +491,7 @@ func (s *SessionsStorage) GetSessionDesc(
 	}
 	sessState := pbc.SessionState{
 		Time:               utils.GetTimestampFromTime(now),
-		SessionKey:         &pbc.SessionKey{SessId: int64(keyS.SessID), TmId: int64(DiscoveredTmID)},
+		SessionKey:         &pbc.SessionKey{SessId: int64(keyS.SessID), TmId: DiscoveredTmID},
 		SessionInfo:        getSessInfo(valS.SessionData.GpStatInfo),
 		RunningQuery:       getRunningQKey(runningQ.QueryKey),
 		RunningQueryInfo:   getRunningQInfo(runningQ.TotalQueryInfo),
@@ -552,7 +560,6 @@ func (s *SessionsStorage) GetSessionDataForWrite(
 		RunningQueryLevel:    sessState.RunningQueryLevel,
 		RunningQuerySlices:   sessState.RunningQuerySlices,
 	}, nil
-
 }
 
 func (s *SessionsStorage) GetAllSessions(showSystem bool, runningQType pbm.RunningQueryType) (*pbm.GetGPSessionsResponse, error) {
@@ -644,7 +651,6 @@ func (s *SessionsStorage) RecalculateProcfsUsage() error {
 }
 
 func (s *SessionsStorage) RefreshSessionList(newList []*GpStatActivity, clearDeletedSessions bool) error {
-
 	s.l.Debug("Refreshing session list")
 	refreshedSessID := make(map[SessionKey]bool, 0)
 	for _, valN := range newList {
@@ -860,7 +866,6 @@ func (s *SessionsStorage) UpdateSessionQuery(
 				valS.SessionData.GpStatInfo.State = &StateActive
 			}
 		}
-
 	}
 
 	return nil

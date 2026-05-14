@@ -1,3 +1,19 @@
+// Licensed to the Apache Software Foundation (ASF) under one or more
+// contributor license agreements. See the NOTICE file distributed
+// with this work for additional information regarding copyright
+// ownership. The ASF licenses this file to You under the Apache
+// License, Version 2.0 (the "License"); you may not use this file
+// except in compliance with the License. You may obtain a copy of the
+// License at
+//
+//    http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or
+// implied. See the License for the specific language governing
+// permissions and limitations under the License.
+
 package grpc
 
 import (
@@ -48,7 +64,6 @@ func (s *SetQueryInfoServer) logSpecificMetrics(in *pb.SetQueryReq) {
 			ntuples, nloops,
 		)
 	}
-
 }
 
 func (s *SetQueryInfoServer) SetMetricQuery(ctx context.Context, in *pb.SetQueryReq) (*pb.MetricResponse, error) {
@@ -76,7 +91,7 @@ func (s *SetQueryInfoServer) SetMetricQuery(ctx context.Context, in *pb.SetQuery
 	if storage.CheckQueryStarted(int32(in.QueryStatus)) && measuredQueryTimes.QueryStart == nil {
 		measuredQueryTimes.QueryStart = in.Datetime
 	}
-	newQuery, err := s.RQStorage.StoreInfoInStorage(
+	newQuery, storeErr := s.RQStorage.StoreInfoInStorage(
 		qKey,
 		int32(in.QueryStatus),
 		measuredQueryTimes,
@@ -85,23 +100,25 @@ func (s *SetQueryInfoServer) SetMetricQuery(ctx context.Context, in *pb.SetQuery
 		in.GetQueryMetrics(),
 	)
 	if s.UpdateSessionMetrics {
-		err = s.SessionsStorage.UpdateSessionQuery(
+		if sessErr := s.SessionsStorage.UpdateSessionQuery(
 			in.GetQueryKey(),
 			in.GetQueryInfo(),
 			int32(in.QueryStatus),
 			in.GetAddInfo(),
 			newQuery,
-		)
+		); sessErr != nil && storeErr == nil {
+			storeErr = sessErr
+		}
 	}
 	s.Logger.Debugf("set metric query message %v took %v", in.QueryKey, time.Since(start))
 	if metrics.YagpccMetrics != nil {
 		metrics.YagpccMetrics.HandleLatencies.With(map[string]string{"method": "SetMetricQuery"}).Observe(time.Since(start).Seconds())
 		metrics.YagpccMetrics.QueryStatuses.With(map[string]string{"status": in.QueryStatus.String()}).Inc()
 	}
-	if err != nil {
-		return &pb.MetricResponse{
+	if storeErr != nil {
+		return &pb.MetricResponse{ //nolint:nilerr // error is intentionally returned in the response body, not as a Go error
 			ErrorCode: pb.MetricResponseStatusCode_METRIC_RESPONSE_STATUS_CODE_ERROR,
-			ErrorText: err.Error(),
+			ErrorText: storeErr.Error(),
 		}, nil
 	}
 	return &pb.MetricResponse{

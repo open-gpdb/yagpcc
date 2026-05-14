@@ -1,3 +1,19 @@
+// Licensed to the Apache Software Foundation (ASF) under one or more
+// contributor license agreements. See the NOTICE file distributed
+// with this work for additional information regarding copyright
+// ownership. The ASF licenses this file to You under the Apache
+// License, Version 2.0 (the "License"); you may not use this file
+// except in compliance with the License. You may obtain a copy of the
+// License at
+//
+//    http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or
+// implied. See the License for the specific language governing
+// permissions and limitations under the License.
+
 package master
 
 import (
@@ -59,7 +75,7 @@ func (ps *ProcfsGatherStorage) getJobsMap(sessions []stat_activity.SessionPid) h
 func (ps *ProcfsGatherStorage) processProcfsRequests(ctx context.Context, hostname string, portn uint32, gatherTimeout time.Duration, maxMsgSize int, reqs []stat_activity.SessionPid) ([]*pbc.GpPidProcInfo, error) {
 	grpcConn, err := getGrpcClientConnection(ctx, hostname, portn, gatherTimeout.Seconds())
 	if err != nil {
-		return nil, fmt.Errorf("grpc client connection error: %v", err)
+		return nil, fmt.Errorf("grpc client connection error: %w", err)
 	}
 	cGet := pb.NewGetQueryInfoClient(grpcConn)
 	ctxTimeout, ctxCancel := context.WithTimeout(ctx, gatherTimeout)
@@ -82,7 +98,7 @@ func (ps *ProcfsGatherStorage) processProcfsRequests(ctx context.Context, hostna
 			if len(msgReq.SegmentProcess) >= jobsPerQuery {
 				segResponse, errGet := cGet.GetPidProcStat(ctxTimeout, msgReq, maxSizeOption)
 				if errGet != nil {
-					return nil, fmt.Errorf("grpc get pid proc stat error: hostname %v port %v error %v", hostname, portn, errGet)
+					return nil, fmt.Errorf("grpc get pid proc stat error: hostname %v port %v error %w", hostname, portn, errGet)
 				}
 				result = append(result, segResponse.GetPidProcData()...)
 				msgReq.SegmentProcess = make([]*pb.SegmentProcess, 0, 10)
@@ -92,7 +108,7 @@ func (ps *ProcfsGatherStorage) processProcfsRequests(ctx context.Context, hostna
 	if len(msgReq.SegmentProcess) > 0 {
 		segResponse, errGet := cGet.GetPidProcStat(ctxTimeout, msgReq, maxSizeOption)
 		if errGet != nil {
-			return nil, fmt.Errorf("grpc get pid proc stat error: hostname %v port %v error %v", hostname, portn, errGet)
+			return nil, fmt.Errorf("grpc get pid proc stat error: hostname %v port %v error %w", hostname, portn, errGet)
 		}
 		result = append(result, segResponse.GetPidProcData()...)
 	}
@@ -106,7 +122,7 @@ func (ps *ProcfsGatherStorage) GatherProcfsStat(ctx context.Context, nPullers in
 	ps.l.Debug("GatherProcfsStat")
 	sessions, err := ps.statActivityLister.ListAllSessions(ctx)
 	if err != nil {
-		return nil, fmt.Errorf("error listing sessions pids: %v", err)
+		return nil, fmt.Errorf("error listing sessions pids: %w", err)
 	}
 	hostJobs := ps.getJobsMap(sessions)
 
