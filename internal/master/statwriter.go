@@ -1,3 +1,19 @@
+// Licensed to the Apache Software Foundation (ASF) under one or more
+// contributor license agreements. See the NOTICE file distributed
+// with this work for additional information regarding copyright
+// ownership. The ASF licenses this file to You under the Apache
+// License, Version 2.0 (the "License"); you may not use this file
+// except in compliance with the License. You may obtain a copy of the
+// License at
+//
+//    http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or
+// implied. See the License for the specific language governing
+// permissions and limitations under the License.
+
 package master
 
 import (
@@ -95,7 +111,6 @@ func (w *RotateWriter) Write(output []byte) (int, error) {
 
 // Perform the actual act of rotating and reopening file.
 func (w *RotateWriter) Rotate() (err error) {
-
 	// Rename dest file if exceeded file size
 	fi, err := os.Stat(w.filename)
 	if err == nil {
@@ -158,15 +173,15 @@ func StoreSerializableData(ctx context.Context, l *zap.SugaredLogger, sChan Seri
 }
 
 func StoreSessions(ctx context.Context, l *zap.SugaredLogger, sessionChan SessionChanRead, writer io.Writer) {
-	SerializableChan := make(SerializableChan, cap(sessionChan))
-	defer close(SerializableChan)
-	go StoreSerializableData(ctx, l, SerializableChan, writer)
+	serChan := make(SerializableChan, cap(sessionChan))
+	defer close(serChan)
+	go StoreSerializableData(ctx, l, serChan, writer)
 	for {
 		select {
 		case val := <-sessionChan:
 			val.GpStatInfo.TmID = int(gp.DiscoveredTmID)
 			val.RunningQuery.Tmid = int32(gp.DiscoveredTmID)
-			SerializableChan <- val
+			serChan <- val
 		case <-ctx.Done():
 			l.Warn("done StoreSessions")
 			return
@@ -175,14 +190,14 @@ func StoreSessions(ctx context.Context, l *zap.SugaredLogger, sessionChan Sessio
 }
 
 func StoreQuery(ctx context.Context, l *zap.SugaredLogger, queryChan QueryStatChanRead, writer io.Writer) {
-	SerializableChan := make(SerializableChan, cap(queryChan))
-	defer close(SerializableChan)
-	go StoreSerializableData(ctx, l, SerializableChan, writer)
+	serChan := make(SerializableChan, cap(queryChan))
+	defer close(serChan)
+	go StoreSerializableData(ctx, l, serChan, writer)
 	for {
 		select {
 		case val := <-queryChan:
 			val.QueryKey.Tmid = int32(gp.DiscoveredTmID)
-			SerializableChan <- &QueryStatWriteSerializable{v: val}
+			serChan <- &QueryStatWriteSerializable{v: val}
 		case <-ctx.Done():
 			l.Warn("done StoreQuery")
 			return
@@ -191,14 +206,14 @@ func StoreQuery(ctx context.Context, l *zap.SugaredLogger, queryChan QueryStatCh
 }
 
 func StoreSegmensMetrics(ctx context.Context, l *zap.SugaredLogger, segChan SegmentStatChanRead, writer io.Writer) {
-	SerializableChan := make(SerializableChan, cap(segChan))
-	defer close(SerializableChan)
-	go StoreSerializableData(ctx, l, SerializableChan, writer)
+	serChan := make(SerializableChan, cap(segChan))
+	defer close(serChan)
+	go StoreSerializableData(ctx, l, serChan, writer)
 	for {
 		select {
 		case val := <-segChan:
 			val.QueryKey.Tmid = int32(gp.DiscoveredTmID)
-			SerializableChan <- &SegmentMetricsWriteSerializable{v: val}
+			serChan <- &SegmentMetricsWriteSerializable{v: val}
 		case <-ctx.Done():
 			l.Warn("done StoreSegmensMetrics")
 			return

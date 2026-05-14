@@ -1,0 +1,78 @@
+# --------------------------------------------------------------------
+#
+# Licensed to the Apache Software Foundation (ASF) under one or more
+# contributor license agreements. See the NOTICE file distributed
+# with this work for additional information regarding copyright
+# ownership. The ASF licenses this file to You under the Apache
+# License, Version 2.0 (the "License"); you may not use this file
+# except in compliance with the License. You may obtain a copy of the
+# License at
+#
+#    http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or
+# implied. See the License for the specific language governing
+# permissions and limitations under the License.
+#
+# --------------------------------------------------------------------
+# GitHub Actions Workflow: Apache RAT License Audit
+# --------------------------------------------------------------------
+# Description:
+#
+#   Runs Apache RAT (Release Audit Tool) to verify that all source
+#   files contain the required Apache 2.0 license header.
+
+name: Apache RAT audit
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+    types: [opened, synchronize, reopened, edited]
+  workflow_dispatch:
+
+env:
+  RAT_VERSION: "0.16.1"
+
+jobs:
+  rat-check:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Cache Apache RAT JAR
+        uses: actions/cache@v4
+        with:
+          path: apache-rat.jar
+          key: apache-rat-${{ env.RAT_VERSION }}
+
+      - name: Download Apache RAT
+        run: |
+          if [ ! -f apache-rat.jar ]; then
+            curl -sSfL \
+              "https://dlcdn.apache.org/creadur/apache-rat-${RAT_VERSION}/apache-rat-${RAT_VERSION}-bin.tar.gz" \
+              | tar xz --strip-components=1 "apache-rat-${RAT_VERSION}/apache-rat-${RAT_VERSION}.jar"
+            mv "apache-rat-${RAT_VERSION}.jar" apache-rat.jar
+          fi
+
+      - name: Run Apache RAT
+        run: |
+          java -jar apache-rat.jar \
+            --dir . \
+            --exclude-file .rat-excludes \
+            | tee rat-report.txt
+
+          # Fail if there are unapproved files
+          if grep -q "^== Files with unapproved licenses:" rat-report.txt; then
+            UNAPPROVED=$(sed -n '/^== Files with unapproved licenses:/,/^==/p' rat-report.txt | grep -c '^\s\+!')
+            if [ "$UNAPPROVED" -gt 0 ]; then
+              echo "::error::Found $UNAPPROVED file(s) with missing or unapproved license headers."
+              sed -n '/^== Files with unapproved licenses:/,/^==/p' rat-report.txt
+              exit 1
+            fi
+          fi
+          echo "All files have approved license headers."

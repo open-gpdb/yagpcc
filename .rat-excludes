@@ -14,13 +14,33 @@
 # implied. See the License for the specific language governing
 # permissions and limitations under the License.
 
-version: v2
-plugins:
-  - local: protoc-gen-go
-    out: .
-    opt:
-      - paths=source_relative
-  - local: protoc-gen-go-grpc
-    out: .
-    opt:
-      - paths=source_relative
+# Apache RAT exclusion list for yagpcc
+# Files listed here are excluded from license header checks.
+
+# Version control
+.git
+
+# Go module files (not source code)
+go.mod
+go.sum
+
+# License file itself
+LICENSE
+
+# Markdown documentation
+*.md
+
+# Generated protobuf files
+*.pb.go
+
+# Compiled binaries
+devbin
+
+# Debian packaging
+debian
+
+# Certificate bundles
+*.pem
+
+# Test artifacts
+*.test

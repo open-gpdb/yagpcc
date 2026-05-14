@@ -1,3 +1,19 @@
+// Licensed to the Apache Software Foundation (ASF) under one or more
+// contributor license agreements. See the NOTICE file distributed
+// with this work for additional information regarding copyright
+// ownership. The ASF licenses this file to You under the Apache
+// License, Version 2.0 (the "License"); you may not use this file
+// except in compliance with the License. You may obtain a copy of the
+// License at
+//
+//    http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or
+// implied. See the License for the specific language governing
+// permissions and limitations under the License.
+
 package config
 
 import (
@@ -118,12 +134,12 @@ func DefaultConfig() (*Config, error) {
 		IgnoreDatabaseError:        false,
 		MinimumQueryDurationSec:    10 * 60,
 		MaxShortQueriesPerUser:     2000,
-		ShortAggInterval:           time.Duration(time.Minute * 10),
-		SessionRefreshInterval:     time.Duration(time.Second * 30),
-		QueriesRefreshInterval:     time.Duration(time.Second * 1),
+		ShortAggInterval:           time.Minute * 10,
+		SessionRefreshInterval:     time.Second * 30,
+		QueriesRefreshInterval:     time.Second * 1,
 		ProcfsEnabled:              true,
-		ProcfsRefreshInterval:      time.Duration(time.Second * 60),
-		SessionSendMetricInterval:  time.Duration(time.Second * 60),
+		ProcfsRefreshInterval:      time.Second * 60,
+		SessionSendMetricInterval:  time.Second * 60,
 		MinFreePercent:             10,
 		CustomSegmentList:          nil,
 		SegmentPullRateSec:         2,

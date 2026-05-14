@@ -1,3 +1,19 @@
+// Licensed to the Apache Software Foundation (ASF) under one or more
+// contributor license agreements. See the NOTICE file distributed
+// with this work for additional information regarding copyright
+// ownership. The ASF licenses this file to You under the Apache
+// License, Version 2.0 (the "License"); you may not use this file
+// except in compliance with the License. You may obtain a copy of the
+// License at
+//
+//    http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or
+// implied. See the License for the specific language governing
+// permissions and limitations under the License.
+
 package master
 
 import (
@@ -67,23 +83,22 @@ func NewBackgroundStorage(l *zap.SugaredLogger,
 }
 
 func (bs *BackgroundStorage) SendSegmentRefreshMessages(ctx context.Context, pullRateSec float64, configCacheDurability time.Duration, portn uint32, customSegmentList *config.SegmentList) error {
-
 	durationBetweenLoop := time.Second * time.Duration(pullRateSec)
 	for {
 		start := time.Now()
 		select {
 		case <-ctx.Done():
 			bs.l.Warn("Done SendSegmentRefreshMessages")
-			return fmt.Errorf("done context with %v", ctx.Err())
+			return fmt.Errorf("done context with %w", ctx.Err())
 		// add segments to channel
 		default:
 			var segConfig gp.GpSegmentsConfiguration
 			if customSegmentList == nil {
 				bs.l.Debugf("Start refresh segment config")
 				ctxTimeout, ctxCancel := context.WithTimeout(ctx, time.Duration(float64(time.Second)*pullRateSec))
-				defer ctxCancel()
 				var err error
 				segConfig, err = gp.GetSegmentConfig(ctxTimeout, configCacheDurability)
+				ctxCancel()
 				if err != nil {
 					bs.l.Errorf("fail to get segment config %v", err)
 					return err
@@ -146,7 +161,7 @@ func (bs *BackgroundStorage) SendSegmentRefreshMessages(ctx context.Context, pul
 				select {
 				case <-ctx.Done():
 					bs.l.Warn("Done SendSegmentRefreshMessages")
-					return fmt.Errorf("done context with %v", ctx.Err())
+					return fmt.Errorf("done context with %w", ctx.Err())
 				// add segments to channel
 				default:
 					segChan <- *segmentI
@@ -216,7 +231,6 @@ func (bs *BackgroundStorage) launchArchiveWriters(ctx context.Context,
 	segChan chan *pbm.SegmentMetricsWrite,
 	maxFileSize int64,
 ) error {
-
 	fileSession, err := NewRotateWriter(archConfig.SessionsFile, maxFileSize)
 	if err != nil {
 		bs.l.Errorf("could not create output file %v with error %v", archConfig.SessionsFile, err)
@@ -247,7 +261,7 @@ func (bs *BackgroundStorage) launchArchivers(ctx context.Context,
 	segChan chan *pbm.SegmentMetricsWrite,
 	hostname string,
 ) {
-	qDuration := time.Duration(time.Second * time.Duration(qDurationSec))
+	qDuration := time.Second * time.Duration(qDurationSec)
 	for i := uint32(0); i < nProcesses; i++ {
 		go bs.ArchiveOrAggregate(ctx, qDuration, clusterID, archChan, queryChan, segChan, hostname)
 	}
@@ -261,7 +275,7 @@ func (bs *BackgroundStorage) SendSessionMetrics(ctx context.Context, sessChan ch
 		select {
 		case <-ctx.Done():
 			bs.l.Warn("Done SendSessionMetrics")
-			return fmt.Errorf("done context with %v", ctx.Err())
+			return fmt.Errorf("done context with %w", ctx.Err())
 		case <-ticker.C:
 			currTime := time.Now()
 			// send session stat
@@ -281,13 +295,12 @@ func (bs *BackgroundStorage) SendSessionMetrics(ctx context.Context, sessChan ch
 					case <-ctx.Done():
 						bs.l.Warn("Done SendSessionMetrics")
 						// unlock session and exit
-						return fmt.Errorf("done context with %v", ctx.Err())
+						return fmt.Errorf("done context with %w", ctx.Err())
 					default:
 						bs.l.Debugf("sent %v", *sessData)
 						sessChan <- sessData
 					}
 				}
-
 			}
 
 			if metrics.YagpccMetrics != nil {
@@ -315,7 +328,7 @@ func queryCompleted(qKey *storage.QueryKey, qVal *storage.RunningQuery, segmentG
 			l.Debugf("Query %v comleted and got metrics from all segments", *qKey)
 			return 1
 		}
-		if now.Sub(qValEnded) > time.Duration(time.Second*time.Duration(segmentGetTimeoutSec)) {
+		if now.Sub(qValEnded) > time.Second*time.Duration(segmentGetTimeoutSec) {
 			l.Debugf("Query %v comleted and exceeded segment timeout", *qKey)
 			return 1
 		}
@@ -398,7 +411,7 @@ func (bs *BackgroundStorage) ClearCompletedQueries(ctx context.Context,
 			select {
 			case <-ctx.Done():
 				bs.l.Warn("Done ClearCompletedQueries")
-				return fmt.Errorf("done context with %v", ctx.Err())
+				return fmt.Errorf("done context with %w", ctx.Err())
 			default:
 				// prevent double-sent session market as LastQuery since it is not deleted until new query start execution
 				qValI.QueryLock.RLock()
@@ -438,7 +451,7 @@ func (bs *BackgroundStorage) RefreshSessions(ctx context.Context, sessionRefresh
 		select {
 		case <-ctx.Done():
 			bs.l.Warn("Done RefreshSessions")
-			return fmt.Errorf("done context with %v", ctx.Err())
+			return fmt.Errorf("done context with %w", ctx.Err())
 		case <-ticker.C:
 			currTime := time.Now()
 			bs.l.Info("Refresh session List")
@@ -466,7 +479,7 @@ func (bs *BackgroundStorage) RefreshQueries(ctx context.Context,
 		select {
 		case <-ctx.Done():
 			bs.l.Warn("Done RefreshQueries")
-			return fmt.Errorf("done context with %v", ctx.Err())
+			return fmt.Errorf("done context with %w", ctx.Err())
 		case <-ticker.C:
 			currTime := time.Now()
 			bs.l.Debug("Clear queries list")
@@ -500,7 +513,7 @@ func (bs *BackgroundStorage) RefreshProcfs(ctx context.Context, procfsRefreshInt
 		select {
 		case <-ctx.Done():
 			bs.l.Warn("Done RefreshProcfs")
-			return fmt.Errorf("done context with %v", ctx.Err())
+			return fmt.Errorf("done context with %w", ctx.Err())
 		case <-ticker.C:
 			currTime := time.Now()
 			bs.l.Debugf("Refresh procfs stat %v", currTime)
@@ -511,7 +524,7 @@ func (bs *BackgroundStorage) RefreshProcfs(ctx context.Context, procfsRefreshInt
 				continue
 			}
 			bs.procfsStorage.RegisterProcfsStat(currTime, result)
-			// measure only successfull latencies
+			// measure only successful latencies
 			if metrics.YagpccMetrics != nil {
 				metrics.YagpccMetrics.HandleLatencies.With(map[string]string{"method": "RefreshProcfs"}).Observe(time.Since(currTime).Seconds())
 			}
@@ -549,12 +562,12 @@ func InitBG(
 	archChan := make(chan *EndedQuery, cfg.ArchiverConfig.ArchiverQueueSize)
 	queryChan := make(chan *pbm.QueryStatWrite, cfg.ArchiverConfig.QueriesQueueSize)
 	sessChan := make(chan *gp.SessionDataWrite, cfg.ArchiverConfig.SessionsQueueSize)
-	segChan := make(chan *pbm.SegmentMetricsWrite, cfg.ArchiverConfig.SegmentsQueueSize)
+	segMetricsChan := make(chan *pbm.SegmentMetricsWrite, cfg.ArchiverConfig.SegmentsQueueSize)
 
 	errG.Go(func() error {
-		if err := masterSentinel.RunUntilIsMaster(ctxI); err != nil {
-			l.Errorf("the current instance is not considered to be the active master anymore due to an error: %s", err.Error())
-			return err
+		if sentinelErr := masterSentinel.RunUntilIsMaster(ctxI); sentinelErr != nil {
+			l.Errorf("the current instance is not considered to be the active master anymore due to an error: %s", sentinelErr.Error())
+			return sentinelErr
 		}
 
 		l.Warnf("the current instance is not considered to be the active master anymore")
@@ -569,51 +582,51 @@ func InitBG(
 	}
 
 	errG.Go(func() error {
-		err := backgroundStorage.SendSegmentRefreshMessages(ctxI,
+		bgErr := backgroundStorage.SendSegmentRefreshMessages(ctxI,
 			cfg.SegmentPullRateSec,
 			time.Duration(cfg.ConfigCacheDurabilitySec*float64(time.Second)),
 			cfg.ListenPort,
 			cfg.CustomSegmentList,
 		)
-		l.Errorf("got %v in segment refresh", err)
-		return err
+		l.Errorf("got %v in segment refresh", bgErr)
+		return bgErr
 	},
 	)
 	backgroundStorage.launchSegmentPullers(ctxI, cfg.SegmentPullThreads, cfg.SegmentConnectTimeoutSec, cfg.SegmentGetTimeoutSec, int(cfg.MaxMessageSize))
-	backgroundStorage.launchArchivers(ctxI, cfg.MinimumQueryDurationSec, cfg.ArchiverConfig.ArciverProcesses, cfg.ClusterID, archChan, queryChan, segChan, hostname)
-	err = backgroundStorage.launchArchiveWriters(ctxI, cfg.ArchiverConfig, queryChan, sessChan, segChan, cfg.ArchiverConfig.MaxFileSize)
+	backgroundStorage.launchArchivers(ctxI, cfg.MinimumQueryDurationSec, cfg.ArchiverConfig.ArciverProcesses, cfg.ClusterID, archChan, queryChan, segMetricsChan, hostname)
+	err = backgroundStorage.launchArchiveWriters(ctxI, cfg.ArchiverConfig, queryChan, sessChan, segMetricsChan, cfg.ArchiverConfig.MaxFileSize)
 	if err != nil {
 		return err
 	}
 	errG.Go(func() error {
-		err := backgroundStorage.AggStorage.ArchiveAggQuery(ctxI, queryChan, cfg.ClusterID, hostname)
-		l.Errorf("got %v in archive agg query", err)
-		return err
+		bgErr := backgroundStorage.AggStorage.ArchiveAggQuery(ctxI, queryChan, cfg.ClusterID, hostname)
+		l.Errorf("got %v in archive agg query", bgErr)
+		return bgErr
 	},
 	)
 	errG.Go(func() error {
-		err := backgroundStorage.SendSessionMetrics(ctxI, sessChan, cfg.SessionSendMetricInterval, cfg.ClusterID, hostname)
-		l.Errorf("got %v in send session metrics", err)
-		return err
+		bgErr := backgroundStorage.SendSessionMetrics(ctxI, sessChan, cfg.SessionSendMetricInterval, cfg.ClusterID, hostname)
+		l.Errorf("got %v in send session metrics", bgErr)
+		return bgErr
 	},
 	)
 	errG.Go(func() error {
-		err := backgroundStorage.RefreshSessions(ctxI, cfg.SessionRefreshInterval, cfg.ClearDeletedSessions)
-		l.Errorf("got %v refresh session and queries", err)
-		return err
+		bgErr := backgroundStorage.RefreshSessions(ctxI, cfg.SessionRefreshInterval, cfg.ClearDeletedSessions)
+		l.Errorf("got %v refresh session and queries", bgErr)
+		return bgErr
 	},
 	)
 	errG.Go(func() error {
-		err := backgroundStorage.RefreshQueries(ctxI, archChan, cfg.QueriesRefreshInterval, cfg.SegmentGetTimeoutSec, cfg.ClearDeletedSessions)
-		l.Errorf("got %v refresh session and queries", err)
-		return err
+		bgErr := backgroundStorage.RefreshQueries(ctxI, archChan, cfg.QueriesRefreshInterval, cfg.SegmentGetTimeoutSec, cfg.ClearDeletedSessions)
+		l.Errorf("got %v refresh session and queries", bgErr)
+		return bgErr
 	},
 	)
 	if cfg.ProcfsEnabled {
 		errG.Go(func() error {
-			err := backgroundStorage.RefreshProcfs(ctxI, cfg.ProcfsRefreshInterval, int(cfg.SegmentPullThreads), cfg.ListenPort, int(cfg.MaxMessageSize))
-			l.Errorf("got %v in RefreshProcfs", err)
-			return err
+			bgErr := backgroundStorage.RefreshProcfs(ctxI, cfg.ProcfsRefreshInterval, int(cfg.SegmentPullThreads), cfg.ListenPort, int(cfg.MaxMessageSize))
+			l.Errorf("got %v in RefreshProcfs", bgErr)
+			return bgErr
 		},
 		)
 	} else {

@@ -1,3 +1,19 @@
+// Licensed to the Apache Software Foundation (ASF) under one or more
+// contributor license agreements. See the NOTICE file distributed
+// with this work for additional information regarding copyright
+// ownership. The ASF licenses this file to You under the Apache
+// License, Version 2.0 (the "License"); you may not use this file
+// except in compliance with the License. You may obtain a copy of the
+// License at
+//
+//    http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or
+// implied. See the License for the specific language governing
+// permissions and limitations under the License.
+
 package storage
 
 import (
@@ -112,7 +128,6 @@ func NewConfiguredRunningQueriesStorage(cfg *config.Config) *RunningQueriesStora
 }
 
 func NewRunningQueriesStorage(opts ...Option) *RunningQueriesStorage {
-
 	const (
 		defaultMaximumStoredQueries = 50 * 1000
 		defaultFreePercent          = 20
@@ -175,15 +190,15 @@ func CheckQueryErrored(status int32) bool {
 	return status == int32(pbc.QueryStatus_QUERY_STATUS_CANCELED) || status == int32(pbc.QueryStatus_QUERY_STATUS_ERROR)
 }
 
-func setMetricsForEndedQuery(qKey *NodeKey, rQ *RunningQuery, status int32, StartTime *timestamppb.Timestamp, EndTime *timestamppb.Timestamp, SubmitTime *timestamppb.Timestamp) {
+func setMetricsForEndedQuery(qKey *NodeKey, rQ *RunningQuery, status int32, startTime *timestamppb.Timestamp, endTime *timestamppb.Timestamp, submitTime *timestamppb.Timestamp) {
 	// global read lock should be taken
 	qEnd := time.Now()
-	if EndTime != nil {
-		qEnd = EndTime.AsTime()
+	if endTime != nil {
+		qEnd = endTime.AsTime()
 	}
 	qStart := qEnd
-	if StartTime != nil {
-		qStart = StartTime.AsTime()
+	if startTime != nil {
+		qStart = startTime.AsTime()
 	}
 	if metrics.YagpccMetrics != nil {
 		metrics.YagpccMetrics.SliceLatencies.With(map[string]string{}).Observe(qEnd.Sub(qStart).Seconds())
@@ -196,16 +211,15 @@ func setMetricsForEndedQuery(qKey *NodeKey, rQ *RunningQuery, status int32, Star
 		rQ.Completed = true
 	}
 	rQ.QueryStatus = status
-	if StartTime != nil {
-		rQ.QueryStart = StartTime.AsTime()
+	if startTime != nil {
+		rQ.QueryStart = startTime.AsTime()
 	}
-	if EndTime != nil {
-		rQ.QueryEnd = EndTime.AsTime()
+	if endTime != nil {
+		rQ.QueryEnd = endTime.AsTime()
 	}
-	if SubmitTime != nil {
-		rQ.QuerySubmit = SubmitTime.AsTime()
+	if submitTime != nil {
+		rQ.QuerySubmit = submitTime.AsTime()
 	}
-
 }
 
 func (s *RunningQueriesStorage) deleteQuery(qKey QueryKey) {
@@ -244,7 +258,7 @@ func (s *RunningQueriesStorage) garbageCollect() {
 	s.stat.NumGC += 1
 }
 
-func (s *RunningQueriesStorage) newQuery(QKey *QueryKey, status int32, mQTimes MeasuredQueryTimes) *RunningQuery {
+func (s *RunningQueriesStorage) newQuery(qKey *QueryKey, status int32, mQTimes MeasuredQueryTimes) *RunningQuery {
 	// should be called under exclusive lock
 	if len(s.runningQueries) >= s.maximumStoredQueries {
 		s.garbageCollect()
@@ -271,7 +285,7 @@ func (s *RunningQueriesStorage) newQuery(QKey *QueryKey, status int32, mQTimes M
 	if mQTimes.QuerySubmit != nil {
 		rQ.QuerySubmit = utils.GetTimeForTimestamp(mQTimes.QuerySubmit)
 	}
-	s.runningQueries[*QKey] = rQ
+	s.runningQueries[*qKey] = rQ
 	s.stat.QueriesCount += 1
 	if metrics.YagpccMetrics != nil {
 		metrics.YagpccMetrics.NewQueries.Inc()

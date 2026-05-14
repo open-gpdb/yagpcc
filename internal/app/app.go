@@ -1,3 +1,19 @@
+// Licensed to the Apache Software Foundation (ASF) under one or more
+// contributor license agreements. See the NOTICE file distributed
+// with this work for additional information regarding copyright
+// ownership. The ASF licenses this file to You under the Apache
+// License, Version 2.0 (the "License"); you may not use this file
+// except in compliance with the License. You may obtain a copy of the
+// License at
+//
+//    http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or
+// implied. See the License for the specific language governing
+// permissions and limitations under the License.
+
 package app
 
 import (
@@ -146,14 +162,12 @@ func requestDurationBuckets() []float64 {
 		(20 * time.Second).Seconds(),
 		(30 * time.Second).Seconds(),
 	}
-
 }
 
 func requestHistogramLabels() []string {
 	return []string{
 		"method",
 	}
-
 }
 
 func requestQueryBuckets() []float64 {
@@ -181,7 +195,6 @@ func requestQueryBuckets() []float64 {
 
 func requestQueryLabels() []string {
 	return []string{}
-
 }
 
 func requestQueryStatuses() []string {
@@ -207,7 +220,6 @@ func (app *AgentApp) unlockFile() {
 }
 
 func InitMetrics() {
-
 	metrics.YagpccMetrics = &metrics.YagpccMetricsType{
 		NewSessions:          promauto.NewCounter(prometheus.CounterOpts{Name: "new_sessions"}),
 		NewQueries:           promauto.NewCounter(prometheus.CounterOpts{Name: "new_queries"}),
@@ -238,7 +250,6 @@ func InitMetrics() {
 		QueriesInFlight:         promauto.NewGauge(prometheus.GaugeOpts{Name: "queries_in_flight"}),
 		ExecutingQueryLatencies: metrics.NewTimeGaugeHistogram("executing_query", "executing queries latencies", prometheus.DefaultRegisterer, requestQueryBuckets()),
 	}
-
 }
 
 func NewApp(
@@ -274,7 +285,6 @@ func NewApp(
 
 		pbm.RegisterGetGPInfoServer(s, getMasterInfo)
 		pbm.RegisterActionServiceServer(s, actionInfo)
-
 	}
 	// Register reflection service on gRPC server.
 	reflection.Register(s)
@@ -447,47 +457,47 @@ func Run(ctx context.Context, configFile string) error {
 	defer agentApp.Shutdown()
 
 	if agentApp.Config.ListenPort > 0 {
-		lisTCP, err := net.Listen("tcp", fmt.Sprintf(":%d", agentApp.Config.ListenPort))
+		lisTCP, lisErr := net.Listen("tcp", fmt.Sprintf(":%d", agentApp.Config.ListenPort))
+		if lisErr != nil {
+			logger.Fatalf("failed to listen tcp %v", lisErr)
+			return lisErr
+		}
 		defer func() {
 			_ = lisTCP.Close()
 		}()
-		if err != nil {
-			logger.Fatalf("failed to listen tcp %v", err)
-			return err
-		}
 		go func() {
 			logger.Infof("grpc ran on tcp protocol %v", agentApp.Config.ListenPort)
-			err := agentApp.GrpcServer.Serve(lisTCP)
-			if err != nil {
-				logger.Fatalf("failed to serve GRPC on tcp - got %v", err)
+			serveErr := agentApp.GrpcServer.Serve(lisTCP)
+			if serveErr != nil {
+				logger.Fatalf("failed to serve GRPC on tcp - got %v", serveErr)
 			}
 		}()
 	}
 
 	if agentApp.Config.SocketFile != "" {
-		lisUDS, err := OpenUDS(agentApp.Config.SocketFile, logger)
+		lisUDS, udsErr := OpenUDS(agentApp.Config.SocketFile, logger)
+		if udsErr != nil {
+			logger.Fatalf("failed to listen UDS GRPC %v", udsErr)
+			return udsErr
+		}
 		defer func() {
 			_ = lisUDS.Close()
 		}()
-		if err != nil {
-			logger.Fatalf("failed to listen UDS GRPC %v", err)
-			return err
-		}
 		go func() {
 			logger.Infof("grpc ran on unix socket  protocol %v", agentApp.Config.SocketFile)
-			err := agentApp.GrpcServer.Serve(lisUDS)
-			if err != nil {
-				logger.Fatalf("failed to serve GRPC on UDS - got %v", err)
+			serveErr := agentApp.GrpcServer.Serve(lisUDS)
+			if serveErr != nil {
+				logger.Fatalf("failed to serve GRPC on UDS - got %v", serveErr)
 			}
 		}()
 	}
 
 	if agentApp.Config.UDSFile != "" {
 		// todo: MDB-38186
-		lisUDSYa, err := OpenUDS(agentApp.Config.UDSFile, logger)
-		if err != nil {
-			logger.Fatalf("failed to listen UDS Yagpcc %v", err)
-			return err
+		lisUDSYa, udsYaErr := OpenUDS(agentApp.Config.UDSFile, logger)
+		if udsYaErr != nil {
+			logger.Fatalf("failed to listen UDS Yagpcc %v", udsYaErr)
+			return udsYaErr
 		}
 		defer func() {
 			_ = lisUDSYa.Close()
@@ -506,15 +516,15 @@ func Run(ctx context.Context, configFile string) error {
 				case <-ctx.Done():
 					return
 				default:
-					connection, err := lisUDSYa.Accept()
-					if err != nil {
-						logger.Errorf("error accepting: %v", err.Error())
+					connection, acceptErr := lisUDSYa.Accept()
+					if acceptErr != nil {
+						logger.Errorf("error accepting: %v", acceptErr.Error())
 						continue
 					}
 					go func() {
-						err := clientProcessor.Process(ctx, connection)
-						if err != nil {
-							logger.Error(err.Error())
+						processErr := clientProcessor.Process(ctx, connection)
+						if processErr != nil {
+							logger.Error(processErr.Error())
 						}
 					}()
 				}
@@ -523,21 +533,21 @@ func Run(ctx context.Context, configFile string) error {
 	}
 
 	if cfg.Role == "master" {
-		err := master.InitConnection(ctx, logger, cfg, true)
-		if err != nil {
-			logger.Fatal(err.Error())
-			return err
+		initErr := master.InitConnection(ctx, logger, cfg, true)
+		if initErr != nil {
+			logger.Fatal(initErr.Error())
+			return initErr
 		}
-		modernStatActivity, err := gp.UsesModernStatActivity(ctx)
-		if err != nil {
-			logger.Fatal(err.Error())
-			return err
+		modernStatActivity, modErr := gp.UsesModernStatActivity(ctx)
+		if modErr != nil {
+			logger.Fatal(modErr.Error())
+			return modErr
 		}
 		if modernStatActivity {
-			err = statActivityLister.SetModernSessionLister(ctx)
-			if err != nil {
-				logger.Fatal(err.Error())
-				return err
+			setErr := statActivityLister.SetModernSessionLister(ctx)
+			if setErr != nil {
+				logger.Fatal(setErr.Error())
+				return setErr
 			}
 		}
 	}
@@ -553,10 +563,10 @@ func Run(ctx context.Context, configFile string) error {
 				return err
 			}
 			// check if we could connect to GP
-			err := master.InitConnection(ctx, logger, cfg, false)
-			if err != nil {
-				logger.Fatal(err.Error())
-				return err
+			connErr := master.InitConnection(ctx, logger, cfg, false)
+			if connErr != nil {
+				logger.Fatal(connErr.Error())
+				return connErr
 			}
 		}
 
@@ -567,6 +577,5 @@ func Run(ctx context.Context, configFile string) error {
 			logger.Info("All Ok, I'm alive")
 			time.Sleep(time.Second * 1)
 		}
-
 	}
 }
