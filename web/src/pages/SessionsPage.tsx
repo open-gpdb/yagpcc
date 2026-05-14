@@ -176,7 +176,7 @@ export default function SessionsPage() {
               { value: "SESSION_STATUS_IDLE", label: "Idle" },
               { value: "SESSION_STATUS_IDLE_TRANSACTION", label: "Idle in Transaction" },
               {
-                value: "IDLE IN TRANSACTION (ABORTED)",
+                value: "SESSION_STATUS_IDLE_TRANSACTION_ABORTED",
                 label: "Idle in Txn (Aborted)",
               },
             ]}

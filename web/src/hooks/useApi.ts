@@ -38,9 +38,6 @@ export function useApi<T>(
 
   useEffect(() => {
     refresh();
-    return () => {
-      requestIdRef.current += 1;
-    };
   }, [refresh]);
 
   return { data, loading, error, refresh };

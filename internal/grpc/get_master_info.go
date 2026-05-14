@@ -100,6 +100,10 @@ func FilterOutSession(filters []*pbm.SessionFilter, sessionState *pbc.SessionSta
 				if strings.EqualFold(sessionState.SessionInfo.State, "IDLE IN TRANSACTION") {
 					sortMap[pbm.SessionFilterEnum_SESSION_FILTER_STATE] = true
 				}
+			case "SESSION_STATUS_IDLE_TRANSACTION_ABORTED":
+				if strings.EqualFold(sessionState.SessionInfo.State, "IDLE IN TRANSACTION (ABORTED)") {
+					sortMap[pbm.SessionFilterEnum_SESSION_FILTER_STATE] = true
+				}
 			case "SESSION_STATUS_WAITING":
 				if strings.EqualFold(sessionState.SessionInfo.State, "WAITING") {
 					sortMap[pbm.SessionFilterEnum_SESSION_FILTER_STATE] = true
