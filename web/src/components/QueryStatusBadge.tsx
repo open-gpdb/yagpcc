@@ -1,10 +1,10 @@
 import { Tag } from "antd";
 
 const statusColors: Record<string, string> = {
-  running: "processing",
-  finished: "success",
+  start: "processing",
+  done: "success",
   error: "error",
-  cancelled: "warning",
+  canceled: "warning",
   idle: "default",
 };
 
