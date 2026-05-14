@@ -406,7 +406,7 @@ func (s *GetMasterInfoServer) GetGPExtensions(ctx context.Context, in *pbm.GetGP
 		Databases: make([]*pbm.DatabaseExtensionsInfo, 0),
 	}
 
-	appendDatabase := func(databaseName string, dbExtensions gp.DatabaseExtensions) {
+	addDatabaseToResponse := func(databaseName string, dbExtensions gp.DatabaseExtensions) {
 		dbInfo := &pbm.DatabaseExtensionsInfo{
 			DatabaseName: databaseName,
 			Error:        dbExtensions.Error,
@@ -427,11 +427,16 @@ func (s *GetMasterInfoServer) GetGPExtensions(ctx context.Context, in *pbm.GetGP
 	}
 
 	if in.GetDatabaseName() == "" {
-		for databaseName, dbExtensions := range allExtensions {
-			appendDatabase(databaseName, dbExtensions)
+		databaseNames := make([]string, 0, len(allExtensions))
+		for databaseName := range allExtensions {
+			databaseNames = append(databaseNames, databaseName)
+		}
+		sort.Strings(databaseNames)
+		for _, databaseName := range databaseNames {
+			addDatabaseToResponse(databaseName, allExtensions[databaseName])
 		}
 	} else if dbExtensions, exists := allExtensions[in.GetDatabaseName()]; exists {
-		appendDatabase(in.GetDatabaseName(), dbExtensions)
+		addDatabaseToResponse(in.GetDatabaseName(), dbExtensions)
 	}
 
 	s.logger.Debugf("Get extensions took %v", time.Since(start))
