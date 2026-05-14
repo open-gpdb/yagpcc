@@ -52,9 +52,12 @@ func spaHandler() http.Handler {
 			path = "index.html"
 		}
 
-		if _, err := sub.Open(path); err != nil {
+		f, err := sub.Open(path)
+		if err != nil {
 			// File not found — serve index.html for SPA routing.
 			r.URL.Path = "/"
+		} else {
+			_ = f.Close()
 		}
 
 		fileServer.ServeHTTP(w, r)
