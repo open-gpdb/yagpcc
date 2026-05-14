@@ -590,6 +590,60 @@ extensions_cache_ttl_sec: 900   # default
 
 ---
 
+## JSON HTTP API (Web UI)
+
+The JSON HTTP API serves the same data as the CSV and gRPC APIs but returns JSON responses,
+designed for consumption by the browser-based web UI. It is served on the port configured by
+`ui_port` (disabled by default, set to `1441` to enable).
+
+All responses use `Content-Type: application/json; charset=utf-8`. Protobuf messages are
+serialized using `protojson` with camelCase field names and zero-value fields included.
+
+### Read Endpoints
+
+| Method | Path | Description |
+|--------|------|-------------|
+| `GET` | `/api/sessions` | List sessions (same query params as CSV: `show_system`, `show_query_type`, `hide_empty_queries`, `page_size`, `page_token`, `sort`, `filter_*`) |
+| `GET` | `/api/session/{sess_id}` | Get a single session by session ID |
+| `GET` | `/api/queries` | List queries (query params: `page_size`, `page_token`, `sort`, `filter_*`) |
+| `GET` | `/api/query/{ssid}/{ccnt}` | Get a single query by SSID and CCNT |
+| `GET` | `/api/stats/sessions` | Get session state statistics (counts by state) |
+| `GET` | `/api/extensions` | List extensions (optional `database_name` param) |
+| `GET` | `/api/databases` | List available databases |
+
+### Action Endpoints
+
+| Method | Path | Request Body | Description |
+|--------|------|-------------|-------------|
+| `POST` | `/api/action/terminate-session` | `{"sess_id": 123, "tm_id": 0}` | Terminate a session |
+| `POST` | `/api/action/terminate-query` | `{"ssid": 42, "ccnt": 1}` | Terminate a query |
+| `POST` | `/api/action/terminate-sessions` | `{"database": "mydb", "username": "user", "query_id": 0}` | Bulk terminate sessions |
+| `POST` | `/api/action/move-query-rsg` | `{"ssid": 42, "ccnt": 1, "resource_group_name": "rg1"}` | Move query to resource group |
+
+### Static Assets
+
+All non-API paths serve the embedded SPA frontend. Unknown paths fall back to `index.html`
+for client-side routing.
+
+### Error Responses
+
+| HTTP Status | Condition |
+|-------------|-----------|
+| `400 Bad Request` | Missing or invalid required parameters / invalid JSON body. |
+| `405 Method Not Allowed` | Wrong HTTP method (e.g., POST to a GET endpoint). |
+| `500 Internal Server Error` | gRPC method returned an error. |
+| `503 Service Unavailable` | Master or action server not initialized. |
+
+### Configuration
+
+Set `ui_port` in `yagpcc.yaml` to enable the JSON HTTP / Web UI server. Set to `0` to disable (default).
+
+```yaml
+ui_port: 1441
+```
+
+---
+
 ## Proto file layout
 
 ```

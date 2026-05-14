@@ -40,6 +40,7 @@ import (
 	"github.com/open-gpdb/yagpcc/internal/gp/stat_activity"
 	"github.com/open-gpdb/yagpcc/internal/grpc"
 	"github.com/open-gpdb/yagpcc/internal/httpcsv"
+	"github.com/open-gpdb/yagpcc/internal/httpui"
 	"github.com/open-gpdb/yagpcc/internal/master"
 	"github.com/open-gpdb/yagpcc/internal/metrics"
 	"github.com/open-gpdb/yagpcc/internal/storage"
@@ -56,8 +57,10 @@ type AgentApp struct {
 	GrpcServer      *gogrpc.Server
 	SetQIServer     *grpc.SetQueryInfoServer
 	getMasterServer *grpc.GetMasterInfoServer
+	actionServer    *grpc.ActionsServer
 	pingHttp        *http.Server
 	csvHttp         *http.Server
+	uiHttp          *http.Server
 	filelock        *flock.Flock
 }
 
@@ -282,6 +285,7 @@ func NewApp(
 		getMasterInfo := grpc.NewGetMasterInfoServer(config.ClusterID, baseApp.L(), int(config.MaxOuterMessageSize), backgroundStorage, time.Duration(config.ExtensionsCacheTTL*float64(time.Second)))
 		agentApp.getMasterServer = getMasterInfo
 		actionInfo := &grpc.ActionsServer{ClusterID: config.ClusterID, Logger: baseApp.L(), Timeout: 5 * time.Minute, BackgroundStorage: backgroundStorage}
+		agentApp.actionServer = actionInfo
 
 		pbm.RegisterGetGPInfoServer(s, getMasterInfo)
 		pbm.RegisterActionServiceServer(s, actionInfo)
@@ -338,6 +342,18 @@ func (app *AgentApp) RunCSVHandler() error {
 	return nil
 }
 
+// RunUIHandler starts the HTTP server that serves the web UI and JSON API endpoints.
+func (app *AgentApp) RunUIHandler() error {
+	uiServer := httpui.NewServer(app.L(), app.getMasterServer, app.actionServer, app.Config.ClusterID)
+	uiAddr := fmt.Sprintf("[::1]:%d", app.Config.UIPort)
+	app.uiHttp = httpui.NewHTTPServer(uiAddr, uiServer)
+	if err := baseapp.Serve(app.uiHttp, app.L()); err != nil {
+		app.L().Errorf("got error in serve ui %v", err)
+		return err
+	}
+	return nil
+}
+
 func (app *AgentApp) RunDebugHandler() {
 	debugAddr := fmt.Sprintf("[::1]:%d", app.Config.DebugPort)
 	dws := NewDebugWebServer(debugAddr, app.L())
@@ -376,6 +392,12 @@ func (app *AgentApp) Shutdown() {
 	if app.csvHttp != nil {
 		if err := baseapp.ShutdownHttp(app.csvHttp, PING_TIMEOUT); err != nil {
 			app.L().Error("error while shutting down csv server", zap.Error(err))
+		}
+	}
+
+	if app.uiHttp != nil {
+		if err := baseapp.ShutdownHttp(app.uiHttp, PING_TIMEOUT); err != nil {
+			app.L().Error("error while shutting down ui server", zap.Error(err))
 		}
 	}
 
@@ -445,6 +467,17 @@ func Run(ctx context.Context, configFile string) error {
 			logger.Warn("csv handler is configured but master server is not initialized; skipping csv startup")
 		} else {
 			err = agentApp.RunCSVHandler()
+			if err != nil {
+				logger.Error(err.Error())
+				return err
+			}
+		}
+	}
+	if agentApp.Config.UIPort > 0 {
+		if agentApp.getMasterServer == nil {
+			logger.Warn("ui handler is configured but master server is not initialized; skipping ui startup")
+		} else {
+			err = agentApp.RunUIHandler()
 			if err != nil {
 				logger.Error(err.Error())
 				return err

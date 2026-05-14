@@ -148,6 +148,7 @@ The table below lists all network listeners that yagpcc opens, their default por
 Port 1432  — gRPC (all interfaces)     [master + segment]
 Port 1435  — HTTP ping                  [master only]
 Port 1440  — HTTP CSV export            [master only]
+Port 1441  — HTTP JSON / Web UI         [master only, disabled by default]
 UDS /tmp/yagpcc_agent.sock      — gRPC  [master + segment]
 UDS /tmp/yagpcc_agent_uds.sock  — UDS   [master + segment]
 ```

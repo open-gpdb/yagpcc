@@ -43,6 +43,16 @@ genbin:
 build: genproto genbin
 	go build -pgo=auto -o devbin/yagpcc $(GOFLAGS) ./cmd/server
 
+####################### UI BUILD #######################
+
+build-ui:
+	cd web && npm ci && npm run build
+	rm -rf internal/httpui/dist
+	cp -r web/dist internal/httpui/dist
+
+build-all: genproto build-ui genbin
+	go build -pgo=auto -o devbin/yagpcc $(GOFLAGS) ./cmd/server
+
 ####################### TESTS #######################
 
 unittest:

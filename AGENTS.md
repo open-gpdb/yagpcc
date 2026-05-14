@@ -130,6 +130,8 @@ make lint          # golangci-lint (requires golangci-lint installed)
 | `make unittest` | Run all Ginkgo tests with race detector |
 | `make fmt` | Format Go source files |
 | `make lint` | Run `golangci-lint` |
+| `make build-ui` | Build frontend (web/) and copy dist to `internal/httpui/dist` |
+| `make build-all` | `genproto` → `build-ui` → compile binary with embedded UI |
 | `make package` | Build a Debian package |
 
 ---
