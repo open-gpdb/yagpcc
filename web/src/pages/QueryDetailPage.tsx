@@ -118,6 +118,7 @@ export default function QueryDetailPage() {
                 <Descriptions.Item label="Resource Group">
                   {query.rsgName}
                 </Descriptions.Item>
+                <Descriptions.Item label="Host">{query.host}</Descriptions.Item>
                 <Descriptions.Item label="Session ID">
                   <Button
                     type="link"
@@ -132,6 +133,27 @@ export default function QueryDetailPage() {
                 </Descriptions.Item>
                 <Descriptions.Item label="Query Start">
                   {query.queryStart}
+                </Descriptions.Item>
+                <Descriptions.Item label="PID">
+                  {query.pid || ""}
+                </Descriptions.Item>
+                <Descriptions.Item label="Session State">
+                  {query.state}
+                </Descriptions.Item>
+                <Descriptions.Item label="Wait Event Type">
+                  {query.waitEventType}
+                </Descriptions.Item>
+                <Descriptions.Item label="Wait Event">
+                  {query.waitEvent}
+                </Descriptions.Item>
+                <Descriptions.Item label="Query Level">
+                  {query.runningQueryLevel}
+                </Descriptions.Item>
+                <Descriptions.Item label="Query Slices">
+                  {query.runningQuerySlices}
+                </Descriptions.Item>
+                <Descriptions.Item label="Query Error">
+                  {query.runningQueryError}
                 </Descriptions.Item>
               </Descriptions>
             </Card>

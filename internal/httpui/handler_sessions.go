@@ -21,10 +21,148 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
+	"time"
 
 	pbm "github.com/open-gpdb/yagpcc/api/proto/agent_master"
 	pbc "github.com/open-gpdb/yagpcc/api/proto/common"
+	"google.golang.org/protobuf/types/known/timestamppb"
 )
+
+// formatTimestamp safely formats a protobuf timestamp to RFC3339 string.
+// Returns empty string for nil or zero timestamps.
+func formatTimestamp(ts *timestamppb.Timestamp) string {
+	if ts == nil || (ts.Seconds == 0 && ts.Nanos == 0) {
+		return ""
+	}
+	return ts.AsTime().Format(time.RFC3339)
+}
+
+// convertQueryDesc converts a proto QueryDesc to a map matching the frontend
+// QueryDesc interface: { queryKey, queryText, queryStart, queryDurationSeconds, status }.
+func convertQueryDesc(qd *pbc.QueryDesc) map[string]interface{} {
+	if qd == nil {
+		return nil
+	}
+
+	queryStartStr := formatTimestamp(qd.GetQueryStart())
+
+	// Calculate duration from queryStart to now.
+	var queryDurationSeconds float64
+	if qd.QueryStart != nil && qd.QueryStart.Seconds > 0 {
+		queryDurationSeconds = float64(time.Now().Unix() - qd.QueryStart.Seconds)
+	}
+
+	result := map[string]interface{}{
+		"queryKey":             nil,
+		"queryText":            "",
+		"queryStart":           queryStartStr,
+		"queryDurationSeconds": queryDurationSeconds,
+		"status":               qd.GetQueryStatus().String(),
+	}
+	if qd.QueryKey != nil {
+		result["queryKey"] = map[string]interface{}{
+			"ssid": qd.QueryKey.GetSsid(),
+			"ccnt": qd.QueryKey.GetCcnt(),
+		}
+	}
+	if qd.QueryInfo != nil {
+		result["queryText"] = qd.QueryInfo.GetQueryText()
+	}
+	return result
+}
+
+// convertSessionState converts a proto SessionState to a flat map with all
+// available fields for the frontend.
+func convertSessionState(sessionState *pbc.SessionState) map[string]interface{} {
+	if sessionState == nil || sessionState.SessionInfo == nil {
+		return nil
+	}
+
+	si := sessionState.SessionInfo
+
+	// Calculate total running time.
+	var totalRunningTimeSeconds float64
+	if si.QueryStart != nil && si.QueryStart.Seconds > 0 {
+		totalRunningTimeSeconds = float64(time.Now().Unix() - si.QueryStart.Seconds)
+	}
+
+	// Convert queries stack.
+	queriesStack := make([]map[string]interface{}, 0)
+	for _, qd := range sessionState.GetRunningQueriesStack() {
+		if converted := convertQueryDesc(qd); converted != nil {
+			queriesStack = append(queriesStack, converted)
+		}
+	}
+
+	session := map[string]interface{}{
+		// SessionKey
+		"sessionKey": map[string]interface{}{
+			"sessId": fmt.Sprintf("%d", sessionState.SessionKey.GetSessId()),
+			"tmId":   fmt.Sprintf("%d", sessionState.SessionKey.GetTmId()),
+		},
+
+		// SessionState top-level fields
+		"collectTime":         formatTimestamp(sessionState.GetTime()),
+		"clusterId":           sessionState.GetClusterId(),
+		"host":                sessionState.GetHostname(),
+		"runningQueryLevel":   sessionState.GetRunningQueryLevel(),
+		"blockedSessionLevel": sessionState.GetBlockedSessionLevel(),
+		"runningQueryError":   sessionState.GetRunningQueryError(),
+		"runningQuerySlices":  sessionState.GetRunningQuerySlices(),
+
+		// SessionInfo fields
+		"pid":                     si.GetPid(),
+		"user":                    si.GetUser(),
+		"database":                si.GetDatabase(),
+		"applicationName":         si.GetApplicationName(),
+		"clientAddr":              si.GetClientAddr(),
+		"clientHostname":          si.GetClientHostname(),
+		"clientPort":              si.GetClientPort(),
+		"backendStart":            formatTimestamp(si.GetBackendStart()),
+		"xactStart":               formatTimestamp(si.GetXactStart()),
+		"queryStart":              formatTimestamp(si.GetQueryStart()),
+		"stateChange":             formatTimestamp(si.GetStateChange()),
+		"waitingReason":           si.GetWaitingReason(),
+		"waiting":                 si.GetWaiting(),
+		"state":                   si.GetState(),
+		"backendXid":              si.GetBackendXid(),
+		"backendXmin":             si.GetBackendXmin(),
+		"rsgId":                   si.GetRsgid(),
+		"rsgName":                 si.GetRsgname(),
+		"rsgQueueDuration":        si.GetRsgqueueduration(),
+		"blockedBySessId":         si.GetBlockedBySessId(),
+		"waitMode":                si.GetWaitMode(),
+		"lockedItem":              si.GetLockedItem(),
+		"lockedMode":              si.GetLockedMode(),
+		"waitEventType":           si.GetWaitEventType(),
+		"waitEvent":               si.GetWaitEvent(),
+		"totalRunningTimeSeconds": totalRunningTimeSeconds,
+
+		// Running query info
+		"runningQuery": nil,
+		"queries":      queriesStack,
+	}
+
+	// Running query key
+	if rq := sessionState.GetRunningQuery(); rq != nil {
+		session["runningQuery"] = map[string]interface{}{
+			"ssid": rq.GetSsid(),
+			"ccnt": rq.GetCcnt(),
+		}
+	}
+
+	// Running query status
+	session["runningQueryStatus"] = sessionState.GetRunningQueryStatus().String()
+
+	// Running query text (from RunningQueryInfo)
+	if rqi := sessionState.GetRunningQueryInfo(); rqi != nil {
+		session["runningQueryText"] = rqi.GetQueryText()
+	} else {
+		session["runningQueryText"] = ""
+	}
+
+	return session
+}
 
 // handleGetSessions handles GET /api/sessions
 //
@@ -86,7 +224,21 @@ func (s *Server) handleGetSessions(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	writeProtoJSON(w, http.StatusOK, resp)
+	// Convert to the format expected by the frontend.
+	sessions := make([]map[string]interface{}, 0, len(resp.SessionsState))
+	for _, sessionState := range resp.SessionsState {
+		if session := convertSessionState(sessionState); session != nil {
+			sessions = append(sessions, session)
+		}
+	}
+
+	response := map[string]interface{}{
+		"sessions":      sessions,
+		"nextPageToken": resp.GetNextPageToken(),
+		"totalCount":    fmt.Sprintf("%d", len(sessions)),
+	}
+
+	writeJSON(w, http.StatusOK, response)
 }
 
 // handleGetSession handles GET /api/session/{sess_id}
@@ -124,7 +276,17 @@ func (s *Server) handleGetSession(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	writeProtoJSON(w, http.StatusOK, resp)
+	session := convertSessionState(resp.GetSessionsState())
+	if session == nil {
+		writeJSON(w, http.StatusOK, map[string]interface{}{
+			"session": nil,
+		})
+		return
+	}
+
+	writeJSON(w, http.StatusOK, map[string]interface{}{
+		"session": session,
+	})
 }
 
 // parseSessionFilters parses filter query parameters.

@@ -46,7 +46,29 @@ func (s *Server) handleGetExtensions(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	writeProtoJSON(w, http.StatusOK, resp)
+	// Convert to the format expected by the frontend.
+	// Proto Extension has: name, owner, namespace, relocatable, version
+	// Frontend PgExtensionInfo expects: name, defaultVersion, installedVersion, comment
+	databases := make([]map[string]interface{}, 0, len(resp.GetDatabases()))
+	for _, db := range resp.GetDatabases() {
+		extensions := make([]map[string]interface{}, 0, len(db.GetExtensions()))
+		for _, ext := range db.GetExtensions() {
+			extensions = append(extensions, map[string]interface{}{
+				"name":             ext.GetName(),
+				"defaultVersion":   "",
+				"installedVersion": ext.GetVersion(),
+				"comment":          "",
+			})
+		}
+		databases = append(databases, map[string]interface{}{
+			"databaseName": db.GetDatabaseName(),
+			"extensions":   extensions,
+		})
+	}
+
+	writeJSON(w, http.StatusOK, map[string]interface{}{
+		"databases": databases,
+	})
 }
 
 // handleListDatabases handles GET /api/databases
@@ -68,5 +90,15 @@ func (s *Server) handleListDatabases(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	writeProtoJSON(w, http.StatusOK, resp)
+	// Convert to the format expected by the frontend.
+	// Proto ListDatabasesResponse has repeated DatabaseInfo (with name field).
+	// Frontend DatabasesResponse expects databases as string[].
+	names := make([]string, 0, len(resp.GetDatabases()))
+	for _, db := range resp.GetDatabases() {
+		names = append(names, db.GetName())
+	}
+
+	writeJSON(w, http.StatusOK, map[string]interface{}{
+		"databases": names,
+	})
 }

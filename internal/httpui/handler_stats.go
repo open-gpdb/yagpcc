@@ -42,5 +42,16 @@ func (s *Server) handleGetTotalSessionsStat(w http.ResponseWriter, r *http.Reque
 		return
 	}
 
-	writeProtoJSON(w, http.StatusOK, resp)
+	// Convert to the format expected by the frontend
+	stats := make([]map[string]interface{}, 0, len(resp.GetSessionsStat()))
+	for _, stat := range resp.GetSessionsStat() {
+		stats = append(stats, map[string]interface{}{
+			"state": stat.GetState(),
+			"count": stat.GetCount(),
+		})
+	}
+
+	writeJSON(w, http.StatusOK, map[string]interface{}{
+		"stats": stats,
+	})
 }

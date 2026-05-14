@@ -89,6 +89,8 @@ export default function SessionsPage() {
     {
       title: "Session ID",
       dataIndex: ["sessionKey", "sessId"],
+      fixed: "left" as const,
+      width: 110,
       render: (v: string, _record: SessionInfo) => (
         <Button
           type="link"
@@ -99,13 +101,15 @@ export default function SessionsPage() {
         </Button>
       ),
     },
-    { title: "User", dataIndex: "user", ellipsis: true },
-    { title: "Database", dataIndex: "database", ellipsis: true },
-    { title: "Host", dataIndex: "host", ellipsis: true },
-    { title: "App", dataIndex: "applicationName", ellipsis: true },
+    { title: "PID", dataIndex: "pid", width: 80 },
+    { title: "User", dataIndex: "user", width: 120, ellipsis: true },
+    { title: "Database", dataIndex: "database", width: 120, ellipsis: true },
+    { title: "Host", dataIndex: "host", width: 140, ellipsis: true },
+    { title: "App", dataIndex: "applicationName", width: 140, ellipsis: true },
     {
       title: "State",
       dataIndex: "state",
+      width: 120,
       render: (v: string) => <SessionStateBadge state={v ?? ""} />,
     },
     {
@@ -113,18 +117,70 @@ export default function SessionsPage() {
       dataIndex: "totalRunningTimeSeconds",
       render: (v: number) => (v ?? 0).toFixed(1),
       sorter: true,
+      width: 110,
+    },
+    { title: "Client Addr", dataIndex: "clientAddr", width: 130, ellipsis: true },
+    { title: "Client Host", dataIndex: "clientHostname", width: 140, ellipsis: true },
+    { title: "Client Port", dataIndex: "clientPort", width: 100 },
+    { title: "Wait Event Type", dataIndex: "waitEventType", width: 140, ellipsis: true },
+    { title: "Wait Event", dataIndex: "waitEvent", width: 140, ellipsis: true },
+    {
+      title: "Waiting",
+      dataIndex: "waiting",
+      width: 80,
+      render: (v: boolean) => (v ? "Yes" : "No"),
+    },
+    { title: "Waiting Reason", dataIndex: "waitingReason", width: 140, ellipsis: true },
+    { title: "RSG Name", dataIndex: "rsgName", width: 130, ellipsis: true },
+    { title: "RSG Queue Duration", dataIndex: "rsgQueueDuration", width: 150, ellipsis: true },
+    { title: "Backend Start", dataIndex: "backendStart", width: 180, ellipsis: true },
+    { title: "Xact Start", dataIndex: "xactStart", width: 180, ellipsis: true },
+    { title: "Query Start", dataIndex: "queryStart", width: 180, ellipsis: true },
+    { title: "State Change", dataIndex: "stateChange", width: 180, ellipsis: true },
+    { title: "Backend XID", dataIndex: "backendXid", width: 120, ellipsis: true },
+    { title: "Backend XMIN", dataIndex: "backendXmin", width: 120, ellipsis: true },
+    {
+      title: "Blocked By",
+      dataIndex: "blockedBySessId",
+      width: 110,
+      render: (v: number) => (v ? String(v) : ""),
+    },
+    { title: "Wait Mode", dataIndex: "waitMode", width: 120, ellipsis: true },
+    { title: "Locked Item", dataIndex: "lockedItem", width: 140, ellipsis: true },
+    { title: "Locked Mode", dataIndex: "lockedMode", width: 120, ellipsis: true },
+    {
+      title: "Running Query",
+      dataIndex: "runningQueryText",
+      width: 200,
+      ellipsis: true,
+      render: (v: string) => (
+        <span className="mono truncate" title={v}>
+          {v}
+        </span>
+      ),
+    },
+    { title: "Query Status", dataIndex: "runningQueryStatus", width: 120, ellipsis: true },
+    { title: "Query Level", dataIndex: "runningQueryLevel", width: 100 },
+    { title: "Query Slices", dataIndex: "runningQuerySlices", width: 110 },
+    { title: "Query Error", dataIndex: "runningQueryError", width: 160, ellipsis: true },
+    {
+      title: "Blocked Level",
+      dataIndex: "blockedSessionLevel",
       width: 120,
+      render: (v: number) => (v ? String(v) : ""),
     },
     {
       title: "Queries",
       dataIndex: "queries",
-      render: (v: unknown[]) => v?.length ?? 0,
       width: 80,
+      render: (v: unknown[]) => v?.length ?? 0,
     },
+    { title: "TM ID", dataIndex: ["sessionKey", "tmId"], width: 100 },
     {
       title: "Actions",
       key: "actions",
-      width: 100,
+      fixed: "right" as const,
+      width: 80,
       render: (_: unknown, record: SessionInfo) => (
         <Button
           danger
@@ -231,7 +287,7 @@ export default function SessionsPage() {
               }
             },
           }}
-          scroll={{ x: 1000 }}
+          scroll={{ x: 4000 }}
         />
       </Card>
     </div>

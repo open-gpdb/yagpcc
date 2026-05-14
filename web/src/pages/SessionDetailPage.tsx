@@ -101,6 +101,9 @@ export default function SessionDetailPage() {
                 <Descriptions.Item label="TM ID">
                   <span className="mono">{session.sessionKey?.tmId}</span>
                 </Descriptions.Item>
+                <Descriptions.Item label="PID">
+                  <span className="mono">{session.pid}</span>
+                </Descriptions.Item>
                 <Descriptions.Item label="State">
                   <SessionStateBadge state={session.state ?? ""} />
                 </Descriptions.Item>
@@ -110,17 +113,32 @@ export default function SessionDetailPage() {
                 <Descriptions.Item label="Application">
                   {session.applicationName}
                 </Descriptions.Item>
+                <Descriptions.Item label="Client Address">
+                  {session.clientAddr}
+                </Descriptions.Item>
                 <Descriptions.Item label="Client Hostname">
                   {session.clientHostname}
                 </Descriptions.Item>
+                <Descriptions.Item label="Client Port">
+                  {session.clientPort}
+                </Descriptions.Item>
                 <Descriptions.Item label="Resource Group">
                   {session.rsgName}
+                </Descriptions.Item>
+                <Descriptions.Item label="RSG Queue Duration">
+                  {session.rsgQueueDuration}
                 </Descriptions.Item>
                 <Descriptions.Item label="Wait Event Type">
                   {session.waitEventType}
                 </Descriptions.Item>
                 <Descriptions.Item label="Wait Event">
                   {session.waitEvent}
+                </Descriptions.Item>
+                <Descriptions.Item label="Waiting">
+                  {session.waiting ? "Yes" : "No"}
+                </Descriptions.Item>
+                <Descriptions.Item label="Waiting Reason">
+                  {session.waitingReason}
                 </Descriptions.Item>
                 <Descriptions.Item label="Running Time">
                   {(session.totalRunningTimeSeconds ?? 0).toFixed(1)}s
@@ -137,8 +155,69 @@ export default function SessionDetailPage() {
                 <Descriptions.Item label="State Change">
                   {session.stateChange}
                 </Descriptions.Item>
+                <Descriptions.Item label="Backend XID">
+                  {session.backendXid}
+                </Descriptions.Item>
+                <Descriptions.Item label="Backend XMIN">
+                  {session.backendXmin}
+                </Descriptions.Item>
+                <Descriptions.Item label="Blocked By Session">
+                  {session.blockedBySessId ? (
+                    <Button
+                      type="link"
+                      className="mono"
+                      onClick={() => navigate(`/session/${session.blockedBySessId}`)}
+                    >
+                      {session.blockedBySessId}
+                    </Button>
+                  ) : (
+                    ""
+                  )}
+                </Descriptions.Item>
+                <Descriptions.Item label="Wait Mode">
+                  {session.waitMode}
+                </Descriptions.Item>
+                <Descriptions.Item label="Locked Item">
+                  {session.lockedItem}
+                </Descriptions.Item>
+                <Descriptions.Item label="Locked Mode">
+                  {session.lockedMode}
+                </Descriptions.Item>
+                <Descriptions.Item label="Running Query Status">
+                  {session.runningQueryStatus}
+                </Descriptions.Item>
+                <Descriptions.Item label="Running Query Level">
+                  {session.runningQueryLevel}
+                </Descriptions.Item>
+                <Descriptions.Item label="Running Query Slices">
+                  {session.runningQuerySlices}
+                </Descriptions.Item>
+                <Descriptions.Item label="Running Query Error">
+                  {session.runningQueryError}
+                </Descriptions.Item>
+                <Descriptions.Item label="Blocked Session Level">
+                  {session.blockedSessionLevel || ""}
+                </Descriptions.Item>
               </Descriptions>
             </Card>
+
+            {session.runningQueryText && (
+              <Card title="Running Query Text" style={{ marginBottom: 16 }}>
+                <pre
+                  style={{
+                    background: "#f6f6f6",
+                    padding: 16,
+                    borderRadius: 6,
+                    overflow: "auto",
+                    maxHeight: 300,
+                    fontSize: 13,
+                    fontFamily: "'SF Mono', 'Fira Code', monospace",
+                  }}
+                >
+                  {session.runningQueryText}
+                </pre>
+              </Card>
+            )}
 
             <Card title={`Queries (${session.queries?.length ?? 0})`}>
               <Table
@@ -180,6 +259,11 @@ export default function SessionDetailPage() {
                     title: "Duration (s)",
                     dataIndex: "queryDurationSeconds",
                     render: (v: number) => (v ?? 0).toFixed(1),
+                  },
+                  {
+                    title: "Query Start",
+                    dataIndex: "queryStart",
+                    ellipsis: true,
                   },
                   {
                     title: "Actions",

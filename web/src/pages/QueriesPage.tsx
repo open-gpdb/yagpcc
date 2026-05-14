@@ -72,6 +72,7 @@ export default function QueriesPage() {
   const columns = [
     {
       title: "SSID/CCNT",
+      fixed: "left" as const,
       render: (_: unknown, r: QueryInfo) => (
         <Button
           type="link"
@@ -100,7 +101,7 @@ export default function QueriesPage() {
     {
       title: "Status",
       dataIndex: "status",
-      width: 100,
+      width: 120,
       render: (v: string) => <QueryStatusBadge status={v ?? ""} />,
     },
     {
@@ -112,10 +113,34 @@ export default function QueriesPage() {
         (a.queryDurationSeconds ?? 0) - (b.queryDurationSeconds ?? 0),
     },
     { title: "Resource Group", dataIndex: "rsgName", width: 140, ellipsis: true },
+    { title: "Host", dataIndex: "host", width: 140, ellipsis: true },
+    { title: "PID", dataIndex: "pid", width: 80 },
+    { title: "Session State", dataIndex: "state", width: 120, ellipsis: true },
+    { title: "Query Start", dataIndex: "queryStart", width: 180, ellipsis: true },
+    { title: "Wait Event Type", dataIndex: "waitEventType", width: 140, ellipsis: true },
+    { title: "Wait Event", dataIndex: "waitEvent", width: 140, ellipsis: true },
+    { title: "Query Level", dataIndex: "runningQueryLevel", width: 100 },
+    { title: "Query Slices", dataIndex: "runningQuerySlices", width: 110 },
+    { title: "Query Error", dataIndex: "runningQueryError", width: 160, ellipsis: true },
+    {
+      title: "Session ID",
+      dataIndex: ["sessionKey", "sessId"],
+      width: 110,
+      render: (v: string) => (
+        <Button
+          type="link"
+          className="mono"
+          onClick={() => navigate(`/session/${v}`)}
+        >
+          {v}
+        </Button>
+      ),
+    },
     {
       title: "Actions",
       key: "actions",
-      width: 100,
+      fixed: "right" as const,
+      width: 80,
       render: (_: unknown, r: QueryInfo) => (
         <Button
           danger
@@ -186,7 +211,7 @@ export default function QueriesPage() {
               }
             },
           }}
-          scroll={{ x: 1000 }}
+          scroll={{ x: 2400 }}
         />
       </Card>
     </div>

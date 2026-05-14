@@ -154,29 +154,60 @@ export function moveQueryToResourceGroup(
 }
 
 // ─── Response types ──────────────────────────────────────────────
-// These mirror the protojson output from the Go backend.
+// These mirror the JSON output from the Go backend handlers.
 
 export interface SessionKey {
-  sessId: string; // int64 as string in protojson
+  sessId: string; // int64 as string
   tmId: string;
 }
 
 export interface SessionInfo {
+  // Session identification
   sessionKey: SessionKey;
   host: string;
+  clusterId: string;
+  collectTime: string;
+
+  // pg_stat_activity fields
+  pid: number;
   user: string;
   database: string;
   applicationName: string;
+  clientAddr: string;
   clientHostname: string;
-  state: string;
-  rsgName: string;
-  waitEventType: string;
-  waitEvent: string;
+  clientPort: number;
   backendStart: string;
   xactStart: string;
   queryStart: string;
   stateChange: string;
+  waitingReason: string;
+  waiting: boolean;
+  state: string;
+  backendXid: string;
+  backendXmin: string;
+  rsgId: number;
+  rsgName: string;
+  rsgQueueDuration: string;
+  blockedBySessId: number;
+  waitMode: string;
+  lockedItem: string;
+  lockedMode: string;
+  waitEventType: string;
+  waitEvent: string;
+
+  // Computed fields
   totalRunningTimeSeconds: number;
+
+  // Running query info
+  runningQuery: QueryKey | null;
+  runningQueryStatus: string;
+  runningQueryText: string;
+  runningQueryLevel: number;
+  runningQuerySlices: number;
+  runningQueryError: string;
+  blockedSessionLevel: number;
+
+  // Nested queries
   queries: QueryDesc[];
 }
 
@@ -203,6 +234,14 @@ export interface QueryInfo {
   user: string;
   database: string;
   rsgName: string;
+  host: string;
+  pid: number;
+  state: string;
+  waitEventType: string;
+  waitEvent: string;
+  runningQueryLevel: number;
+  runningQuerySlices: number;
+  runningQueryError: string;
   metrics: GPMetrics | null;
 }
 
