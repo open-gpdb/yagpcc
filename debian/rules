@@ -3,7 +3,7 @@
 	dh $@
 
 override_dh_auto_build:
-	make build
+	make build-all
 
 override_dh_auto_test:
 
@@ -11,4 +11,3 @@ override_dh_auto_test:
 override_dh_auto_install:
 	mkdir -p $(PWD)/debian/build
 	cp $(PWD)/devbin/* $(PWD)/debian/build
-

@@ -1,4 +1,4 @@
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { Table, Card, Typography, Button, Space, Input, Modal, message } from "antd";
 import { ReloadOutlined, StopOutlined } from "@ant-design/icons";
@@ -22,18 +22,34 @@ export default function QueriesPage() {
   });
   const [filterUser, setFilterUser] = useState("");
   const [filterDatabase, setFilterDatabase] = useState("");
+  const [page, setPage] = useState(1);
+  const [pageTokens, setPageTokens] = useState<Record<number, string>>({ 1: "" });
+
+  const resetPagination = useCallback(() => {
+    setPage(1);
+    setPageTokens({ 1: "" });
+  }, []);
 
   const buildParams = useCallback((): GetQueriesParams => {
     const filters: Record<string, string> = {};
     if (filterUser) filters["filter_user"] = filterUser;
     if (filterDatabase) filters["filter_database"] = filterDatabase;
-    return { ...params, filters };
-  }, [params, filterUser, filterDatabase]);
+    return { ...params, pageToken: pageTokens[page] ?? "", filters };
+  }, [params, filterUser, filterDatabase, page, pageTokens]);
 
   const { data, loading, error, refresh } = useApi(
     () => getQueries(buildParams()),
-    [params, filterUser, filterDatabase],
+    [params, filterUser, filterDatabase, page, pageTokens],
   );
+
+  useEffect(() => {
+    const nextToken = data?.nextPageToken;
+    if (!nextToken) return;
+    setPageTokens((prev) => {
+      if (prev[page + 1] === nextToken) return prev;
+      return { ...prev, [page + 1]: nextToken };
+    });
+  }, [data?.nextPageToken, page]);
 
   const handleTerminate = (ssid: number, ccnt: number) => {
     Modal.confirm({
@@ -52,8 +68,6 @@ export default function QueriesPage() {
       },
     });
   };
-
-  void setParams; // used for future page_token navigation
 
   const columns = [
     {
@@ -125,13 +139,19 @@ export default function QueriesPage() {
           <Search
             placeholder="Filter by user"
             allowClear
-            onSearch={setFilterUser}
+            onSearch={(v) => {
+              setFilterUser(v);
+              resetPagination();
+            }}
             style={{ width: 180 }}
           />
           <Search
             placeholder="Filter by database"
             allowClear
-            onSearch={setFilterDatabase}
+            onSearch={(v) => {
+              setFilterDatabase(v);
+              resetPagination();
+            }}
             style={{ width: 180 }}
           />
           <Button icon={<ReloadOutlined />} onClick={refresh}>
@@ -148,10 +168,23 @@ export default function QueriesPage() {
           rowKey={(r) => `${r.queryKey?.ssid ?? 0}-${r.queryKey?.ccnt ?? 0}`}
           size="small"
           pagination={{
+            current: page,
             total: Number(data?.totalCount ?? 0),
             pageSize: params.pageSize ?? 50,
             showSizeChanger: true,
             showTotal: (total: number) => `${total} queries`,
+            onChange: (nextPage, nextPageSize) => {
+              if (nextPageSize !== (params.pageSize ?? 50)) {
+                setParams((p) => ({ ...p, pageSize: nextPageSize }));
+                resetPagination();
+                return;
+              }
+              if (nextPage === 1 || pageTokens[nextPage] !== undefined) {
+                setPage(nextPage);
+              } else {
+                message.info("Please move to pages sequentially.");
+              }
+            },
           }}
           scroll={{ x: 1000 }}
         />

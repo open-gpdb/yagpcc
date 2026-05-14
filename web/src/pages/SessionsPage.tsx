@@ -1,4 +1,4 @@
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   Table,
@@ -37,19 +37,35 @@ export default function SessionsPage() {
   const [filterUser, setFilterUser] = useState("");
   const [filterDatabase, setFilterDatabase] = useState("");
   const [filterState, setFilterState] = useState("");
+  const [page, setPage] = useState(1);
+  const [pageTokens, setPageTokens] = useState<Record<number, string>>({ 1: "" });
+
+  const resetPagination = useCallback(() => {
+    setPage(1);
+    setPageTokens({ 1: "" });
+  }, []);
 
   const buildParams = useCallback((): GetSessionsParams => {
     const filters: Record<string, string> = {};
     if (filterUser) filters["filter_user"] = filterUser;
     if (filterDatabase) filters["filter_database"] = filterDatabase;
     if (filterState) filters["filter_state"] = filterState;
-    return { ...params, filters };
-  }, [params, filterUser, filterDatabase, filterState]);
+    return { ...params, pageToken: pageTokens[page] ?? "", filters };
+  }, [params, filterUser, filterDatabase, filterState, page, pageTokens]);
 
   const { data, loading, error, refresh } = useApi(
     () => getSessions(buildParams()),
-    [params, filterUser, filterDatabase, filterState],
+    [params, filterUser, filterDatabase, filterState, page, pageTokens],
   );
+
+  useEffect(() => {
+    const nextToken = data?.nextPageToken;
+    if (!nextToken) return;
+    setPageTokens((prev) => {
+      if (prev[page + 1] === nextToken) return prev;
+      return { ...prev, [page + 1]: nextToken };
+    });
+  }, [data?.nextPageToken, page]);
 
   const handleTerminate = (sessId: string) => {
     Modal.confirm({
@@ -132,26 +148,35 @@ export default function SessionsPage() {
           <Search
             placeholder="Filter by user"
             allowClear
-            onSearch={setFilterUser}
+            onSearch={(v) => {
+              setFilterUser(v);
+              resetPagination();
+            }}
             style={{ width: 180 }}
           />
           <Search
             placeholder="Filter by database"
             allowClear
-            onSearch={setFilterDatabase}
+            onSearch={(v) => {
+              setFilterDatabase(v);
+              resetPagination();
+            }}
             style={{ width: 180 }}
           />
           <Select
             placeholder="Filter by state"
             allowClear
             style={{ width: 200 }}
-            onChange={(v) => setFilterState(v ?? "")}
+            onChange={(v) => {
+              setFilterState(v ?? "");
+              resetPagination();
+            }}
             options={[
               { value: "SESSION_STATUS_ACTIVE", label: "Active" },
               { value: "SESSION_STATUS_IDLE", label: "Idle" },
-              { value: "SESSION_STATUS_IDLE_IN_TRANSACTION", label: "Idle in Transaction" },
+              { value: "SESSION_STATUS_IDLE_TRANSACTION", label: "Idle in Transaction" },
               {
-                value: "SESSION_STATUS_IDLE_IN_TRANSACTION_ABORTED",
+                value: "IDLE IN TRANSACTION (ABORTED)",
                 label: "Idle in Txn (Aborted)",
               },
             ]}
@@ -160,13 +185,19 @@ export default function SessionsPage() {
             checkedChildren="System"
             unCheckedChildren="System"
             checked={params.showSystem}
-            onChange={(v) => setParams((p) => ({ ...p, showSystem: v }))}
+            onChange={(v) => {
+              setParams((p) => ({ ...p, showSystem: v }));
+              resetPagination();
+            }}
           />
           <Switch
             checkedChildren="Hide Empty"
             unCheckedChildren="Hide Empty"
             checked={params.hideEmptyQueries}
-            onChange={(v) => setParams((p) => ({ ...p, hideEmptyQueries: v }))}
+            onChange={(v) => {
+              setParams((p) => ({ ...p, hideEmptyQueries: v }));
+              resetPagination();
+            }}
           />
           <Button icon={<ReloadOutlined />} onClick={refresh}>
             Refresh
@@ -182,10 +213,23 @@ export default function SessionsPage() {
           rowKey={(r) => `${r.sessionKey?.sessId ?? ""}-${r.sessionKey?.tmId ?? ""}`}
           size="small"
           pagination={{
+            current: page,
             total: Number(data?.totalCount ?? 0),
             pageSize: params.pageSize ?? 50,
             showSizeChanger: true,
             showTotal: (total) => `${total} sessions`,
+            onChange: (nextPage, nextPageSize) => {
+              if (nextPageSize !== (params.pageSize ?? 50)) {
+                setParams((p) => ({ ...p, pageSize: nextPageSize }));
+                resetPagination();
+                return;
+              }
+              if (nextPage === 1 || pageTokens[nextPage] !== undefined) {
+                setPage(nextPage);
+              } else {
+                message.info("Please move to pages sequentially.");
+              }
+            },
           }}
           scroll={{ x: 1000 }}
         />
