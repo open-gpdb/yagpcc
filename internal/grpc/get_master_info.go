@@ -395,11 +395,6 @@ func (s *GetMasterInfoServer) GetGPExtensions(ctx context.Context, in *pbm.GetGP
 	s.logger.Debugf("got get extensions request")
 	start := time.Now()
 
-	// database_name is required
-	if in.GetDatabaseName() == "" {
-		return nil, fmt.Errorf("database_name is required")
-	}
-
 	// Get extensions data from all databases
 	allExtensions, err := gp.GetAllExtensions(ctx, s.extensionsCacheTTL)
 	if err != nil {
@@ -411,27 +406,32 @@ func (s *GetMasterInfoServer) GetGPExtensions(ctx context.Context, in *pbm.GetGP
 		Databases: make([]*pbm.DatabaseExtensionsInfo, 0),
 	}
 
-	// Include only the requested database
-	if dbExtensions, exists := allExtensions[in.GetDatabaseName()]; exists {
+	appendDatabase := func(databaseName string, dbExtensions gp.DatabaseExtensions) {
 		dbInfo := &pbm.DatabaseExtensionsInfo{
-			DatabaseName: in.GetDatabaseName(),
+			DatabaseName: databaseName,
 			Error:        dbExtensions.Error,
 		}
 
-		// Convert extensions
 		extensions := make([]*pbm.Extension, 0, len(dbExtensions.Extensions))
 		for _, ext := range dbExtensions.Extensions {
-			extInfo := &pbm.Extension{
+			extensions = append(extensions, &pbm.Extension{
 				Name:        ext.ExtName,
 				Owner:       ext.ExtOwner,
 				Namespace:   ext.ExtNamespace,
 				Relocatable: ext.ExtRelocatable,
 				Version:     ext.ExtVersion,
-			}
-			extensions = append(extensions, extInfo)
+			})
 		}
 		dbInfo.Extensions = extensions
 		response.Databases = append(response.Databases, dbInfo)
+	}
+
+	if in.GetDatabaseName() == "" {
+		for databaseName, dbExtensions := range allExtensions {
+			appendDatabase(databaseName, dbExtensions)
+		}
+	} else if dbExtensions, exists := allExtensions[in.GetDatabaseName()]; exists {
+		appendDatabase(in.GetDatabaseName(), dbExtensions)
 	}
 
 	s.logger.Debugf("Get extensions took %v", time.Since(start))
