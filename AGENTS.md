@@ -73,6 +73,7 @@ go build -o devbin/yagpcc ./cmd/server
 | Tool | Install hint |
 |------|-------------|
 | Go 1.25+ | <https://go.dev/dl/> |
+| Node.js 18+ | <https://nodejs.org/> or `nvm install 18` (required for `make build-ui` / `make build-all`) |
 | `buf` CLI | `brew install bufbuild/buf/buf` or <https://buf.build/docs/installation> |
 | `protoc-gen-go` | installed automatically by `make genproto` |
 | `protoc-gen-go-grpc` | installed automatically by `make genproto` |
@@ -130,6 +131,7 @@ make lint          # golangci-lint (requires golangci-lint installed)
 | `make unittest` | Run all Ginkgo tests with race detector |
 | `make fmt` | Format Go source files |
 | `make lint` | Run `golangci-lint` |
+| `make check-node` | Verify Node.js ≥ 18 is installed (runs automatically before `build-ui`) |
 | `make build-ui` | Build frontend (web/) and copy dist to `internal/httpui/dist` |
 | `make build-all` | `genproto` → `build-ui` → compile binary with embedded UI |
 | `make package` | Build a Debian package |
