@@ -37,13 +37,13 @@ func TestGetPidProcInfo_CurrentProcess(t *testing.T) {
 	assert.NotEmpty(t, info.Cmdline)
 
 	require.NotNil(t, info.ProcStat)
-	assert.Equal(t, int64(pid), info.ProcStat.Pid)
+	assert.Equal(t, pid, info.ProcStat.Pid)
 	assert.NotEmpty(t, info.ProcStat.Comm)
 	assert.NotEmpty(t, info.ProcStat.State)
 	assert.Greater(t, info.ProcStat.NumThreads, int32(0))
 
 	require.NotNil(t, info.ProcStatus)
-	assert.Equal(t, int64(pid), info.ProcStatus.Pid)
+	assert.Equal(t, pid, info.ProcStatus.Pid)
 	assert.NotEmpty(t, info.ProcStatus.Name)
 	assert.Greater(t, info.ProcStatus.VmSize, int64(0))
 	assert.Greater(t, info.ProcStatus.VmRss, int64(0))
