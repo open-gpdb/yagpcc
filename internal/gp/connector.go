@@ -114,6 +114,10 @@ func GetAliveConnection(ctx context.Context, log *zap.SugaredLogger, pgconfig *c
 		_, err = newDB.ExecContext(ctxTimeoutOps, "set session gp_resource_group_bypass = on")
 		if err != nil {
 			ctxTimeoutCancel()
+			errClose := newDB.Close()
+			if errClose != nil {
+				log.Debugf("cannot close connection with error %v", errClose)
+			}
 			log.Warnf("error setting up bypass option for new connection: %v", err)
 			continue
 		}
