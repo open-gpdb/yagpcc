@@ -18,6 +18,7 @@ package grpc_test
 
 import (
 	"context"
+	"slices"
 	"testing"
 	"time"
 
@@ -88,6 +89,61 @@ func TestFilterOut(t *testing.T) {
 	assert.Equal(t, filter, false)
 	filter = grpc.FilterOutSession(filter3, sessionState2)
 	assert.Equal(t, filter, false)
+}
+
+func TestGetGPExtensionsWithoutDatabaseName(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	sessionMocker := NewMockStatActivityLister(ctrl)
+	clientSet, cleanup := setupGRPCClientSet(t, sessionMocker)
+	defer cleanup()
+
+	oldCachedItem, hadCachedItem := gp.CachedItems[gp.ExtensionsConfig]
+	gp.CachedItems[gp.ExtensionsConfig] = &gp.CacheItem{
+		ItemValue: gp.AllDatabaseExtensions{
+			"db1": {
+				Extensions: []gp.PgExtension{
+					{
+						ExtName:        "ext1",
+						ExtOwner:       "owner1",
+						ExtNamespace:   "public",
+						ExtRelocatable: true,
+						ExtVersion:     "1.0",
+					},
+				},
+			},
+			"db2": {
+				Extensions: []gp.PgExtension{
+					{
+						ExtName:        "ext2",
+						ExtOwner:       "owner2",
+						ExtNamespace:   "public",
+						ExtRelocatable: false,
+						ExtVersion:     "2.0",
+					},
+				},
+			},
+		},
+		Status:      gp.CacheOk,
+		RefreshDate: time.Now(),
+	}
+	t.Cleanup(func() {
+		if hadCachedItem {
+			gp.CachedItems[gp.ExtensionsConfig] = oldCachedItem
+		} else {
+			delete(gp.CachedItems, gp.ExtensionsConfig)
+		}
+	})
+
+	response, err := clientSet.GetGetGPInfoClient().GetGPExtensions(context.Background(), &pbm.GetGPExtensionsReq{})
+	require.NoError(t, err)
+	require.Len(t, response.Databases, 2)
+
+	databaseNames := make([]string, 0, len(response.Databases))
+	for _, db := range response.Databases {
+		databaseNames = append(databaseNames, db.DatabaseName)
+	}
+	slices.Sort(databaseNames)
+	assert.Equal(t, []string{"db1", "db2"}, databaseNames)
 }
 
 func TestMasterMethods(t *testing.T) {

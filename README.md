@@ -8,6 +8,7 @@
 - Aggregates it across Master and Segment hosts.
 - Exposes it over gRPC for real-time and historical use.
 - Provides an HTTP CSV export API mirroring the gRPC GetGPInfo service for easy scripting and spreadsheet integration.
+- **Web UI** — a browser-based Command Center for monitoring sessions, queries, cluster health, and managing resources (terminate sessions/queries, move queries between resource groups).
 
 ## Documentation
 
@@ -21,16 +22,30 @@
 
 ## Building
 
-**Prerequisites:** 
+**Prerequisites:**
 - Go 1.25+ (see `go.mod`).
 - protoc compiler (see https://protobuf.dev/installation/ `apt install -y protobuf-compiler`)
 - protoc-gen-go, use https://protobuf.dev/reference/go/go-generated/ `go install google.golang.org/protobuf/cmd/protoc-gen-go@latest`
 - protoc-gen-go-grpc, use `go install google.golang.org/grpc/cmd/protoc-gen-go-grpc@latest`
+- Node.js 18+ and npm (only needed for building the web UI)
 
 Build the binary (generates protos and outputs to `devbin/yagpcc`):
 
 ```bash
 make build
+```
+
+Build with the web UI embedded:
+
+```bash
+make build-all
+```
+
+Or build the UI separately and then the Go binary:
+
+```bash
+make build-ui    # builds web/ → copies dist to internal/httpui/dist
+make build       # compiles Go binary with embedded UI assets
 ```
 
 Or build without regenerating protos:
@@ -90,6 +105,16 @@ app:
 ```
 
 Adjust `listen_port`, logging, and other options as needed (see `internal/config/config.go` for full options).
+
+### Web UI
+
+To enable the web UI, add `ui_port` to the **master** config:
+
+```yaml
+ui_port: 1441
+```
+
+The UI is disabled by default (`ui_port: 0`). When enabled, the web UI is available at `http://[::1]:1441/`.
 
 ## Running
 

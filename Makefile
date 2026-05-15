@@ -43,6 +43,30 @@ genbin:
 build: genproto genbin
 	go build -pgo=auto -o devbin/yagpcc $(GOFLAGS) ./cmd/server
 
+####################### UI BUILD #######################
+
+MIN_NODE_VERSION := 18
+
+check-node:
+	@NODE_VER=$$(node -v 2>/dev/null | sed 's/^v//' | cut -d. -f1); \
+	if [ -z "$$NODE_VER" ]; then \
+		echo "ERROR: Node.js is not installed. Node.js >= $(MIN_NODE_VERSION) is required for building the UI."; \
+		echo "Install it from https://nodejs.org/ or via nvm: nvm install $(MIN_NODE_VERSION)"; \
+		exit 1; \
+	elif [ "$$NODE_VER" -lt $(MIN_NODE_VERSION) ]; then \
+		echo "ERROR: Node.js >= $(MIN_NODE_VERSION) is required, but found $$(node -v)."; \
+		echo "Please upgrade Node.js. If using nvm: nvm install $(MIN_NODE_VERSION) && nvm use $(MIN_NODE_VERSION)"; \
+		exit 1; \
+	fi
+
+build-ui: check-node
+	cd web && npm ci && npm run build
+	rm -rf internal/httpui/dist
+	cp -r web/dist internal/httpui/dist
+
+build-all: genproto build-ui genbin
+	go build -pgo=auto -o devbin/yagpcc $(GOFLAGS) ./cmd/server
+
 ####################### TESTS #######################
 
 unittest:

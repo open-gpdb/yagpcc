@@ -44,3 +44,6 @@ debian
 
 # Test artifacts
 *.test
+
+# Frontend sources and package manifests are governed by project-level ASF license docs.
+web/**

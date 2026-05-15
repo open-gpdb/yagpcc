@@ -96,8 +96,12 @@ func FilterOutSession(filters []*pbm.SessionFilter, sessionState *pbc.SessionSta
 				if strings.EqualFold(sessionState.SessionInfo.State, "ACTIVE") {
 					sortMap[pbm.SessionFilterEnum_SESSION_FILTER_STATE] = true
 				}
-			case "SESSION_STATUS_IDLE_TRANSACTION":
+			case "SESSION_STATUS_IDLE_TRANSACTION", "SESSION_STATUS_IDLE_IN_TRANSACTION":
 				if strings.EqualFold(sessionState.SessionInfo.State, "IDLE IN TRANSACTION") {
+					sortMap[pbm.SessionFilterEnum_SESSION_FILTER_STATE] = true
+				}
+			case "SESSION_STATUS_IDLE_TRANSACTION_ABORTED", "SESSION_STATUS_IDLE_IN_TRANSACTION_ABORTED":
+				if strings.EqualFold(sessionState.SessionInfo.State, "IDLE IN TRANSACTION (ABORTED)") {
 					sortMap[pbm.SessionFilterEnum_SESSION_FILTER_STATE] = true
 				}
 			case "SESSION_STATUS_WAITING":
@@ -395,11 +399,6 @@ func (s *GetMasterInfoServer) GetGPExtensions(ctx context.Context, in *pbm.GetGP
 	s.logger.Debugf("got get extensions request")
 	start := time.Now()
 
-	// database_name is required
-	if in.GetDatabaseName() == "" {
-		return nil, fmt.Errorf("database_name is required")
-	}
-
 	// Get extensions data from all databases
 	allExtensions, err := gp.GetAllExtensions(ctx, s.extensionsCacheTTL)
 	if err != nil {
@@ -411,27 +410,37 @@ func (s *GetMasterInfoServer) GetGPExtensions(ctx context.Context, in *pbm.GetGP
 		Databases: make([]*pbm.DatabaseExtensionsInfo, 0),
 	}
 
-	// Include only the requested database
-	if dbExtensions, exists := allExtensions[in.GetDatabaseName()]; exists {
+	addDatabaseToResponse := func(databaseName string, dbExtensions gp.DatabaseExtensions) {
 		dbInfo := &pbm.DatabaseExtensionsInfo{
-			DatabaseName: in.GetDatabaseName(),
+			DatabaseName: databaseName,
 			Error:        dbExtensions.Error,
 		}
 
-		// Convert extensions
 		extensions := make([]*pbm.Extension, 0, len(dbExtensions.Extensions))
 		for _, ext := range dbExtensions.Extensions {
-			extInfo := &pbm.Extension{
+			extensions = append(extensions, &pbm.Extension{
 				Name:        ext.ExtName,
 				Owner:       ext.ExtOwner,
 				Namespace:   ext.ExtNamespace,
 				Relocatable: ext.ExtRelocatable,
 				Version:     ext.ExtVersion,
-			}
-			extensions = append(extensions, extInfo)
+			})
 		}
 		dbInfo.Extensions = extensions
 		response.Databases = append(response.Databases, dbInfo)
+	}
+
+	if in.GetDatabaseName() == "" {
+		databaseNames := make([]string, 0, len(allExtensions))
+		for databaseName := range allExtensions {
+			databaseNames = append(databaseNames, databaseName)
+		}
+		sort.Strings(databaseNames)
+		for _, databaseName := range databaseNames {
+			addDatabaseToResponse(databaseName, allExtensions[databaseName])
+		}
+	} else if dbExtensions, exists := allExtensions[in.GetDatabaseName()]; exists {
+		addDatabaseToResponse(in.GetDatabaseName(), dbExtensions)
 	}
 
 	s.logger.Debugf("Get extensions took %v", time.Since(start))

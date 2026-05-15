@@ -1,0 +1,251 @@
+/* ================================================================
+   YAGPCC — Turbo Vision (soft) global styles
+   Supports dark and light themes via [data-theme] attribute
+   ================================================================ */
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  font-family: "IBM Plex Mono", "Fira Code", "Fira Mono", "Cascadia Code",
+    "Consolas", "SF Mono", monospace;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  transition: background-color 0.3s, color 0.3s;
+}
+
+/* ── Default (dark) body colors ────────────────────────────────── */
+body,
+[data-theme="dark"] body {
+  background: #1e2a3a;
+  color: #c8d6e5;
+}
+
+[data-theme="light"] body {
+  background: #f0ede8;
+  color: #2c3e50;
+}
+
+#root {
+  min-height: 100vh;
+}
+
+/* ── Monospace utility ─────────────────────────────────────────── */
+.mono {
+  font-family: "IBM Plex Mono", "Fira Code", "Fira Mono", "Cascadia Code",
+    "Consolas", "SF Mono", monospace;
+  font-size: 0.9em;
+}
+
+/* ── Truncate utility ──────────────────────────────────────────── */
+.truncate {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 300px;
+}
+
+/* ── Session state badge colors ────────────────────────────────── */
+/* Dark */
+[data-theme="dark"] .state-active { color: #6abf8a; }
+[data-theme="dark"] .state-idle { color: #8899aa; }
+[data-theme="dark"] .state-idle-in-transaction { color: #d4915a; }
+[data-theme="dark"] .state-idle-in-transaction-aborted { color: #cf6b6b; }
+
+/* Light */
+[data-theme="light"] .state-active { color: #3a8a5a; }
+[data-theme="light"] .state-idle { color: #6b7b8d; }
+[data-theme="light"] .state-idle-in-transaction { color: #b06a30; }
+[data-theme="light"] .state-idle-in-transaction-aborted { color: #b04a4a; }
+
+/* Fallback (no data-theme yet) */
+.state-active { color: #6abf8a; }
+.state-idle { color: #8899aa; }
+.state-idle-in-transaction { color: #d4915a; }
+.state-idle-in-transaction-aborted { color: #cf6b6b; }
+
+/* ── Scrollbar — dark ──────────────────────────────────────────── */
+[data-theme="dark"] ::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+[data-theme="dark"] ::-webkit-scrollbar-track {
+  background: #172231;
+}
+[data-theme="dark"] ::-webkit-scrollbar-thumb {
+  background: #3d5a75;
+  border-radius: 4px;
+}
+[data-theme="dark"] ::-webkit-scrollbar-thumb:hover {
+  background: #4d6a85;
+}
+
+/* ── Scrollbar — light ─────────────────────────────────────────── */
+[data-theme="light"] ::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+[data-theme="light"] ::-webkit-scrollbar-track {
+  background: #e4e0d8;
+}
+[data-theme="light"] ::-webkit-scrollbar-thumb {
+  background: #b8b0a4;
+  border-radius: 4px;
+}
+[data-theme="light"] ::-webkit-scrollbar-thumb:hover {
+  background: #a09888;
+}
+
+/* ── Fallback scrollbar (before JS sets data-theme) ────────────── */
+::-webkit-scrollbar { width: 8px; height: 8px; }
+::-webkit-scrollbar-track { background: #172231; }
+::-webkit-scrollbar-thumb { background: #3d5a75; border-radius: 4px; }
+::-webkit-scrollbar-thumb:hover { background: #4d6a85; }
+
+/* ================================================================
+   Ant Design overrides — DARK
+   ================================================================ */
+
+[data-theme="dark"] .ant-table-tbody > tr.ant-table-row:hover > td {
+  background: #2d4156 !important;
+}
+[data-theme="dark"] .ant-table-thead > tr > th {
+  border-bottom-color: #2d4156 !important;
+}
+[data-theme="dark"] .ant-card {
+  border-color: #2d4156 !important;
+}
+[data-theme="dark"] .ant-descriptions-bordered .ant-descriptions-item-label,
+[data-theme="dark"] .ant-descriptions-bordered .ant-descriptions-item-content {
+  border-color: #2d4156 !important;
+}
+[data-theme="dark"] .ant-modal-mask {
+  background: rgba(10, 16, 24, 0.7) !important;
+}
+[data-theme="dark"] .ant-collapse > .ant-collapse-item {
+  border-color: #2d4156 !important;
+}
+[data-theme="dark"] .ant-select-dropdown {
+  border: 1px solid #2d4156 !important;
+}
+[data-theme="dark"] .ant-menu-dark .ant-menu-item-selected {
+  background: #2d4156 !important;
+}
+[data-theme="dark"] h1,
+[data-theme="dark"] h2,
+[data-theme="dark"] h3,
+[data-theme="dark"] h4,
+[data-theme="dark"] h5,
+[data-theme="dark"] h6,
+[data-theme="dark"] .ant-typography {
+  color: #e0e8f0 !important;
+}
+[data-theme="dark"] a {
+  color: #5ba4cf;
+}
+[data-theme="dark"] a:hover {
+  color: #6ec6c6;
+}
+[data-theme="dark"] .ant-btn-link {
+  color: #5ba4cf !important;
+}
+[data-theme="dark"] .ant-btn-link:hover {
+  color: #6ec6c6 !important;
+}
+
+/* ================================================================
+   Ant Design overrides — LIGHT
+   ================================================================ */
+
+[data-theme="light"] .ant-table-tbody > tr.ant-table-row:hover > td {
+  background: #e8e4dc !important;
+}
+[data-theme="light"] .ant-table-thead > tr > th {
+  border-bottom-color: #d0cbc2 !important;
+}
+[data-theme="light"] .ant-card {
+  border-color: #d0cbc2 !important;
+}
+[data-theme="light"] .ant-descriptions-bordered .ant-descriptions-item-label,
+[data-theme="light"] .ant-descriptions-bordered .ant-descriptions-item-content {
+  border-color: #d0cbc2 !important;
+}
+[data-theme="light"] .ant-modal-mask {
+  background: rgba(0, 0, 0, 0.35) !important;
+}
+[data-theme="light"] .ant-collapse > .ant-collapse-item {
+  border-color: #d0cbc2 !important;
+}
+[data-theme="light"] .ant-select-dropdown {
+  border: 1px solid #d0cbc2 !important;
+}
+[data-theme="light"] h1,
+[data-theme="light"] h2,
+[data-theme="light"] h3,
+[data-theme="light"] h4,
+[data-theme="light"] h5,
+[data-theme="light"] h6,
+[data-theme="light"] .ant-typography {
+  color: #1a2a3a !important;
+}
+[data-theme="light"] a {
+  color: #3a7ca5;
+}
+[data-theme="light"] a:hover {
+  color: #2a8a8a;
+}
+[data-theme="light"] .ant-btn-link {
+  color: #3a7ca5 !important;
+}
+[data-theme="light"] .ant-btn-link:hover {
+  color: #2a8a8a !important;
+}
+
+/* ================================================================
+   Fallback overrides (before data-theme is set — dark defaults)
+   ================================================================ */
+
+.ant-table-tbody > tr.ant-table-row:hover > td {
+  background: #2d4156 !important;
+}
+.ant-table-thead > tr > th {
+  border-bottom-color: #2d4156 !important;
+}
+.ant-card {
+  border-color: #2d4156 !important;
+}
+.ant-descriptions-bordered .ant-descriptions-item-label,
+.ant-descriptions-bordered .ant-descriptions-item-content {
+  border-color: #2d4156 !important;
+}
+.ant-modal-mask {
+  background: rgba(10, 16, 24, 0.7) !important;
+}
+.ant-collapse > .ant-collapse-item {
+  border-color: #2d4156 !important;
+}
+.ant-select-dropdown {
+  border: 1px solid #2d4156 !important;
+}
+.ant-menu-dark .ant-menu-item-selected {
+  background: #2d4156 !important;
+}
+h1, h2, h3, h4, h5, h6,
+.ant-typography {
+  color: #e0e8f0 !important;
+}
+a {
+  color: #5ba4cf;
+}
+a:hover {
+  color: #6ec6c6;
+}
+.ant-btn-link {
+  color: #5ba4cf !important;
+}
+.ant-btn-link:hover {
+  color: #6ec6c6 !important;
+}
