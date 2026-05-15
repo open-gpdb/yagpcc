@@ -26,12 +26,15 @@ import {
 } from "../api/client";
 import ErrorAlert from "../components/ErrorAlert";
 import SessionStateBadge from "../components/SessionStateBadge";
-import { TV } from "../theme";
+import { useTheme } from "../contexts/ThemeContext";
+import { getColors } from "../theme";
 
 const { Title } = Typography;
 const { Search } = Input;
 
 export default function SessionsPage() {
+  const { mode } = useTheme();
+  const themeColors = getColors(mode);
   const navigate = useNavigate();
   const [params, setParams] = useState<GetSessionsParams>({
     pageSize: 50,
@@ -117,7 +120,7 @@ export default function SessionsPage() {
               {username && <li><strong>Username:</strong> {username}</li>}
               {queryId > 0 && <li><strong>Query ID:</strong> {queryId}</li>}
             </ul>
-            <p style={{ color: TV.red, fontWeight: "bold" }}>This action cannot be undone.</p>
+            <p style={{ color: themeColors.red, fontWeight: "bold" }}>This action cannot be undone.</p>
           </div>
         ),
         okText: "Terminate All Matching",

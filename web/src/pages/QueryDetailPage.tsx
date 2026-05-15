@@ -24,12 +24,16 @@ import {
 import ErrorAlert from "../components/ErrorAlert";
 import QueryStatusBadge from "../components/QueryStatusBadge";
 import { GPMetricsCard, AggregatedMetricsCard } from "../components/MetricsDisplay";
-import { codeBlockStyle, TV } from "../theme";
+import { useTheme } from "../contexts/ThemeContext";
+import { getCodeBlockStyle, getColors } from "../theme";
 
 const { Title, Paragraph } = Typography;
 
 export default function QueryDetailPage() {
   const { ssid, ccnt } = useParams<{ ssid: string; ccnt: string }>();
+  const { mode } = useTheme();
+  const cbStyle = getCodeBlockStyle(mode);
+  const c = getColors(mode);
   const navigate = useNavigate();
   const [moveRsgVisible, setMoveRsgVisible] = useState(false);
   const [rsgName, setRsgName] = useState("");
@@ -153,7 +157,7 @@ export default function QueryDetailPage() {
                   {query.endTime}
                 </Descriptions.Item>
                 <Descriptions.Item label="Completed">
-                  <Tag color={query.completed ? TV.green : TV.primary}>
+                  <Tag color={query.completed ? c.green : c.primary}>
                     {query.completed ? "Yes" : "No"}
                   </Tag>
                 </Descriptions.Item>
@@ -228,7 +232,7 @@ export default function QueryDetailPage() {
 
             <Card title="Query Text" style={{ marginBottom: 16 }}>
               <Paragraph>
-                <pre style={codeBlockStyle}>
+                <pre style={cbStyle}>
                   {query.queryText || "(empty)"}
                 </pre>
               </Paragraph>
@@ -236,7 +240,7 @@ export default function QueryDetailPage() {
 
             {query.queryInfo?.planText && (
               <Card title="Plan Text" style={{ marginBottom: 16 }}>
-                <pre style={codeBlockStyle}>
+                <pre style={cbStyle}>
                   {query.queryInfo.planText}
                 </pre>
               </Card>
@@ -244,7 +248,7 @@ export default function QueryDetailPage() {
 
             {query.queryInfo?.analyzeText && (
               <Card title="Explain Analyze" style={{ marginBottom: 16 }}>
-                <pre style={codeBlockStyle}>
+                <pre style={cbStyle}>
                   {query.queryInfo.analyzeText}
                 </pre>
               </Card>

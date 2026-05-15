@@ -10,17 +10,23 @@ import { useApi } from "../hooks/useApi";
 import { getSessionStats, getSessions, type SessionStat } from "../api/client";
 import ErrorAlert from "../components/ErrorAlert";
 import SessionStateBadge from "../components/SessionStateBadge";
-import { dashboardStateIcons } from "../theme";
+import { useTheme } from "../contexts/ThemeContext";
+import { getDashboardStateIcons } from "../theme";
 
 const { Title } = Typography;
 
-const stateIcons: Record<string, ReactNode> = {
-  active: <ThunderboltOutlined style={{ color: dashboardStateIcons.active }} />,
-  idle: <PauseCircleOutlined style={{ color: dashboardStateIcons.idle }} />,
-  "idle in transaction": <ClockCircleOutlined style={{ color: dashboardStateIcons["idle in transaction"] }} />,
-};
+function useStateIcons(): Record<string, ReactNode> {
+  const { mode } = useTheme();
+  const colors = getDashboardStateIcons(mode);
+  return {
+    active: <ThunderboltOutlined style={{ color: colors.active }} />,
+    idle: <PauseCircleOutlined style={{ color: colors.idle }} />,
+    "idle in transaction": <ClockCircleOutlined style={{ color: colors["idle in transaction"] }} />,
+  };
+}
 
 export default function DashboardPage() {
+  const stateIcons = useStateIcons();
   const stats = useApi(() => getSessionStats(), []);
   const recentSessions = useApi(
     () => getSessions({ pageSize: 10, sort: ["TOTAL_RUNNINGTIMESECONDS:DESC"] }),

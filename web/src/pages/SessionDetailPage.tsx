@@ -22,12 +22,15 @@ import ErrorAlert from "../components/ErrorAlert";
 import SessionStateBadge from "../components/SessionStateBadge";
 import QueryStatusBadge from "../components/QueryStatusBadge";
 import { GPMetricsCard, AggregatedMetricsCard } from "../components/MetricsDisplay";
-import { codeBlockStyle } from "../theme";
+import { useTheme } from "../contexts/ThemeContext";
+import { getCodeBlockStyle } from "../theme";
 
 const { Title } = Typography;
 
 export default function SessionDetailPage() {
   const { sessId } = useParams<{ sessId: string }>();
+  const { mode } = useTheme();
+  const cbStyle = getCodeBlockStyle(mode);
   const navigate = useNavigate();
 
   const { data, loading, error, refresh } = useApi(
@@ -210,7 +213,7 @@ export default function SessionDetailPage() {
 
             {session.runningQueryText && (
               <Card title="Running Query Text" style={{ marginBottom: 16 }}>
-                <pre style={codeBlockStyle}>
+                <pre style={cbStyle}>
                   {session.runningQueryText}
                 </pre>
               </Card>
@@ -252,7 +255,7 @@ export default function SessionDetailPage() {
                     <Typography.Title level={5} style={{ marginTop: 12 }}>
                       Plan Text
                     </Typography.Title>
-                    <pre style={codeBlockStyle}>
+                    <pre style={cbStyle}>
                       {session.runningQueryInfo.planText}
                     </pre>
                   </>
@@ -262,7 +265,7 @@ export default function SessionDetailPage() {
                     <Typography.Title level={5} style={{ marginTop: 12 }}>
                       Explain Analyze
                     </Typography.Title>
-                    <pre style={codeBlockStyle}>
+                    <pre style={cbStyle}>
                       {session.runningQueryInfo.analyzeText}
                     </pre>
                   </>

@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Outlet, useNavigate, useLocation } from "react-router-dom";
-import { Layout as AntLayout, Menu, Button } from "antd";
+import { Layout as AntLayout, Menu, Button, Tooltip } from "antd";
 import {
   DashboardOutlined,
   UserOutlined,
@@ -8,8 +8,11 @@ import {
   AppstoreOutlined,
   MenuFoldOutlined,
   MenuUnfoldOutlined,
+  SunOutlined,
+  MoonOutlined,
 } from "@ant-design/icons";
-import { TV } from "../theme";
+import { useTheme } from "../contexts/ThemeContext";
+import { getColors, SIDEBAR_WIDTH, SIDEBAR_COLLAPSED_WIDTH, FONT_MONO } from "../theme";
 
 const { Sider, Content, Footer } = AntLayout;
 
@@ -24,6 +27,8 @@ export default function Layout() {
   const navigate = useNavigate();
   const location = useLocation();
   const [collapsed, setCollapsed] = useState(false);
+  const { mode, toggle } = useTheme();
+  const c = getColors(mode);
 
   // Determine which menu item is active based on current path
   const selectedKey =
@@ -34,15 +39,15 @@ export default function Layout() {
   return (
     <AntLayout style={{ minHeight: "100vh" }}>
       <Sider
-        width={TV.sidebarWidth}
-        collapsedWidth={TV.sidebarCollapsedWidth}
+        width={SIDEBAR_WIDTH}
+        collapsedWidth={SIDEBAR_COLLAPSED_WIDTH}
         collapsible
         collapsed={collapsed}
         onCollapse={setCollapsed}
         trigger={null}
         style={{
-          background: TV.bgSidebar,
-          borderRight: `1px solid ${TV.border}`,
+          background: c.bgSidebar,
+          borderRight: `1px solid ${c.border}`,
           overflow: "auto",
           height: "100vh",
           position: "fixed",
@@ -57,7 +62,7 @@ export default function Layout() {
           style={{
             padding: collapsed ? "20px 0" : "20px 16px",
             textAlign: collapsed ? "center" : "left",
-            borderBottom: `1px solid ${TV.border}`,
+            borderBottom: `1px solid ${c.border}`,
             marginBottom: 8,
             cursor: "pointer",
           }}
@@ -65,10 +70,10 @@ export default function Layout() {
         >
           <span
             style={{
-              color: TV.cyan,
+              color: c.cyan,
               fontSize: collapsed ? 20 : 16,
               fontWeight: 700,
-              fontFamily: TV.fontMono,
+              fontFamily: FONT_MONO,
               whiteSpace: "nowrap",
               letterSpacing: collapsed ? 0 : 1,
             }}
@@ -79,7 +84,7 @@ export default function Layout() {
 
         {/* Navigation menu */}
         <Menu
-          theme="dark"
+          theme={mode === "dark" ? "dark" : "light"}
           mode="inline"
           selectedKeys={[selectedKey]}
           items={menuItems}
@@ -87,29 +92,45 @@ export default function Layout() {
           style={{
             background: "transparent",
             borderRight: "none",
-            fontFamily: TV.fontMono,
+            fontFamily: FONT_MONO,
           }}
         />
 
-        {/* Collapse toggle at bottom */}
+        {/* Bottom controls: theme toggle + collapse toggle */}
         <div
           style={{
             position: "absolute",
             bottom: 0,
             width: "100%",
-            borderTop: `1px solid ${TV.border}`,
-            padding: "12px 0",
+            borderTop: `1px solid ${c.border}`,
+            padding: "8px 0",
             textAlign: "center",
+            display: "flex",
+            flexDirection: collapsed ? "column" : "row",
+            justifyContent: "center",
+            gap: 4,
           }}
         >
+          <Tooltip title={mode === "dark" ? "Switch to light theme" : "Switch to dark theme"}>
+            <Button
+              type="text"
+              icon={mode === "dark" ? <SunOutlined /> : <MoonOutlined />}
+              onClick={toggle}
+              style={{
+                color: c.textSecondary,
+                fontSize: 16,
+                flex: collapsed ? undefined : 1,
+              }}
+            />
+          </Tooltip>
           <Button
             type="text"
             icon={collapsed ? <MenuUnfoldOutlined /> : <MenuFoldOutlined />}
             onClick={() => setCollapsed(!collapsed)}
             style={{
-              color: TV.textSecondary,
+              color: c.textSecondary,
               fontSize: 16,
-              width: "100%",
+              flex: collapsed ? undefined : 1,
             }}
           />
         </div>
@@ -118,16 +139,16 @@ export default function Layout() {
       {/* Main content area */}
       <AntLayout
         style={{
-          marginLeft: collapsed ? TV.sidebarCollapsedWidth : TV.sidebarWidth,
+          marginLeft: collapsed ? SIDEBAR_COLLAPSED_WIDTH : SIDEBAR_WIDTH,
           transition: "margin-left 0.2s",
-          background: TV.bgMain,
+          background: c.bgMain,
         }}
       >
         <Content
           style={{
             padding: 24,
             minHeight: "calc(100vh - 48px)",
-            background: TV.bgMain,
+            background: c.bgMain,
           }}
         >
           <Outlet />
@@ -135,12 +156,12 @@ export default function Layout() {
         <Footer
           style={{
             textAlign: "center",
-            color: TV.textSecondary,
+            color: c.textSecondary,
             background: "transparent",
             padding: "12px 24px",
-            fontFamily: TV.fontMono,
+            fontFamily: FONT_MONO,
             fontSize: 12,
-            borderTop: `1px solid ${TV.border}`,
+            borderTop: `1px solid ${c.border}`,
           }}
         >
           YAGPCC — Yet Another Greenplum Command Center

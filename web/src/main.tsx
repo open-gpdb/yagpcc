@@ -3,113 +3,126 @@ import ReactDOM from "react-dom/client";
 import { BrowserRouter } from "react-router-dom";
 import { ConfigProvider, theme } from "antd";
 import App from "./App";
-import { TV } from "./theme";
+import { ThemeProvider, useTheme } from "./contexts/ThemeContext";
+import { getColors, FONT_MONO } from "./theme";
 import "./index.css";
 
-ReactDOM.createRoot(document.getElementById("root")!).render(
-  <React.StrictMode>
+function ThemedApp() {
+  const { mode } = useTheme();
+  const c = getColors(mode);
+  const isDark = mode === "dark";
+
+  return (
     <ConfigProvider
       theme={{
-        algorithm: theme.darkAlgorithm,
+        algorithm: isDark ? theme.darkAlgorithm : theme.defaultAlgorithm,
         token: {
-          colorPrimary: TV.primary,
-          colorBgContainer: TV.bgCard,
-          colorBgLayout: TV.bgMain,
-          colorBgElevated: TV.bgElevated,
-          colorBorder: TV.border,
-          colorBorderSecondary: TV.border,
-          colorText: TV.textPrimary,
-          colorTextSecondary: TV.textSecondary,
-          colorTextTertiary: TV.textSecondary,
-          colorTextQuaternary: TV.textSecondary,
+          colorPrimary: c.primary,
+          colorBgContainer: c.bgCard,
+          colorBgLayout: c.bgMain,
+          colorBgElevated: c.bgElevated,
+          colorBorder: c.border,
+          colorBorderSecondary: c.border,
+          colorText: c.textPrimary,
+          colorTextSecondary: c.textSecondary,
+          colorTextTertiary: c.textSecondary,
+          colorTextQuaternary: c.textSecondary,
           borderRadius: 4,
-          fontFamily: TV.fontMono,
+          fontFamily: FONT_MONO,
           fontSize: 13,
-          colorBgSpotlight: TV.bgHover,
-          colorLink: TV.primary,
-          colorLinkHover: TV.cyan,
-          colorSuccess: TV.green,
-          colorWarning: TV.yellow,
-          colorError: TV.red,
-          colorInfo: TV.primary,
+          colorBgSpotlight: c.bgHover,
+          colorLink: c.primary,
+          colorLinkHover: c.cyan,
+          colorSuccess: c.green,
+          colorWarning: c.yellow,
+          colorError: c.red,
+          colorInfo: c.primary,
         },
         components: {
           Layout: {
-            siderBg: TV.bgSidebar,
-            bodyBg: TV.bgMain,
-            headerBg: TV.bgSidebar,
+            siderBg: c.bgSidebar,
+            bodyBg: c.bgMain,
+            headerBg: c.bgSidebar,
             footerBg: "transparent",
           },
-          Menu: {
-            darkItemBg: "transparent",
-            darkItemSelectedBg: TV.bgSelected,
-            darkItemHoverBg: TV.bgSidebarHover,
-            darkItemColor: TV.textSecondary,
-            darkItemSelectedColor: TV.cyan,
-          },
+          Menu: isDark
+            ? {
+                darkItemBg: "transparent",
+                darkItemSelectedBg: c.bgSelected,
+                darkItemHoverBg: c.bgSidebarHover,
+                darkItemColor: c.textSecondary,
+                darkItemSelectedColor: c.cyan,
+              }
+            : {
+                itemBg: "transparent",
+                itemSelectedBg: c.bgSelected,
+                itemHoverBg: c.bgSidebarHover,
+                itemColor: c.textSecondary,
+                itemSelectedColor: c.primary,
+              },
           Card: {
-            colorBgContainer: TV.bgCard,
-            colorBorderSecondary: TV.border,
+            colorBgContainer: c.bgCard,
+            colorBorderSecondary: c.border,
           },
           Table: {
-            colorBgContainer: TV.bgCard,
-            headerBg: TV.bgSidebar,
-            headerColor: TV.textHeading,
-            rowHoverBg: TV.bgHover,
-            borderColor: TV.border,
+            colorBgContainer: c.bgCard,
+            headerBg: isDark ? c.bgSidebar : c.bgCode,
+            headerColor: c.textHeading,
+            rowHoverBg: c.bgHover,
+            borderColor: c.border,
             headerBorderRadius: 4,
           },
           Descriptions: {
-            colorBgContainer: TV.bgCard,
-            labelBg: TV.bgSidebar,
-            colorSplit: TV.border,
+            colorBgContainer: c.bgCard,
+            labelBg: isDark ? c.bgSidebar : c.bgCode,
+            colorSplit: c.border,
           },
           Modal: {
-            contentBg: TV.bgCard,
-            headerBg: TV.bgCard,
-            footerBg: TV.bgCard,
+            contentBg: c.bgCard,
+            headerBg: c.bgCard,
+            footerBg: c.bgCard,
           },
           Input: {
-            colorBgContainer: TV.bgCode,
-            colorBorder: TV.border,
-            activeBorderColor: TV.primary,
-            hoverBorderColor: TV.borderActive,
+            colorBgContainer: isDark ? c.bgCode : "#ffffff",
+            colorBorder: c.border,
+            activeBorderColor: c.primary,
+            hoverBorderColor: c.borderActive,
           },
           Select: {
-            colorBgContainer: TV.bgCode,
-            colorBorder: TV.border,
-            optionSelectedBg: TV.bgSelected,
+            colorBgContainer: isDark ? c.bgCode : "#ffffff",
+            colorBorder: c.border,
+            optionSelectedBg: c.bgSelected,
           },
           InputNumber: {
-            colorBgContainer: TV.bgCode,
-            colorBorder: TV.border,
+            colorBgContainer: isDark ? c.bgCode : "#ffffff",
+            colorBorder: c.border,
           },
           Switch: {
-            colorPrimary: TV.primary,
+            colorPrimary: c.primary,
           },
           Collapse: {
-            colorBgContainer: TV.bgCard,
-            colorBorder: TV.border,
-            headerBg: TV.bgSidebar,
+            colorBgContainer: c.bgCard,
+            colorBorder: c.border,
+            headerBg: isDark ? c.bgSidebar : c.bgCode,
           },
           Statistic: {
-            colorTextDescription: TV.textSecondary,
+            colorTextDescription: c.textSecondary,
           },
           Tag: {
-            colorBgContainer: TV.bgCode,
-            colorBorder: TV.border,
+            colorBgContainer: isDark ? c.bgCode : c.bgCode,
+            colorBorder: c.border,
           },
           Spin: {
-            colorPrimary: TV.cyan,
+            colorPrimary: c.cyan,
           },
           Alert: {
-            colorInfoBg: TV.bgCode,
-            colorInfoBorder: TV.border,
-            colorWarningBg: "#2a2520",
-            colorWarningBorder: "#4a3a28",
+            colorInfoBg: c.bgCode,
+            colorInfoBorder: c.border,
+            colorWarningBg: c.alertWarningBg,
+            colorWarningBorder: c.alertWarningBorder,
           },
           Pagination: {
-            colorBgContainer: TV.bgCard,
+            colorBgContainer: c.bgCard,
           },
         },
       }}
@@ -118,5 +131,13 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
         <App />
       </BrowserRouter>
     </ConfigProvider>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById("root")!).render(
+  <React.StrictMode>
+    <ThemeProvider>
+      <ThemedApp />
+    </ThemeProvider>
   </React.StrictMode>,
 );
