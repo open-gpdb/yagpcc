@@ -9,6 +9,8 @@ import {
   Modal,
   message,
   Input,
+  Table,
+  Tag,
 } from "antd";
 import { ArrowLeftOutlined, StopOutlined, SwapOutlined } from "@ant-design/icons";
 import { useState } from "react";
@@ -17,9 +19,12 @@ import {
   getQuery,
   terminateQuery,
   moveQueryToResourceGroup,
+  type SegmentMetricsInfo,
 } from "../api/client";
 import ErrorAlert from "../components/ErrorAlert";
 import QueryStatusBadge from "../components/QueryStatusBadge";
+import { GPMetricsCard, AggregatedMetricsCard } from "../components/MetricsDisplay";
+import { codeBlockStyle, TV } from "../theme";
 
 const { Title, Paragraph } = Typography;
 
@@ -119,6 +124,7 @@ export default function QueryDetailPage() {
                   {query.rsgName}
                 </Descriptions.Item>
                 <Descriptions.Item label="Host">{query.host}</Descriptions.Item>
+                <Descriptions.Item label="Cluster ID">{query.clusterId}</Descriptions.Item>
                 <Descriptions.Item label="Session ID">
                   <Button
                     type="link"
@@ -134,70 +140,239 @@ export default function QueryDetailPage() {
                 <Descriptions.Item label="Query Start">
                   {query.queryStart}
                 </Descriptions.Item>
-                <Descriptions.Item label="PID">
-                  {query.pid || ""}
+                <Descriptions.Item label="Stat Kind">
+                  {query.statKind}
+                </Descriptions.Item>
+                <Descriptions.Item label="Collect Time">
+                  {query.collectTime}
+                </Descriptions.Item>
+                <Descriptions.Item label="Start Time">
+                  {query.startTime}
+                </Descriptions.Item>
+                <Descriptions.Item label="End Time">
+                  {query.endTime}
+                </Descriptions.Item>
+                <Descriptions.Item label="Completed">
+                  <Tag color={query.completed ? TV.green : TV.primary}>
+                    {query.completed ? "Yes" : "No"}
+                  </Tag>
                 </Descriptions.Item>
                 <Descriptions.Item label="Session State">
-                  {query.state}
+                  {query.sessionState}
                 </Descriptions.Item>
-                <Descriptions.Item label="Wait Event Type">
-                  {query.waitEventType}
+                <Descriptions.Item label="Slices">
+                  {query.slices}
                 </Descriptions.Item>
-                <Descriptions.Item label="Wait Event">
-                  {query.waitEvent}
+                <Descriptions.Item label="Blocked By Session">
+                  {query.blockedBySessId ? (
+                    <Button
+                      type="link"
+                      className="mono"
+                      onClick={() => navigate(`/session/${query.blockedBySessId}`)}
+                    >
+                      {query.blockedBySessId}
+                    </Button>
+                  ) : (
+                    ""
+                  )}
                 </Descriptions.Item>
-                <Descriptions.Item label="Query Level">
-                  {query.runningQueryLevel}
+                <Descriptions.Item label="Wait Mode">
+                  {query.waitMode}
                 </Descriptions.Item>
-                <Descriptions.Item label="Query Slices">
-                  {query.runningQuerySlices}
+                <Descriptions.Item label="Locked Item">
+                  {query.lockedItem}
                 </Descriptions.Item>
-                <Descriptions.Item label="Query Error">
-                  {query.runningQueryError}
+                <Descriptions.Item label="Locked Mode">
+                  {query.lockedMode}
+                </Descriptions.Item>
+                <Descriptions.Item label="Message">
+                  {query.message}
                 </Descriptions.Item>
               </Descriptions>
             </Card>
 
+            {/* Detailed Query Info */}
+            {query.queryInfo && (
+              <Card title="Query Details" style={{ marginBottom: 16 }}>
+                <Descriptions bordered column={{ xs: 1, sm: 2, md: 3 }} size="small">
+                  <Descriptions.Item label="Generator">
+                    {query.queryInfo.generator}
+                  </Descriptions.Item>
+                  <Descriptions.Item label="Query ID">
+                    <span className="mono">{query.queryInfo.queryId || ""}</span>
+                  </Descriptions.Item>
+                  <Descriptions.Item label="Plan ID">
+                    <span className="mono">{query.queryInfo.planId || ""}</span>
+                  </Descriptions.Item>
+                  <Descriptions.Item label="User">
+                    {query.queryInfo.userName}
+                  </Descriptions.Item>
+                  <Descriptions.Item label="Database">
+                    {query.queryInfo.databaseName}
+                  </Descriptions.Item>
+                  <Descriptions.Item label="Resource Group">
+                    {query.queryInfo.rsgname}
+                  </Descriptions.Item>
+                  <Descriptions.Item label="Submit Time">
+                    {query.queryInfo.submitTime}
+                  </Descriptions.Item>
+                  <Descriptions.Item label="Start Time">
+                    {query.queryInfo.startTime}
+                  </Descriptions.Item>
+                  <Descriptions.Item label="End Time">
+                    {query.queryInfo.endTime}
+                  </Descriptions.Item>
+                </Descriptions>
+              </Card>
+            )}
+
             <Card title="Query Text" style={{ marginBottom: 16 }}>
               <Paragraph>
-                <pre
-                  style={{
-                    background: "#f6f6f6",
-                    padding: 16,
-                    borderRadius: 6,
-                    overflow: "auto",
-                    maxHeight: 400,
-                    fontSize: 13,
-                    fontFamily: "'SF Mono', 'Fira Code', monospace",
-                  }}
-                >
+                <pre style={codeBlockStyle}>
                   {query.queryText || "(empty)"}
                 </pre>
               </Paragraph>
             </Card>
 
-            {query.metrics && (
-              <Card title="Metrics">
-                <Descriptions bordered column={{ xs: 1, sm: 2, md: 3 }} size="small">
-                  <Descriptions.Item label="CPU Usage">
-                    {query.metrics.cpuUsage?.toFixed(2) ?? "N/A"}
-                  </Descriptions.Item>
-                  <Descriptions.Item label="Memory Usage">
-                    {query.metrics.memoryUsage?.toFixed(2) ?? "N/A"}
-                  </Descriptions.Item>
-                  <Descriptions.Item label="Disk Read">
-                    {query.metrics.diskRead?.toFixed(2) ?? "N/A"}
-                  </Descriptions.Item>
-                  <Descriptions.Item label="Disk Write">
-                    {query.metrics.diskWrite?.toFixed(2) ?? "N/A"}
-                  </Descriptions.Item>
-                  <Descriptions.Item label="Network Sent">
-                    {query.metrics.networkSent?.toFixed(2) ?? "N/A"}
-                  </Descriptions.Item>
-                  <Descriptions.Item label="Network Received">
-                    {query.metrics.networkReceived?.toFixed(2) ?? "N/A"}
-                  </Descriptions.Item>
-                </Descriptions>
+            {query.queryInfo?.planText && (
+              <Card title="Plan Text" style={{ marginBottom: 16 }}>
+                <pre style={codeBlockStyle}>
+                  {query.queryInfo.planText}
+                </pre>
+              </Card>
+            )}
+
+            {query.queryInfo?.analyzeText && (
+              <Card title="Explain Analyze" style={{ marginBottom: 16 }}>
+                <pre style={codeBlockStyle}>
+                  {query.queryInfo.analyzeText}
+                </pre>
+              </Card>
+            )}
+
+            <GPMetricsCard title="Total Query Metrics" metrics={query.metrics} />
+            <AggregatedMetricsCard title="Aggregated Metrics" metrics={query.aggregatedMetrics} />
+
+            {/* Segment Metrics Table */}
+            {query.segmentMetrics && query.segmentMetrics.length > 0 && (
+              <Card title={`Segment Metrics (${query.segmentMetrics.length})`} style={{ marginBottom: 16 }}>
+                <Table
+                  dataSource={query.segmentMetrics}
+                  rowKey={(r: SegmentMetricsInfo) =>
+                    `${r.segmentKey?.dbid ?? 0}-${r.segmentKey?.segindex ?? 0}-${r.hostname ?? ""}`
+                  }
+                  size="small"
+                  pagination={query.segmentMetrics.length > 20 ? { pageSize: 20 } : false}
+                  scroll={{ x: 1200 }}
+                  columns={[
+                    {
+                      title: "Segment",
+                      key: "segment",
+                      fixed: "left" as const,
+                      width: 120,
+                      render: (_: unknown, r: SegmentMetricsInfo) =>
+                        r.segmentKey
+                          ? `dbid=${r.segmentKey.dbid} seg=${r.segmentKey.segindex}`
+                          : "N/A",
+                    },
+                    {
+                      title: "Hostname",
+                      dataIndex: "hostname",
+                      width: 150,
+                      ellipsis: true,
+                    },
+                    {
+                      title: "Status",
+                      dataIndex: "queryStatus",
+                      width: 120,
+                      render: (v: string) => <QueryStatusBadge status={v ?? ""} />,
+                    },
+                    {
+                      title: "Start Time",
+                      dataIndex: "startTime",
+                      width: 200,
+                      ellipsis: true,
+                    },
+                    {
+                      title: "End Time",
+                      dataIndex: "endTime",
+                      width: 200,
+                      ellipsis: true,
+                    },
+                    {
+                      title: "CPU (s)",
+                      key: "cpu",
+                      width: 100,
+                      render: (_: unknown, r: SegmentMetricsInfo) =>
+                        r.metrics?.cpuUsage?.toFixed(2) ?? "N/A",
+                    },
+                    {
+                      title: "Memory",
+                      key: "memory",
+                      width: 100,
+                      render: (_: unknown, r: SegmentMetricsInfo) => {
+                        const v = r.metrics?.memoryUsage;
+                        if (!v) return "N/A";
+                        if (v > 1073741824) return `${(v / 1073741824).toFixed(2)} GB`;
+                        if (v > 1048576) return `${(v / 1048576).toFixed(2)} MB`;
+                        if (v > 1024) return `${(v / 1024).toFixed(2)} KB`;
+                        return `${v} B`;
+                      },
+                    },
+                    {
+                      title: "Disk Read",
+                      key: "diskRead",
+                      width: 100,
+                      render: (_: unknown, r: SegmentMetricsInfo) => {
+                        const v = r.metrics?.diskRead;
+                        if (!v) return "N/A";
+                        if (v > 1073741824) return `${(v / 1073741824).toFixed(2)} GB`;
+                        if (v > 1048576) return `${(v / 1048576).toFixed(2)} MB`;
+                        if (v > 1024) return `${(v / 1024).toFixed(2)} KB`;
+                        return `${v} B`;
+                      },
+                    },
+                    {
+                      title: "Disk Write",
+                      key: "diskWrite",
+                      width: 100,
+                      render: (_: unknown, r: SegmentMetricsInfo) => {
+                        const v = r.metrics?.diskWrite;
+                        if (!v) return "N/A";
+                        if (v > 1073741824) return `${(v / 1073741824).toFixed(2)} GB`;
+                        if (v > 1048576) return `${(v / 1048576).toFixed(2)} MB`;
+                        if (v > 1024) return `${(v / 1024).toFixed(2)} KB`;
+                        return `${v} B`;
+                      },
+                    },
+                    {
+                      title: "Net Sent",
+                      key: "netSent",
+                      width: 100,
+                      render: (_: unknown, r: SegmentMetricsInfo) => {
+                        const v = r.metrics?.networkSent;
+                        if (!v) return "N/A";
+                        if (v > 1073741824) return `${(v / 1073741824).toFixed(2)} GB`;
+                        if (v > 1048576) return `${(v / 1048576).toFixed(2)} MB`;
+                        if (v > 1024) return `${(v / 1024).toFixed(2)} KB`;
+                        return `${v} B`;
+                      },
+                    },
+                    {
+                      title: "Net Recv",
+                      key: "netRecv",
+                      width: 100,
+                      render: (_: unknown, r: SegmentMetricsInfo) => {
+                        const v = r.metrics?.networkReceived;
+                        if (!v) return "N/A";
+                        if (v > 1073741824) return `${(v / 1073741824).toFixed(2)} GB`;
+                        if (v > 1048576) return `${(v / 1048576).toFixed(2)} MB`;
+                        if (v > 1024) return `${(v / 1024).toFixed(2)} KB`;
+                        return `${v} B`;
+                      },
+                    },
+                  ]}
+                />
               </Card>
             )}
           </>

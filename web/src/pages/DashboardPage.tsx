@@ -10,13 +10,14 @@ import { useApi } from "../hooks/useApi";
 import { getSessionStats, getSessions, type SessionStat } from "../api/client";
 import ErrorAlert from "../components/ErrorAlert";
 import SessionStateBadge from "../components/SessionStateBadge";
+import { dashboardStateIcons } from "../theme";
 
 const { Title } = Typography;
 
 const stateIcons: Record<string, ReactNode> = {
-  active: <ThunderboltOutlined style={{ color: "#52c41a" }} />,
-  idle: <PauseCircleOutlined style={{ color: "#8c8c8c" }} />,
-  "idle in transaction": <ClockCircleOutlined style={{ color: "#faad14" }} />,
+  active: <ThunderboltOutlined style={{ color: dashboardStateIcons.active }} />,
+  idle: <PauseCircleOutlined style={{ color: dashboardStateIcons.idle }} />,
+  "idle in transaction": <ClockCircleOutlined style={{ color: dashboardStateIcons["idle in transaction"] }} />,
 };
 
 export default function DashboardPage() {

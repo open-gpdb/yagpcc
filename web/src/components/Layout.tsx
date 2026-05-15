@@ -1,13 +1,17 @@
+import { useState } from "react";
 import { Outlet, useNavigate, useLocation } from "react-router-dom";
-import { Layout as AntLayout, Menu } from "antd";
+import { Layout as AntLayout, Menu, Button } from "antd";
 import {
   DashboardOutlined,
   UserOutlined,
   CodeOutlined,
   AppstoreOutlined,
+  MenuFoldOutlined,
+  MenuUnfoldOutlined,
 } from "@ant-design/icons";
+import { TV } from "../theme";
 
-const { Header, Content, Footer } = AntLayout;
+const { Sider, Content, Footer } = AntLayout;
 
 const menuItems = [
   { key: "/", icon: <DashboardOutlined />, label: "Dashboard" },
@@ -19,6 +23,7 @@ const menuItems = [
 export default function Layout() {
   const navigate = useNavigate();
   const location = useLocation();
+  const [collapsed, setCollapsed] = useState(false);
 
   // Determine which menu item is active based on current path
   const selectedKey =
@@ -28,46 +33,119 @@ export default function Layout() {
 
   return (
     <AntLayout style={{ minHeight: "100vh" }}>
-      <Header
+      <Sider
+        width={TV.sidebarWidth}
+        collapsedWidth={TV.sidebarCollapsedWidth}
+        collapsible
+        collapsed={collapsed}
+        onCollapse={setCollapsed}
+        trigger={null}
         style={{
-          display: "flex",
-          alignItems: "center",
-          padding: "0 24px",
-          background: "#001529",
+          background: TV.bgSidebar,
+          borderRight: `1px solid ${TV.border}`,
+          overflow: "auto",
+          height: "100vh",
+          position: "fixed",
+          left: 0,
+          top: 0,
+          bottom: 0,
+          zIndex: 10,
         }}
       >
-        <button
-          type="button"
+        {/* Logo / Title */}
+        <div
           style={{
-            color: "#fff",
-            fontSize: 18,
-            fontWeight: 700,
-            marginRight: 40,
+            padding: collapsed ? "20px 0" : "20px 16px",
+            textAlign: collapsed ? "center" : "left",
+            borderBottom: `1px solid ${TV.border}`,
+            marginBottom: 8,
             cursor: "pointer",
-            whiteSpace: "nowrap",
-            background: "transparent",
-            border: "none",
-            padding: 0,
           }}
           onClick={() => navigate("/")}
         >
-          🐘 YAGPCC
-        </button>
+          <span
+            style={{
+              color: TV.cyan,
+              fontSize: collapsed ? 20 : 16,
+              fontWeight: 700,
+              fontFamily: TV.fontMono,
+              whiteSpace: "nowrap",
+              letterSpacing: collapsed ? 0 : 1,
+            }}
+          >
+            {collapsed ? "🐘" : "🐘 YAGPCC"}
+          </span>
+        </div>
+
+        {/* Navigation menu */}
         <Menu
           theme="dark"
-          mode="horizontal"
+          mode="inline"
           selectedKeys={[selectedKey]}
           items={menuItems}
           onClick={({ key }) => navigate(key)}
-          style={{ flex: 1, minWidth: 0 }}
+          style={{
+            background: "transparent",
+            borderRight: "none",
+            fontFamily: TV.fontMono,
+          }}
         />
-      </Header>
-      <Content style={{ padding: "24px 24px", background: "#f5f5f5" }}>
-        <Outlet />
-      </Content>
-      <Footer style={{ textAlign: "center", color: "#999" }}>
-        YAGPCC — Yet Another Greenplum Command Center
-      </Footer>
+
+        {/* Collapse toggle at bottom */}
+        <div
+          style={{
+            position: "absolute",
+            bottom: 0,
+            width: "100%",
+            borderTop: `1px solid ${TV.border}`,
+            padding: "12px 0",
+            textAlign: "center",
+          }}
+        >
+          <Button
+            type="text"
+            icon={collapsed ? <MenuUnfoldOutlined /> : <MenuFoldOutlined />}
+            onClick={() => setCollapsed(!collapsed)}
+            style={{
+              color: TV.textSecondary,
+              fontSize: 16,
+              width: "100%",
+            }}
+          />
+        </div>
+      </Sider>
+
+      {/* Main content area */}
+      <AntLayout
+        style={{
+          marginLeft: collapsed ? TV.sidebarCollapsedWidth : TV.sidebarWidth,
+          transition: "margin-left 0.2s",
+          background: TV.bgMain,
+        }}
+      >
+        <Content
+          style={{
+            padding: 24,
+            minHeight: "calc(100vh - 48px)",
+            background: TV.bgMain,
+          }}
+        >
+          <Outlet />
+        </Content>
+        <Footer
+          style={{
+            textAlign: "center",
+            color: TV.textSecondary,
+            background: "transparent",
+            padding: "12px 24px",
+            fontFamily: TV.fontMono,
+            fontSize: 12,
+            borderTop: `1px solid ${TV.border}`,
+          }}
+        >
+          YAGPCC — Yet Another Greenplum Command Center
+        </Footer>
+      </AntLayout>
     </AntLayout>
   );
 }

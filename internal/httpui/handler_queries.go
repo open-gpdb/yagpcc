@@ -125,8 +125,45 @@ func (s *Server) handleGetQueries(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, response)
 }
 
-// convertGPMetrics converts a proto GPMetrics to a map matching the frontend
-// GPMetrics interface: { cpuUsage, memoryUsage, diskRead, diskWrite, networkSent, networkReceived }.
+// convertNetworkStat converts a proto NetworkStat to a map.
+func convertNetworkStat(ns *pbc.NetworkStat) map[string]interface{} {
+	if ns == nil {
+		return nil
+	}
+	return map[string]interface{}{
+		"totalBytes": ns.GetTotalBytes(),
+		"tupleBytes": ns.GetTupleBytes(),
+		"chunks":     ns.GetChunks(),
+	}
+}
+
+// convertInterconnectStat converts a proto InterconnectStat to a map.
+func convertInterconnectStat(ic *pbc.InterconnectStat) map[string]interface{} {
+	if ic == nil {
+		return nil
+	}
+	return map[string]interface{}{
+		"totalRecvQueueSize":        ic.GetTotalRecvQueueSize(),
+		"recvQueueSizeCountingTime": ic.GetRecvQueueSizeCountingTime(),
+		"totalCapacity":             ic.GetTotalCapacity(),
+		"capacityCountingTime":      ic.GetCapacityCountingTime(),
+		"totalBuffers":              ic.GetTotalBuffers(),
+		"bufferCountingTime":        ic.GetBufferCountingTime(),
+		"activeConnectionsNum":      ic.GetActiveConnectionsNum(),
+		"retransmits":               ic.GetRetransmits(),
+		"startupCachedPktNum":       ic.GetStartupCachedPktNum(),
+		"mismatchNum":               ic.GetMismatchNum(),
+		"crcErrors":                 ic.GetCrcErrors(),
+		"sndPktNum":                 ic.GetSndPktNum(),
+		"recvPktNum":                ic.GetRecvPktNum(),
+		"disorderedPktNum":          ic.GetDisorderedPktNum(),
+		"duplicatedPktNum":          ic.GetDuplicatedPktNum(),
+		"recvAckNum":                ic.GetRecvAckNum(),
+		"statusQueryMsgNum":         ic.GetStatusQueryMsgNum(),
+	}
+}
+
+// convertGPMetrics converts a proto GPMetrics to a map with all available fields.
 func convertGPMetrics(m *pbc.GPMetrics) map[string]interface{} {
 	if m == nil {
 		return nil
@@ -152,7 +189,8 @@ func convertGPMetrics(m *pbc.GPMetrics) map[string]interface{} {
 		}
 	}
 
-	return map[string]interface{}{
+	result := map[string]interface{}{
+		// Summary fields (backward compatible)
 		"cpuUsage":        cpuUsage,
 		"memoryUsage":     memoryUsage,
 		"diskRead":        diskRead,
@@ -160,6 +198,124 @@ func convertGPMetrics(m *pbc.GPMetrics) map[string]interface{} {
 		"networkSent":     networkSent,
 		"networkReceived": networkReceived,
 	}
+
+	// Detailed SystemStat
+	if ss := m.GetSystemStat(); ss != nil {
+		result["systemStat"] = map[string]interface{}{
+			"runningTimeSeconds":  ss.GetRunningTimeSeconds(),
+			"userTimeSeconds":     ss.GetUserTimeSeconds(),
+			"kernelTimeSeconds":   ss.GetKernelTimeSeconds(),
+			"vsize":               ss.GetVsize(),
+			"rss":                 ss.GetRss(),
+			"vmPeakKb":            ss.GetVmPeakKb(),
+			"rchar":               ss.GetRchar(),
+			"wchar":               ss.GetWchar(),
+			"syscr":               ss.GetSyscr(),
+			"syscw":               ss.GetSyscw(),
+			"readBytes":           ss.GetReadBytes(),
+			"writeBytes":          ss.GetWriteBytes(),
+			"cancelledWriteBytes": ss.GetCancelledWriteBytes(),
+		}
+	}
+
+	// Detailed Instrumentation
+	if instr := m.GetInstrumentation(); instr != nil {
+		result["instrumentation"] = map[string]interface{}{
+			"ntuples":           instr.GetNtuples(),
+			"nloops":            instr.GetNloops(),
+			"tuplecount":        instr.GetTuplecount(),
+			"firsttuple":        instr.GetFirsttuple(),
+			"startup":           instr.GetStartup(),
+			"total":             instr.GetTotal(),
+			"sharedBlksHit":     instr.GetSharedBlksHit(),
+			"sharedBlksRead":    instr.GetSharedBlksRead(),
+			"sharedBlksDirtied": instr.GetSharedBlksDirtied(),
+			"sharedBlksWritten": instr.GetSharedBlksWritten(),
+			"localBlksHit":      instr.GetLocalBlksHit(),
+			"localBlksRead":     instr.GetLocalBlksRead(),
+			"localBlksDirtied":  instr.GetLocalBlksDirtied(),
+			"localBlksWritten":  instr.GetLocalBlksWritten(),
+			"tempBlksRead":      instr.GetTempBlksRead(),
+			"tempBlksWritten":   instr.GetTempBlksWritten(),
+			"blkReadTime":       instr.GetBlkReadTime(),
+			"blkWriteTime":      instr.GetBlkWriteTime(),
+			"startupTime":       instr.GetStartupTime(),
+			"inheritedCalls":    instr.GetInheritedCalls(),
+			"inheritedTime":     instr.GetInheritedTime(),
+			"sent":              convertNetworkStat(instr.GetSent()),
+			"received":          convertNetworkStat(instr.GetReceived()),
+			"interconnect":      convertInterconnectStat(instr.GetInterconnect()),
+		}
+	}
+
+	// Spill info
+	if sp := m.GetSpill(); sp != nil {
+		result["spill"] = map[string]interface{}{
+			"fileCount":  sp.GetFileCount(),
+			"totalBytes": sp.GetTotalBytes(),
+		}
+	}
+
+	return result
+}
+
+// convertAggregatedMetrics converts a proto AggregatedMetrics to a map.
+func convertAggregatedMetrics(am *pbc.AggregatedMetrics) map[string]interface{} {
+	if am == nil {
+		return nil
+	}
+	return map[string]interface{}{
+		"calls":      am.GetCalls(),
+		"minTime":    am.GetMinTime(),
+		"maxTime":    am.GetMaxTime(),
+		"meanTime":   am.GetMeanTime(),
+		"stddevTime": am.GetStddevTime(),
+		"totalTime":  am.GetTotalTime(),
+	}
+}
+
+// convertQueryInfo converts a proto QueryInfo to a map with all fields.
+func convertQueryInfo(qi *pbc.QueryInfo) map[string]interface{} {
+	if qi == nil {
+		return nil
+	}
+	return map[string]interface{}{
+		"generator":    qi.GetGenerator().String(),
+		"queryId":      qi.GetQueryId(),
+		"planId":       qi.GetPlanId(),
+		"queryText":    qi.GetQueryText(),
+		"planText":     qi.GetPlanText(),
+		"userName":     qi.GetUserName(),
+		"databaseName": qi.GetDatabaseName(),
+		"rsgname":      qi.GetRsgname(),
+		"analyzeText":  qi.GetAnalyzeText(),
+		"submitTime":   formatTimestamp(qi.GetSubmitTime()),
+		"startTime":    formatTimestamp(qi.GetStartTime()),
+		"endTime":      formatTimestamp(qi.GetEndTime()),
+	}
+}
+
+// convertSegmentMetrics converts a proto SegmentMetrics to a map.
+func convertSegmentMetrics(sm *pbm.SegmentMetrics) map[string]interface{} {
+	if sm == nil {
+		return nil
+	}
+	result := map[string]interface{}{
+		"clusterId":   sm.GetClusterId(),
+		"hostname":    sm.GetHostname(),
+		"collectTime": formatTimestamp(sm.GetCollectTime()),
+		"queryStatus": sm.GetQueryStatus().String(),
+		"startTime":   formatTimestamp(sm.GetStartTime()),
+		"endTime":     formatTimestamp(sm.GetEndTime()),
+		"metrics":     convertGPMetrics(sm.GetSegmentMetrics()),
+	}
+	if sk := sm.GetSegmentKey(); sk != nil {
+		result["segmentKey"] = map[string]interface{}{
+			"dbid":     sk.GetDbid(),
+			"segindex": sk.GetSegindex(),
+		}
+	}
+	return result
 }
 
 // handleGetQuery handles GET /api/query/{ssid}/{ccnt}
@@ -239,10 +395,38 @@ func (s *Server) handleGetQuery(w http.ResponseWriter, r *http.Request) {
 		"host":                 qs.GetHostname(),
 		"sessionKey": map[string]interface{}{
 			"sessId": fmt.Sprintf("%d", qs.QueryKey.GetSsid()),
-			"tmId":   "0",
+			"tmId":   fmt.Sprintf("%d", qs.QueryKey.GetTmid()),
 		},
 		"metrics": convertGPMetrics(qs.GetTotalQueryMetrics()),
+
+		// QueryStat fields
+		"clusterId":       qs.GetClusterId(),
+		"collectTime":     formatTimestamp(qs.GetCollectTime()),
+		"statKind":        qs.GetStatKind().String(),
+		"startTime":       formatTimestamp(qs.GetStartTime()),
+		"endTime":         formatTimestamp(qs.GetEndTime()),
+		"completed":       qs.GetCompleted(),
+		"message":         qs.GetMessage(),
+		"blockedBySessId": qs.GetBlockedBySessId(),
+		"waitMode":        qs.GetWaitMode(),
+		"lockedItem":      qs.GetLockedItem(),
+		"lockedMode":      qs.GetLockedMode(),
+		"sessionState":    qs.GetSessionState(),
+		"slices":          qs.GetSlices(),
+
+		// Detailed query info
+		"queryInfo":         convertQueryInfo(qs.GetQueryInfo()),
+		"aggregatedMetrics": convertAggregatedMetrics(qs.GetAggregatedMetrics()),
 	}
+
+	// Convert segment metrics
+	segMetrics := make([]map[string]interface{}, 0, len(qData.SegmentQueryMetrics))
+	for _, sm := range qData.SegmentQueryMetrics {
+		if converted := convertSegmentMetrics(sm); converted != nil {
+			segMetrics = append(segMetrics, converted)
+		}
+	}
+	query["segmentMetrics"] = segMetrics
 
 	writeJSON(w, http.StatusOK, map[string]interface{}{
 		"query": query,

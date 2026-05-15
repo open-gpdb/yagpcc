@@ -1,12 +1,5 @@
 import { Tag } from "antd";
-
-const statusColors: Record<string, string> = {
-  start: "processing",
-  done: "success",
-  error: "error",
-  canceled: "warning",
-  idle: "default",
-};
+import { queryStatusColors } from "../theme";
 
 interface Props {
   status: string;
@@ -14,6 +7,6 @@ interface Props {
 
 export default function QueryStatusBadge({ status }: Props) {
   const normalized = status.toLowerCase().replace(/query_status_/i, "");
-  const color = statusColors[normalized] ?? "default";
+  const color = queryStatusColors[normalized] ?? queryStatusColors["idle"];
   return <Tag color={color}>{normalized || "unknown"}</Tag>;
 }

@@ -47,7 +47,6 @@ function post<T>(url: string, body: unknown): Promise<T> {
 export interface GetSessionsParams {
   showSystem?: boolean;
   showQueryType?: string;
-  hideEmptyQueries?: boolean;
   pageSize?: number;
   pageToken?: string;
   sort?: string[];
@@ -58,7 +57,6 @@ export function getSessions(params: GetSessionsParams = {}) {
   const q = new URLSearchParams();
   if (params.showSystem) q.set("show_system", "true");
   if (params.showQueryType) q.set("show_query_type", params.showQueryType);
-  if (params.hideEmptyQueries) q.set("hide_empty_queries", "true");
   if (params.pageSize) q.set("page_size", String(params.pageSize));
   if (params.pageToken) q.set("page_token", params.pageToken);
   params.sort?.forEach((s) => q.append("sort", s));
@@ -207,6 +205,17 @@ export interface SessionInfo {
   runningQueryError: string;
   blockedSessionLevel: number;
 
+  // Running query detailed info
+  runningQueryInfo: QueryDetailInfo | null;
+
+  // Metrics
+  totalMetrics: GPMetrics | null;
+  lastMetrics: GPMetrics | null;
+  queryMetrics: GPMetrics | null;
+
+  // Aggregated metrics
+  aggregatedMetrics: AggregatedMetrics | null;
+
   // Nested queries
   queries: QueryDesc[];
 }
@@ -222,6 +231,21 @@ export interface QueryDesc {
 export interface QueryKey {
   ssid: number;
   ccnt: number;
+}
+
+export interface QueryDetailInfo {
+  generator: string;
+  queryId: number;
+  planId: number;
+  queryText: string;
+  planText: string;
+  userName: string;
+  databaseName: string;
+  rsgname: string;
+  analyzeText: string;
+  submitTime: string;
+  startTime: string;
+  endTime: string;
 }
 
 export interface QueryInfo {
@@ -243,15 +267,142 @@ export interface QueryInfo {
   runningQuerySlices: number;
   runningQueryError: string;
   metrics: GPMetrics | null;
+
+  // QueryStat fields
+  clusterId: string;
+  collectTime: string;
+  statKind: string;
+  startTime: string;
+  endTime: string;
+  completed: boolean;
+  message: string;
+  blockedBySessId: number;
+  waitMode: string;
+  lockedItem: string;
+  lockedMode: string;
+  sessionState: string;
+  slices: number;
+
+  // Detailed query info
+  queryInfo: QueryDetailInfo | null;
+  aggregatedMetrics: AggregatedMetrics | null;
+
+  // Segment metrics
+  segmentMetrics: SegmentMetricsInfo[];
+}
+
+export interface NetworkStat {
+  totalBytes: number;
+  tupleBytes: number;
+  chunks: number;
+}
+
+export interface InterconnectStat {
+  totalRecvQueueSize: number;
+  recvQueueSizeCountingTime: number;
+  totalCapacity: number;
+  capacityCountingTime: number;
+  totalBuffers: number;
+  bufferCountingTime: number;
+  activeConnectionsNum: number;
+  retransmits: number;
+  startupCachedPktNum: number;
+  mismatchNum: number;
+  crcErrors: number;
+  sndPktNum: number;
+  recvPktNum: number;
+  disorderedPktNum: number;
+  duplicatedPktNum: number;
+  recvAckNum: number;
+  statusQueryMsgNum: number;
+}
+
+export interface SystemStat {
+  runningTimeSeconds: number;
+  userTimeSeconds: number;
+  kernelTimeSeconds: number;
+  vsize: number;
+  rss: number;
+  vmPeakKb: number;
+  rchar: number;
+  wchar: number;
+  syscr: number;
+  syscw: number;
+  readBytes: number;
+  writeBytes: number;
+  cancelledWriteBytes: number;
+}
+
+export interface Instrumentation {
+  ntuples: number;
+  nloops: number;
+  tuplecount: number;
+  firsttuple: number;
+  startup: number;
+  total: number;
+  sharedBlksHit: number;
+  sharedBlksRead: number;
+  sharedBlksDirtied: number;
+  sharedBlksWritten: number;
+  localBlksHit: number;
+  localBlksRead: number;
+  localBlksDirtied: number;
+  localBlksWritten: number;
+  tempBlksRead: number;
+  tempBlksWritten: number;
+  blkReadTime: number;
+  blkWriteTime: number;
+  startupTime: number;
+  inheritedCalls: number;
+  inheritedTime: number;
+  sent: NetworkStat | null;
+  received: NetworkStat | null;
+  interconnect: InterconnectStat | null;
+}
+
+export interface SpillInfo {
+  fileCount: number;
+  totalBytes: number;
 }
 
 export interface GPMetrics {
+  // Summary fields
   cpuUsage: number;
   memoryUsage: number;
   diskRead: number;
   diskWrite: number;
   networkSent: number;
   networkReceived: number;
+
+  // Detailed fields
+  systemStat: SystemStat | null;
+  instrumentation: Instrumentation | null;
+  spill: SpillInfo | null;
+}
+
+export interface AggregatedMetrics {
+  calls: number;
+  minTime: number;
+  maxTime: number;
+  meanTime: number;
+  stddevTime: number;
+  totalTime: number;
+}
+
+export interface SegmentKey {
+  dbid: number;
+  segindex: number;
+}
+
+export interface SegmentMetricsInfo {
+  segmentKey: SegmentKey | null;
+  clusterId: string;
+  hostname: string;
+  collectTime: string;
+  queryStatus: string;
+  startTime: string;
+  endTime: string;
+  metrics: GPMetrics | null;
 }
 
 export interface SessionStat {

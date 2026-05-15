@@ -141,6 +141,14 @@ func convertSessionState(sessionState *pbc.SessionState) map[string]interface{} 
 		// Running query info
 		"runningQuery": nil,
 		"queries":      queriesStack,
+
+		// Metrics
+		"totalMetrics": convertGPMetrics(sessionState.GetTotalMetrics()),
+		"lastMetrics":  convertGPMetrics(sessionState.GetLastMetrics()),
+		"queryMetrics": convertGPMetrics(sessionState.GetQueryMetrics()),
+
+		// Aggregated metrics
+		"aggregatedMetrics": convertAggregatedMetrics(sessionState.GetAggregatedMetrics()),
 	}
 
 	// Running query key
@@ -154,11 +162,13 @@ func convertSessionState(sessionState *pbc.SessionState) map[string]interface{} 
 	// Running query status
 	session["runningQueryStatus"] = sessionState.GetRunningQueryStatus().String()
 
-	// Running query text (from RunningQueryInfo)
+	// Running query info (all fields)
 	if rqi := sessionState.GetRunningQueryInfo(); rqi != nil {
 		session["runningQueryText"] = rqi.GetQueryText()
+		session["runningQueryInfo"] = convertQueryInfo(rqi)
 	} else {
 		session["runningQueryText"] = ""
+		session["runningQueryInfo"] = nil
 	}
 
 	return session
@@ -169,7 +179,6 @@ func convertSessionState(sessionState *pbc.SessionState) map[string]interface{} 
 // Query parameters (same as CSV endpoint):
 //   - show_system: bool (default false)
 //   - show_query_type: RQT_TOP|RQT_LAST (default RQT_UNSPECIFIED)
-//   - hide_empty_queries: bool (default false)
 //   - page_size: int (default 100)
 //   - page_token: string
 //   - sort: FIELD_NAME:ASC|DESC (repeatable)
@@ -187,7 +196,6 @@ func (s *Server) handleGetSessions(w http.ResponseWriter, r *http.Request) {
 	q := r.URL.Query()
 
 	showSystem, _ := strconv.ParseBool(q.Get("show_system"))
-	hideEmptyQueries, _ := strconv.ParseBool(q.Get("hide_empty_queries"))
 
 	filters := parseSessionFilters(r)
 	sortFields := parseSortFields(r)
@@ -208,13 +216,12 @@ func (s *Server) handleGetSessions(w http.ResponseWriter, r *http.Request) {
 	}
 
 	req := &pbm.GetGPSessionsReq{
-		ShowSystem:       showSystem,
-		Field:            sortFields,
-		Filter:           filters,
-		PageSize:         pageSize,
-		PageToken:        pageToken,
-		HideEmptyQueries: hideEmptyQueries,
-		ShowQueryType:    queryType,
+		ShowSystem:    showSystem,
+		Field:         sortFields,
+		Filter:        filters,
+		PageSize:      pageSize,
+		PageToken:     pageToken,
+		ShowQueryType: queryType,
 	}
 
 	resp, err := s.grpcServer.GetGPSessions(r.Context(), req)

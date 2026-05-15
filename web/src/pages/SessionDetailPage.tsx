@@ -21,6 +21,8 @@ import {
 import ErrorAlert from "../components/ErrorAlert";
 import SessionStateBadge from "../components/SessionStateBadge";
 import QueryStatusBadge from "../components/QueryStatusBadge";
+import { GPMetricsCard, AggregatedMetricsCard } from "../components/MetricsDisplay";
+import { codeBlockStyle } from "../theme";
 
 const { Title } = Typography;
 
@@ -110,6 +112,8 @@ export default function SessionDetailPage() {
                 <Descriptions.Item label="User">{session.user}</Descriptions.Item>
                 <Descriptions.Item label="Database">{session.database}</Descriptions.Item>
                 <Descriptions.Item label="Host">{session.host}</Descriptions.Item>
+                <Descriptions.Item label="Cluster ID">{session.clusterId}</Descriptions.Item>
+                <Descriptions.Item label="Collect Time">{session.collectTime}</Descriptions.Item>
                 <Descriptions.Item label="Application">
                   {session.applicationName}
                 </Descriptions.Item>
@@ -124,6 +128,9 @@ export default function SessionDetailPage() {
                 </Descriptions.Item>
                 <Descriptions.Item label="Resource Group">
                   {session.rsgName}
+                </Descriptions.Item>
+                <Descriptions.Item label="Resource Group ID">
+                  {session.rsgId || ""}
                 </Descriptions.Item>
                 <Descriptions.Item label="RSG Queue Duration">
                   {session.rsgQueueDuration}
@@ -203,21 +210,70 @@ export default function SessionDetailPage() {
 
             {session.runningQueryText && (
               <Card title="Running Query Text" style={{ marginBottom: 16 }}>
-                <pre
-                  style={{
-                    background: "#f6f6f6",
-                    padding: 16,
-                    borderRadius: 6,
-                    overflow: "auto",
-                    maxHeight: 300,
-                    fontSize: 13,
-                    fontFamily: "'SF Mono', 'Fira Code', monospace",
-                  }}
-                >
+                <pre style={codeBlockStyle}>
                   {session.runningQueryText}
                 </pre>
               </Card>
             )}
+
+            {session.runningQueryInfo && (
+              <Card title="Running Query Details" style={{ marginBottom: 16 }}>
+                <Descriptions bordered column={{ xs: 1, sm: 2, md: 3 }} size="small">
+                  <Descriptions.Item label="Generator">
+                    {session.runningQueryInfo.generator}
+                  </Descriptions.Item>
+                  <Descriptions.Item label="Query ID">
+                    <span className="mono">{session.runningQueryInfo.queryId || ""}</span>
+                  </Descriptions.Item>
+                  <Descriptions.Item label="Plan ID">
+                    <span className="mono">{session.runningQueryInfo.planId || ""}</span>
+                  </Descriptions.Item>
+                  <Descriptions.Item label="User">
+                    {session.runningQueryInfo.userName}
+                  </Descriptions.Item>
+                  <Descriptions.Item label="Database">
+                    {session.runningQueryInfo.databaseName}
+                  </Descriptions.Item>
+                  <Descriptions.Item label="Resource Group">
+                    {session.runningQueryInfo.rsgname}
+                  </Descriptions.Item>
+                  <Descriptions.Item label="Submit Time">
+                    {session.runningQueryInfo.submitTime}
+                  </Descriptions.Item>
+                  <Descriptions.Item label="Start Time">
+                    {session.runningQueryInfo.startTime}
+                  </Descriptions.Item>
+                  <Descriptions.Item label="End Time">
+                    {session.runningQueryInfo.endTime}
+                  </Descriptions.Item>
+                </Descriptions>
+                {session.runningQueryInfo.planText && (
+                  <>
+                    <Typography.Title level={5} style={{ marginTop: 12 }}>
+                      Plan Text
+                    </Typography.Title>
+                    <pre style={codeBlockStyle}>
+                      {session.runningQueryInfo.planText}
+                    </pre>
+                  </>
+                )}
+                {session.runningQueryInfo.analyzeText && (
+                  <>
+                    <Typography.Title level={5} style={{ marginTop: 12 }}>
+                      Explain Analyze
+                    </Typography.Title>
+                    <pre style={codeBlockStyle}>
+                      {session.runningQueryInfo.analyzeText}
+                    </pre>
+                  </>
+                )}
+              </Card>
+            )}
+
+            <GPMetricsCard title="Query Metrics (Current Query)" metrics={session.queryMetrics} />
+            <GPMetricsCard title="Total Metrics (Session Lifetime)" metrics={session.totalMetrics} />
+            <GPMetricsCard title="Last Metrics (1h Window)" metrics={session.lastMetrics} />
+            <AggregatedMetricsCard title="Aggregated Metrics" metrics={session.aggregatedMetrics} />
 
             <Card title={`Queries (${session.queries?.length ?? 0})`}>
               <Table

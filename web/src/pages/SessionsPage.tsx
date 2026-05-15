@@ -7,21 +7,26 @@ import {
   Button,
   Space,
   Input,
+  InputNumber,
   Select,
   Switch,
   Modal,
   message,
+  Form,
+  Alert,
 } from "antd";
-import { ReloadOutlined, StopOutlined } from "@ant-design/icons";
+import { ReloadOutlined, StopOutlined, DeleteOutlined } from "@ant-design/icons";
 import { useApi } from "../hooks/useApi";
 import {
   getSessions,
   terminateSession,
+  terminateSessions,
   type SessionInfo,
   type GetSessionsParams,
 } from "../api/client";
 import ErrorAlert from "../components/ErrorAlert";
 import SessionStateBadge from "../components/SessionStateBadge";
+import { TV } from "../theme";
 
 const { Title } = Typography;
 const { Search } = Input;
@@ -31,7 +36,6 @@ export default function SessionsPage() {
   const [params, setParams] = useState<GetSessionsParams>({
     pageSize: 50,
     showSystem: false,
-    hideEmptyQueries: false,
     sort: ["TOTAL_RUNNINGTIMESECONDS:DESC"],
   });
   const [filterUser, setFilterUser] = useState("");
@@ -39,6 +43,11 @@ export default function SessionsPage() {
   const [filterState, setFilterState] = useState("");
   const [page, setPage] = useState(1);
   const [pageTokens, setPageTokens] = useState<Record<number, string>>({ 1: "" });
+
+  // Terminate Sessions modal state
+  const [terminateModalVisible, setTerminateModalVisible] = useState(false);
+  const [terminateLoading, setTerminateLoading] = useState(false);
+  const [terminateForm] = Form.useForm();
 
   const resetPagination = useCallback(() => {
     setPage(1);
@@ -83,6 +92,69 @@ export default function SessionsPage() {
         }
       },
     });
+  };
+
+  const handleTerminateSessions = async () => {
+    try {
+      const values = await terminateForm.validateFields();
+      const database = (values.database ?? "").trim();
+      const username = (values.username ?? "").trim();
+      const queryId = values.queryId ?? 0;
+
+      if (!database && !username && !queryId) {
+        message.warning("Please specify at least one filter (database, username, or query ID)");
+        return;
+      }
+
+      // Show a final confirmation
+      Modal.confirm({
+        title: "Confirm Bulk Terminate",
+        content: (
+          <div>
+            <p>This will terminate all sessions matching:</p>
+            <ul>
+              {database && <li><strong>Database:</strong> {database}</li>}
+              {username && <li><strong>Username:</strong> {username}</li>}
+              {queryId > 0 && <li><strong>Query ID:</strong> {queryId}</li>}
+            </ul>
+            <p style={{ color: TV.red, fontWeight: "bold" }}>This action cannot be undone.</p>
+          </div>
+        ),
+        okText: "Terminate All Matching",
+        okType: "danger",
+        onOk: async () => {
+          setTerminateLoading(true);
+          try {
+            const resp = await terminateSessions({ database, username, queryId });
+            const results = resp.terminateResponse ?? [];
+            const successCount = results.filter(
+              (r) => r.statusCode === "TERMINATE_RESPONSE_STATUS_CODE_SUCCESS",
+            ).length;
+            const errorCount = results.length - successCount;
+
+            if (errorCount === 0) {
+              message.success(`Successfully terminated ${successCount} session(s)`);
+            } else {
+              message.warning(
+                `Terminated ${successCount} session(s), ${errorCount} failed`,
+              );
+            }
+
+            setTerminateModalVisible(false);
+            terminateForm.resetFields();
+            refresh();
+          } catch (err) {
+            message.error(
+              `Failed: ${err instanceof Error ? err.message : String(err)}`,
+            );
+          } finally {
+            setTerminateLoading(false);
+          }
+        },
+      });
+    } catch {
+      // form validation failed
+    }
   };
 
   const columns = [
@@ -246,17 +318,15 @@ export default function SessionsPage() {
               resetPagination();
             }}
           />
-          <Switch
-            checkedChildren="Hide Empty"
-            unCheckedChildren="Hide Empty"
-            checked={params.hideEmptyQueries}
-            onChange={(v) => {
-              setParams((p) => ({ ...p, hideEmptyQueries: v }));
-              resetPagination();
-            }}
-          />
           <Button icon={<ReloadOutlined />} onClick={refresh}>
             Refresh
+          </Button>
+          <Button
+            danger
+            icon={<DeleteOutlined />}
+            onClick={() => setTerminateModalVisible(true)}
+          >
+            Terminate Sessions
           </Button>
         </Space>
       </Card>
@@ -290,6 +360,55 @@ export default function SessionsPage() {
           scroll={{ x: 4000 }}
         />
       </Card>
+
+      <Modal
+        title="Terminate Multiple Sessions"
+        open={terminateModalVisible}
+        onOk={handleTerminateSessions}
+        onCancel={() => {
+          setTerminateModalVisible(false);
+          terminateForm.resetFields();
+        }}
+        okText="Terminate"
+        okType="danger"
+        okButtonProps={{ loading: terminateLoading, icon: <DeleteOutlined /> }}
+        width={500}
+      >
+        <Alert
+          message="This will terminate all sessions matching the specified filters."
+          description="At least one filter must be provided. Leave a field empty to not filter by it."
+          type="warning"
+          showIcon
+          style={{ marginBottom: 16 }}
+        />
+        <Form form={terminateForm} layout="vertical">
+          <Form.Item
+            name="database"
+            label="Database"
+            tooltip="Terminate sessions connected to this database"
+          >
+            <Input placeholder="e.g. mydb" allowClear />
+          </Form.Item>
+          <Form.Item
+            name="username"
+            label="Username"
+            tooltip="Terminate sessions belonging to this user"
+          >
+            <Input placeholder="e.g. gpadmin" allowClear />
+          </Form.Item>
+          <Form.Item
+            name="queryId"
+            label="Query ID"
+            tooltip="Terminate sessions running this normalized query ID"
+          >
+            <InputNumber
+              placeholder="e.g. 12345"
+              style={{ width: "100%" }}
+              min={0}
+            />
+          </Form.Item>
+        </Form>
+      </Modal>
     </div>
   );
 }
