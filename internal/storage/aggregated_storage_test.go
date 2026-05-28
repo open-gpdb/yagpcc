@@ -17,6 +17,7 @@
 package storage
 
 import (
+	"context"
 	"math/rand"
 	"os"
 	"testing"
@@ -24,6 +25,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"go.uber.org/zap"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/timestamppb"
 
@@ -267,4 +269,82 @@ func TestParallelAgg(t *testing.T) {
 			}
 		})
 	}
+}
+
+// TestArchiveAggQuery_CycleHookSnapshotIsDeepCloned guards against a race
+// where the cycle hook receives a TotalMetrics pointer that a concurrent
+// AggQuery (which already retrieved the same *AggVal from the map before
+// the drain pass deleted it) could later mutate via GroupGPMetrics. The
+// snapshot must own its own copy of TotalMetrics so the hook can read the
+// fields without holding the bucket lock.
+func TestArchiveAggQuery_CycleHookSnapshotIsDeepCloned(t *testing.T) {
+	logger := zap.NewNop().Sugar()
+	aggStorage := NewAggregatedStorage(logger, WithTruncInterval(50*time.Millisecond))
+
+	startQ, endQ := setTime()
+	require.NoError(t, aggStorage.AggQuery(&pbm.TotalQueryData{
+		QueryStat: &pbm.QueryStat{
+			StatKind:    pbm.StatKind_SK_PRECISE,
+			Completed:   true,
+			StartTime:   timestamppb.New(startQ),
+			EndTime:     timestamppb.New(endQ),
+			QueryStatus: pbc.QueryStatus_QUERY_STATUS_DONE,
+			QueryInfo: &pbc.QueryInfo{
+				QueryId:      42,
+				UserName:     "u",
+				DatabaseName: "d",
+				QueryText:    "select 1",
+			},
+			QueryKey:          &pbc.QueryKey{Ssid: 1},
+			TotalQueryMetrics: &pbc.GPMetrics{SystemStat: &pbc.SystemStat{UserTimeSeconds: 7}},
+		},
+	}))
+
+	// Capture the original *AggVal pointer so we can mutate the underlying
+	// TotalMetrics later, then advance time so the bucket is mature.
+	startI, endI := aggStorage.GetCurrentInterval()
+	aggStorage.mx.RLock()
+	origVal := aggStorage.aggQueries[AggKey{QueryID: 42, UserName: "u", DatabaseName: "d", StartTime: startI, EndTime: endI}]
+	aggStorage.mx.RUnlock()
+	require.NotNil(t, origVal)
+	CurrentTime = func() time.Time { return endQ.Add(2 * aggStorage.GetTruncInterval()) }
+
+	captured := make(chan AggBucketSnapshot, 1)
+	aggStorage.SetCycleHook(func(_ context.Context, snaps []AggBucketSnapshot) {
+		if len(snaps) > 0 {
+			captured <- snaps[0]
+		}
+	})
+
+	ctx, cancel := context.WithTimeout(context.Background(), 1*time.Second)
+	defer cancel()
+	queryChan := make(chan *pbm.QueryStatWrite, 4)
+	go func() {
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case <-queryChan:
+			}
+		}
+	}()
+	go func() { _ = aggStorage.ArchiveAggQuery(ctx, queryChan, "cluster", "host") }()
+
+	var snap AggBucketSnapshot
+	select {
+	case snap = <-captured:
+	case <-time.After(800 * time.Millisecond):
+		t.Fatal("cycle hook never fired")
+	}
+	require.NotNil(t, snap.TotalMetrics)
+	require.NotNil(t, snap.TotalMetrics.SystemStat)
+	assert.Equal(t, float64(7), snap.TotalMetrics.SystemStat.UserTimeSeconds)
+	// The snapshot's TotalMetrics must be a distinct allocation. Mutating the
+	// original AggVal's pointer through the storage must not bleed into the
+	// snapshot.
+	assert.NotSame(t, origVal.TotalMetrics, snap.TotalMetrics, "snapshot must own a deep copy of TotalMetrics")
+	origVal.QueryLock.Lock()
+	origVal.TotalMetrics.SystemStat.UserTimeSeconds = 999
+	origVal.QueryLock.Unlock()
+	assert.Equal(t, float64(7), snap.TotalMetrics.SystemStat.UserTimeSeconds, "snapshot must be unaffected by mutation of origVal")
 }

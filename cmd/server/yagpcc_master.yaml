@@ -38,3 +38,41 @@ app:
   prometheus:
     url: "{{ salt['pillar.get']('data:mdb-maintenance:prometheus:url', '') | yaml }}"
   app_name: yagpcc
+# Optional ClickHouse sink — opt-in via enabled: true.
+# Password should be supplied via the YAGPCC_CH_PASSWORD env var so secrets
+# stay out of the config file; the YAML "password" field is also accepted but
+# discouraged.
+# See docs/clickhouse-sink-architecture.md for details.
+clickhouse:
+  enabled: false                           # set to true to start streaming query history to ClickHouse
+  addrs: ["clickhouse-mon:9000"]
+  database: yagpcc
+  user: yagpcc_writer
+  # password: <prefer YAGPCC_CH_PASSWORD env var>   # uncomment only if env-based secret injection is unavailable
+
+  schema_management: auto                  # auto | verify_only | dump_only
+  retention_days: 30                       # rendered into TTL of every table
+
+  # Batching
+  batch_size: 10000
+  flush_interval: 10s
+  buffer_max_rows: 100000
+  on_buffer_overflow: drop_oldest          # drop_oldest | block
+  async_insert: true                       # CH-side async_insert=1, wait_for_async_insert=0
+
+  min_duration_ms: 100                     # drop terminal events shorter than this
+  session_snapshot_interval_sec: 10
+
+  dial_timeout: 5s
+  read_timeout: 30s
+
+  tls:
+    enabled: false
+    ca_file: /etc/yagpcc/ssl/ch_ca.crt
+    insecure_skip_verify: false
+
+  sinks:
+    query_events: true
+    aggregated_metrics: true
+    session_snapshots: true
+    plan_nodes: false                      # reserved for v2

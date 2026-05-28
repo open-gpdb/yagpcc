@@ -47,3 +47,6 @@ debian
 
 # Frontend sources and package manifests are governed by project-level ASF license docs.
 web/**
+
+# Embedded SQL migrations
+internal/sink/clickhouse/migrations/*.sql

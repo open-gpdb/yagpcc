@@ -124,6 +124,22 @@ flowchart TB
     SegmentHostBYagpcc --TCP GRPC<br>GetQueryInfo/GetMetricQueries--> yagpcc
 
     StatsConsumer(Various consumers of collected statistics)
+    ClickHouse[(ClickHouse<br>опциональный sink)]
 
     yagpcc --> StatsConsumer
+    yagpcc --INSERT<br>query_events / aggregated_metrics<br>session_snapshots--> ClickHouse
 ```
+
+### Опциональный ClickHouse sink (только master)
+
+При `clickhouse.enabled: true` master параллельно с in-memory хранилищами и
+JSON-архивом стримит query history в ClickHouse:
+
+- `query_events` — одна строка на каждое изменение статуса запроса (полный plan tree + per-segment метрики).
+- `aggregated_metrics` — агрегаты на `SummingMergeTree` по ключу `(query_id, plan_id, user, database, resource_group)`.
+- `session_snapshots` — периодические снэпшоты `pg_stat_activity`.
+
+Sink — opt-in, работает рядом с JSON-archiver'ом. Можно включить оба, один,
+или ни одного. Подробности — в
+[`clickhouse-sink-architecture.md`](./clickhouse-sink-architecture.md);
+разделение ролей с VictoriaMetrics — в [`vm-vs-ch.md`](./vm-vs-ch.md).
