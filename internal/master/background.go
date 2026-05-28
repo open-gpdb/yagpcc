@@ -332,6 +332,9 @@ func queryCompleted(qKey *storage.QueryKey, qVal *storage.RunningQuery, segmentG
 			l.Debugf("Query %v completed and exceeded segment timeout", *qKey)
 			return 1
 		}
+		// Archive on master Completed; GC can evict before timeout fires.
+		l.Debugf("Query %v completed, archiving without all segments", *qKey)
+		return 1
 	}
 
 	return 0
