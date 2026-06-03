@@ -314,7 +314,10 @@ func (s *RunningQueriesStorage) garbageCollect() {
 
 	var toArchive []GCQuery
 	for i := 0; i < toDelete; i++ {
-		if CheckQueryEnded(ss[i].Value.QueryStatus) && s.archChan != nil {
+		ss[i].Value.QueryLock.RLock()
+		completed := ss[i].Value.Completed
+		ss[i].Value.QueryLock.RUnlock()
+		if completed && s.archChan != nil {
 			// Completed query — send to archive channel instead of losing data.
 			key := ss[i].Key
 			toArchive = append(toArchive, GCQuery{QKey: &key, QVal: ss[i].Value})
@@ -336,10 +339,21 @@ func (s *RunningQueriesStorage) garbageCollect() {
 		gcDone := s.gcDone
 		go func() {
 			for i := range toArchive {
+				if gcDone != nil {
+					select {
+					case <-gcDone:
+						return
+					default:
+					}
+					select {
+					case archChan <- &toArchive[i]:
+					case <-gcDone:
+						return
+					}
+					continue
+				}
 				select {
 				case archChan <- &toArchive[i]:
-				case <-gcDone:
-					return
 				}
 			}
 		}()

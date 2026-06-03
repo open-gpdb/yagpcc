@@ -154,11 +154,8 @@ func TestGCWithArchChan(t *testing.T) {
 	// After GC: 1000 - 200 + 1 = 801
 	assert.Equal(t, 801, len(s.runningQueries))
 
-	// Wait briefly for the goroutine to send to archChan
-	time.Sleep(100 * time.Millisecond)
-
 	// All 200 evicted queries were completed, so all should be sent to archChan
-	assert.Equal(t, 200, len(archChan))
+	assert.Eventually(t, func() bool { return len(archChan) == 200 }, time.Second, 10*time.Millisecond)
 
 	// Verify the archived queries have valid keys
 	for i := 0; i < 200; i++ {
@@ -259,11 +256,8 @@ func TestGCWithArchChanPartiallyCompleted(t *testing.T) {
 
 	assert.Equal(t, 801, len(s.runningQueries))
 
-	// Wait briefly for the goroutine to send to archChan
-	time.Sleep(100 * time.Millisecond)
-
 	// Only the 50 completed queries should be sent to archChan
-	assert.Equal(t, 50, len(archChan))
+	assert.Eventually(t, func() bool { return len(archChan) == 50 }, time.Second, 10*time.Millisecond)
 
 	for i := 0; i < 50; i++ {
 		gcQ := <-archChan

@@ -111,7 +111,7 @@ func TestSyncSegmentHosts_PrunesStaleHosts(t *testing.T) {
 	assert.True(t, hasC, "host-c should remain")
 }
 
-func TestSyncSegmentHosts_NewHostHasNoEntry(t *testing.T) {
+func TestSyncSegmentHosts_NewHostStartsAtZeroRefresh(t *testing.T) {
 	bs := newTestBackgroundStorage()
 	now := time.Now()
 
@@ -128,21 +128,16 @@ func TestSyncSegmentHosts_NewHostHasNoEntry(t *testing.T) {
 
 	bs.segRefreshMu.RLock()
 	_, hasA := bs.segRefreshTimes["host-a"]
-	_, hasB := bs.segRefreshTimes["host-b"]
+	hostBTime, hasB := bs.segRefreshTimes["host-b"]
 	bs.segRefreshMu.RUnlock()
 
 	assert.True(t, hasA, "host-a should remain")
-	assert.False(t, hasB, "host-b should not have an entry yet (not refreshed)")
+	assert.True(t, hasB, "host-b should be inserted with zero refresh time")
+	assert.True(t, hostBTime.IsZero(), "host-b should start at zero refresh time")
 
-	// MinSegmentRefreshTime should return zero because not all active hosts
-	// have been refreshed — host-b is missing from the map.
-	// This is correct behavior: we can't claim all segments are refreshed
-	// if a new host hasn't been polled yet.
-	// Note: MinSegmentRefreshTime only iterates over existing entries,
-	// so it returns host-a's time. The caller (queryCompleted) will still
-	// work correctly because the new host will eventually be polled.
+	// MinSegmentRefreshTime should stay zero until every active host has refreshed.
 	minT := bs.MinSegmentRefreshTime()
-	assert.False(t, minT.IsZero(), "min should be host-a's time since host-b has no entry")
+	assert.True(t, minT.IsZero(), "min should remain zero until host-b refreshes")
 }
 
 func TestSyncSegmentHosts_AllHostsRemoved(t *testing.T) {
@@ -185,15 +180,16 @@ func TestSyncSegmentHosts_HostMovedBetweenRefreshes(t *testing.T) {
 	bs.segRefreshMu.RLock()
 	_, hasA := bs.segRefreshTimes["host-a"]
 	_, hasB := bs.segRefreshTimes["host-b"]
-	_, hasC := bs.segRefreshTimes["host-c"]
+	hostCRefresh, hasC := bs.segRefreshTimes["host-c"]
 	bs.segRefreshMu.RUnlock()
 
 	assert.True(t, hasA, "host-a should remain")
 	assert.False(t, hasB, "host-b should be pruned (no longer in cluster)")
-	assert.False(t, hasC, "host-c should not have an entry yet (new, not refreshed)")
+	assert.True(t, hasC, "host-c should be inserted with zero refresh time")
+	assert.True(t, hostCRefresh.IsZero(), "host-c should start at zero refresh time")
 
-	// Min is host-a's old time. host-c hasn't been polled yet so it has no entry.
-	assert.Equal(t, old, bs.MinSegmentRefreshTime())
+	// Min should be zero until host-c is refreshed at least once.
+	assert.True(t, bs.MinSegmentRefreshTime().IsZero())
 
 	// After host-c is refreshed, min should still be host-a's old time.
 	bs.recordSegmentRefresh("host-c")

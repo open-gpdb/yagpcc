@@ -227,9 +227,11 @@ func (bs *BackgroundStorage) MinSegmentRefreshTime() time.Time {
 	bs.segRefreshMu.RLock()
 	defer bs.segRefreshMu.RUnlock()
 	var minTime time.Time
+	initialized := false
 	for _, t := range bs.segRefreshTimes {
-		if minTime.IsZero() || t.Before(minTime) {
+		if !initialized || t.Before(minTime) {
 			minTime = t
+			initialized = true
 		}
 	}
 	return minTime
@@ -245,6 +247,11 @@ func (bs *BackgroundStorage) syncSegmentHosts(activeHosts map[string]bool) {
 	for host := range bs.segRefreshTimes {
 		if !activeHosts[host] {
 			delete(bs.segRefreshTimes, host)
+		}
+	}
+	for host := range activeHosts {
+		if _, ok := bs.segRefreshTimes[host]; !ok {
+			bs.segRefreshTimes[host] = time.Time{}
 		}
 	}
 }
