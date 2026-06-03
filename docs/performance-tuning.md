@@ -104,6 +104,19 @@ maximum_stored_queries: 50000   # default
 
 Controls the upper bound on how many running-query records yagpcc keeps in memory. Lowering this value reduces RAM usage but may cause recently started short queries to be evicted before they complete. Raising it allows tracking more concurrent queries at the cost of higher memory.
 
+### Garbage collection and archiving
+
+When the number of stored queries reaches `maximum_stored_queries`, a garbage collection (GC) cycle runs and frees **50 %** of the storage capacity. Queries are evicted in the following order:
+
+1. **Running (non-completed) queries** — oldest first.
+2. **Completed queries** — oldest first.
+
+Completed queries evicted by GC are **not silently dropped**. Instead, they are forwarded to the archiver pipeline so their data is preserved in the archive files (sessions, queries, segment metrics). Only running queries that have not yet received a completion status are lost during GC.
+
+This means that even under heavy load, completed query data is retained for historical analysis as long as the archiver is keeping up.
+
+> **Tip:** Monitor the `gc_runs`, `gc_deleted_queries`, and `gc_archived_queries` Prometheus metrics (see below) to understand how often GC fires and how many queries are being archived vs. dropped.
+
 ---
 
 ## Short-query aggregation — `short_agg_interval`
@@ -194,6 +207,9 @@ GET http://<host>:1433/metrics
 | `new_aggregated_queries` | Counter | Short queries aggregated. |
 | `dropped_queries` | Counter | Queries dropped (e.g. storage full). |
 | `failed_queries` | Counter | Queries that ended with an error status. |
+| `gc_runs` | Counter | Total number of storage garbage collection cycles. |
+| `gc_deleted_queries` | Counter | Total queries evicted by GC (both running and completed). |
+| `gc_archived_queries` | Counter | Completed queries forwarded to the archiver during GC (subset of `gc_deleted_queries`). |
 | `total_sessions` | Gauge | Current number of tracked sessions. |
 | `total_queries` | Gauge | Current number of tracked running queries. |
 | `aggregated_queries` | Gauge | Current number of aggregated query buckets. |
@@ -224,6 +240,8 @@ scrape_configs:
 - **`time{method=processSegment}`** — high p99 indicates slow segment pulls; consider increasing `segment_pull_threads` or investigating network latency.
 - **`time{method=RefreshProcfs}`** — if this approaches `procfs_refresh_interval`, procfs gathering is too slow; increase the interval or reduce `segment_pull_threads` for procfs.
 - **`dropped_queries`** — non-zero means the running-queries storage is full; raise `maximum_stored_queries`.
+- **`gc_runs`** — how often GC fires. Frequent GC means the storage is consistently near capacity.
+- **`gc_archived_queries`** — completed queries saved during GC. If this is high, consider raising `maximum_stored_queries`.
 - **`executing_query`** — shows the distribution of currently running query durations; useful for spotting long-running query buildup.
 
 ---

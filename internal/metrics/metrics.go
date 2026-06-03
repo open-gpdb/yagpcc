@@ -39,6 +39,11 @@ type YagpccMetricsType struct {
 	QueryStatuses           *prometheus.CounterVec
 	QueriesInFlight         prometheus.Gauge
 	ExecutingQueryLatencies *TimeGaugeHistogram
+
+	// GC metrics
+	GCRuns            prometheus.Counter
+	GCDeletedQueries  prometheus.Counter
+	GCArchivedQueries prometheus.Counter
 }
 
 var YagpccMetrics *YagpccMetricsType
