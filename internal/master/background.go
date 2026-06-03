@@ -251,6 +251,7 @@ func (bs *BackgroundStorage) syncSegmentHosts(activeHosts map[string]bool) {
 	}
 	for host := range activeHosts {
 		if _, ok := bs.segRefreshTimes[host]; !ok {
+			// Zero time marks a newly active host that has not refreshed yet.
 			bs.segRefreshTimes[host] = time.Time{}
 		}
 	}

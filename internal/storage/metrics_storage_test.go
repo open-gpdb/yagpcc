@@ -208,12 +208,9 @@ func TestGCWithArchChanMixedQueries(t *testing.T) {
 	// GC frees 200 queries, then adds 1 new → 801
 	assert.Equal(t, 801, len(s.runningQueries))
 
-	// Wait briefly for the goroutine to send to archChan
-	time.Sleep(100 * time.Millisecond)
-
 	// All 200 evicted queries were running (not ended), so none should be archived.
 	// Running queries are not sent to archChan to avoid double-counting.
-	assert.Equal(t, 0, len(archChan))
+	assert.Never(t, func() bool { return len(archChan) > 0 }, time.Second, 10*time.Millisecond)
 }
 
 func TestGCWithArchChanPartiallyCompleted(t *testing.T) {

@@ -337,23 +337,23 @@ func (s *RunningQueriesStorage) garbageCollect() {
 	if len(toArchive) > 0 {
 		archChan := s.archChan
 		gcDone := s.gcDone
+		// gcDone is expected to be non-nil whenever archChan is configured.
+		// Keep a defensive fallback channel to avoid nil-channel select behavior
+		// if that invariant is ever broken.
+		if gcDone == nil {
+			gcDone = make(chan struct{})
+		}
 		go func() {
 			for i := range toArchive {
-				if gcDone != nil {
-					select {
-					case <-gcDone:
-						return
-					default:
-					}
-					select {
-					case archChan <- &toArchive[i]:
-					case <-gcDone:
-						return
-					}
-					continue
+				select {
+				case <-gcDone:
+					return
+				default:
 				}
 				select {
 				case archChan <- &toArchive[i]:
+				case <-gcDone:
+					return
 				}
 			}
 		}()
