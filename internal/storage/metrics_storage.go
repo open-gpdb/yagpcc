@@ -62,10 +62,9 @@ type (
 		// internal fields
 		QueryDataLock sync.RWMutex
 	}
-	QueryMap          map[NodeKey]*QueryData
-	QueryIndexNodes   map[NodeKey]bool
-	SegmentIndexNodes map[uint32]interface{}
-	RunningQuery      struct {
+	QueryMap        map[NodeKey]*QueryData
+	QueryIndexNodes map[NodeKey]bool
+	RunningQuery    struct {
 		QueriesData     QueryMap
 		QueryStatus     int32
 		Completed       bool
@@ -75,9 +74,8 @@ type (
 		QueryEnd        time.Time
 		QueryMessage    string // Query status, in most cases we store here Error Message
 		// NestedLevel from AdditionalQueryInfo on the coordinator/master slice (-1 if unknown).
-		NestedLevel  int64
-		SegmentNodes SegmentIndexNodes
-		QueryLock    sync.RWMutex
+		NestedLevel int64
+		QueryLock   sync.RWMutex
 	}
 	RunningQueryType map[QueryKey]*RunningQuery
 
@@ -377,7 +375,6 @@ func (s *RunningQueriesStorage) newQuery(qKey *QueryKey, status int32, mQTimes M
 		QueryEnd:        qNow,
 		QuerySubmit:     qNow,
 		NestedLevel:     -1,
-		SegmentNodes:    make(SegmentIndexNodes),
 	}
 
 	if mQTimes.QueryStart != nil {
