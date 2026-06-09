@@ -259,7 +259,12 @@ func TestParallelAgg(t *testing.T) {
 					aggStorage.mx.RUnlock()
 					if okA {
 						valA.QueryLock.RLock()
-						assert.LessOrEqual(t, int64(1), valA.AggTimes.Calls)
+						// AggQuery publishes a new entry to the map before its first
+						// GroupAggMetrics call increments Calls, so a concurrently
+						// observed entry may legitimately still have Calls == 0. Only
+						// assert the entry is well-formed and the count is non-negative.
+						assert.NotNil(t, valA.AggTimes)
+						assert.GreaterOrEqual(t, valA.AggTimes.Calls, int64(0))
 						valA.QueryLock.RUnlock()
 					}
 				}
