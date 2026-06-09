@@ -22,6 +22,9 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"go.uber.org/zap"
+
+	pbc "github.com/open-gpdb/yagpcc/api/proto/common"
+	"github.com/open-gpdb/yagpcc/internal/storage"
 )
 
 func newTestBackgroundStorage() *BackgroundStorage {
@@ -216,4 +219,111 @@ func TestRecordSegmentRefresh_UpdatesExistingEntry(t *testing.T) {
 	bs.segRefreshMu.RUnlock()
 
 	assert.True(t, newTime.After(old), "refresh time should be updated to a more recent value")
+}
+
+// --- Eternal (never-completing) queries ---
+
+// An eternal query never reaches a completion status, so it must never be archived
+// by the completion logic — no matter how long it has been running. The segment
+// timeout applies only to *completed* queries, so it must NOT force-archive a query
+// that is still running. Such a query can only leave storage via session failure or GC.
+func TestQueryCompleted_EternalQueryNeverArchived(t *testing.T) {
+	bs := newTestBackgroundStorage()
+	qKey := &storage.QueryKey{}
+	// Running for 10 hours, no end time, and a tiny (1s) segment timeout.
+	qVal := &storage.RunningQuery{
+		Completed:   false,
+		QueryStatus: int32(pbc.QueryStatus_QUERY_STATUS_START),
+		QueryStart:  time.Now().Add(-10 * time.Hour),
+	}
+
+	decision, reason := bs.queryCompleted(qKey, qVal, 1)
+
+	assert.Equal(t, 0, decision, "an eternal running query must never be archived by completion logic")
+	assert.Equal(t, reasonNone, reason, "a running query has no archival reason")
+}
+
+// Even when every segment has refreshed long after the eternal query started, it must
+// still not be archived: archival keys off Completed, not off segment refresh times.
+func TestQueryCompleted_EternalQueryIgnoresSegmentRefresh(t *testing.T) {
+	bs := newTestBackgroundStorage()
+	qKey := &storage.QueryKey{}
+	qVal := &storage.RunningQuery{
+		Completed:   false,
+		QueryStatus: int32(pbc.QueryStatus_QUERY_STATUS_START),
+		QueryStart:  time.Now().Add(-time.Hour),
+	}
+	bs.segRefreshMu.Lock()
+	bs.segRefreshTimes["host-a"] = time.Now()
+	bs.segRefreshMu.Unlock()
+
+	decision, reason := bs.queryCompleted(qKey, qVal, 3600)
+
+	assert.Equal(t, 0, decision, "a running query is not archived even if all segments refreshed")
+	assert.Equal(t, reasonNone, reason)
+}
+
+// --- Interrupted (cancelled / errored) queries ---
+
+// An interrupted query (CANCELED/ERROR) is marked Completed with an end time, exactly
+// like a normally finished one, so its data is preserved (archived), not lost. When all
+// segments have reported after the end, it archives with the all-segments reason.
+func TestQueryCompleted_InterruptedArchivedWhenSegmentsReported(t *testing.T) {
+	bs := newTestBackgroundStorage()
+	qKey := &storage.QueryKey{}
+	ended := time.Now().Add(-10 * time.Second)
+	qVal := &storage.RunningQuery{
+		Completed:   true,
+		QueryStatus: int32(pbc.QueryStatus_QUERY_STATUS_CANCELED),
+		QueryEnd:    ended,
+	}
+	// Every segment refreshed AFTER the query was interrupted -> full data collected.
+	bs.segRefreshMu.Lock()
+	bs.segRefreshTimes["host-a"] = ended.Add(2 * time.Second)
+	bs.segRefreshTimes["host-b"] = ended.Add(3 * time.Second)
+	bs.segRefreshMu.Unlock()
+
+	decision, reason := bs.queryCompleted(qKey, qVal, 3600)
+
+	assert.Equal(t, 1, decision, "an interrupted query with all segments reported must be archived")
+	assert.Equal(t, reasonAllSegments, reason, "archival reason must be all-segments")
+}
+
+// An interrupted query whose segments never report is archived once the segment timeout
+// fires, with possibly partial data — it is neither held forever nor silently dropped.
+func TestQueryCompleted_InterruptedArchivedOnTimeout(t *testing.T) {
+	bs := newTestBackgroundStorage()
+	qKey := &storage.QueryKey{}
+	qVal := &storage.RunningQuery{
+		Completed:   true,
+		QueryStatus: int32(pbc.QueryStatus_QUERY_STATUS_ERROR),
+		QueryEnd:    time.Now().Add(-time.Hour),
+	}
+
+	decision, reason := bs.queryCompleted(qKey, qVal, 1)
+
+	assert.Equal(t, 1, decision, "an interrupted query past the segment timeout must be archived")
+	assert.Equal(t, reasonTimeout, reason, "archival reason must be timeout (data may be partial)")
+}
+
+// An interrupted query whose segment data is not yet collected (min refresh still before
+// its end) and whose timeout has not fired must keep waiting, just like a normal one.
+func TestQueryCompleted_InterruptedWaitingForSegments(t *testing.T) {
+	bs := newTestBackgroundStorage()
+	qKey := &storage.QueryKey{}
+	ended := time.Now()
+	qVal := &storage.RunningQuery{
+		Completed:   true,
+		QueryStatus: int32(pbc.QueryStatus_QUERY_STATUS_CANCELED),
+		QueryEnd:    ended,
+	}
+	// The only known segment last refreshed BEFORE the query ended -> stale.
+	bs.segRefreshMu.Lock()
+	bs.segRefreshTimes["host-a"] = ended.Add(-5 * time.Second)
+	bs.segRefreshMu.Unlock()
+
+	decision, reason := bs.queryCompleted(qKey, qVal, 3600)
+
+	assert.Equal(t, 0, decision, "an interrupted query with stale segment data must wait")
+	assert.Equal(t, reasonNone, reason)
 }
