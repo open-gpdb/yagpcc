@@ -210,6 +210,9 @@ GET http://<host>:1433/metrics
 | `gc_runs` | Counter | Total number of storage garbage collection cycles. |
 | `gc_deleted_queries` | Counter | Total queries evicted by GC (both running and completed). |
 | `gc_archived_queries` | Counter | Completed queries forwarded to the archiver during GC (subset of `gc_deleted_queries`). |
+| `queries_archived_complete` | Counter | Completed queries archived after **all segments** reported (full data). |
+| `queries_archived_timeout` | Counter | Completed queries archived because the **segment timeout** (`segment_get_timeout_sec`) fired — segment data may be **partial**. A rising value means some segments are slow/unreachable and archived records are incomplete. |
+| `queries_archived_session_failed` | Counter | Queries archived because their session disappeared before completion (forced `ERROR` / "Session failed"). |
 | `total_sessions` | Gauge | Current number of tracked sessions. |
 | `total_queries` | Gauge | Current number of tracked running queries. |
 | `aggregated_queries` | Gauge | Current number of aggregated query buckets. |
