@@ -62,10 +62,9 @@ type (
 		// internal fields
 		QueryDataLock sync.RWMutex
 	}
-	QueryMap          map[NodeKey]*QueryData
-	QueryIndexNodes   map[NodeKey]bool
-	SegmentIndexNodes map[uint32]interface{}
-	RunningQuery      struct {
+	QueryMap        map[NodeKey]*QueryData
+	QueryIndexNodes map[NodeKey]bool
+	RunningQuery    struct {
 		QueriesData     QueryMap
 		QueryStatus     int32
 		Completed       bool
@@ -75,9 +74,8 @@ type (
 		QueryEnd        time.Time
 		QueryMessage    string // Query status, in most cases we store here Error Message
 		// NestedLevel from AdditionalQueryInfo on the coordinator/master slice (-1 if unknown).
-		NestedLevel  int64
-		SegmentNodes SegmentIndexNodes
-		QueryLock    sync.RWMutex
+		NestedLevel int64
+		QueryLock   sync.RWMutex
 	}
 	RunningQueryType map[QueryKey]*RunningQuery
 
@@ -112,12 +110,21 @@ type (
 	SliceAggregator struct {
 	}
 
+	// GCQuery represents a completed query evicted by garbage collection
+	// that should be sent to the archive channel for processing.
+	GCQuery struct {
+		QKey *QueryKey
+		QVal *RunningQuery
+	}
+
 	RunningQueriesStorage struct {
 		mx                   *sync.RWMutex
 		runningQueries       RunningQueryType
 		stat                 StorageStat
 		maximumStoredQueries int
 		freePercent          int
+		archChan             chan *GCQuery
+		gcDone               chan struct{} // closed when archive reader shuts down; GC senders select on it
 	}
 )
 
@@ -130,7 +137,7 @@ func NewConfiguredRunningQueriesStorage(cfg *config.Config) *RunningQueriesStora
 func NewRunningQueriesStorage(opts ...Option) *RunningQueriesStorage {
 	const (
 		defaultMaximumStoredQueries = 50 * 1000
-		defaultFreePercent          = 20
+		defaultFreePercent          = 50
 	)
 
 	s := &RunningQueriesStorage{
@@ -157,6 +164,49 @@ func WithMaximumStoredQueries(maximumStoredQueries int) Option {
 func WithFreePercent(freePercent int) Option {
 	return func(s *RunningQueriesStorage) {
 		s.freePercent = freePercent
+	}
+}
+
+func WithArchChan(archChan chan *GCQuery) Option {
+	return func(s *RunningQueriesStorage) {
+		s.archChan = archChan
+		s.gcDone = make(chan struct{})
+	}
+}
+
+// SetArchChan sets the archive channel for GC-evicted completed queries.
+// This can be called after construction when the channel is not available at creation time.
+func (s *RunningQueriesStorage) SetArchChan(archChan chan *GCQuery) {
+	s.mx.Lock()
+	defer s.mx.Unlock()
+	s.archChan = archChan
+	s.gcDone = make(chan struct{})
+}
+
+// CloseArchChan signals GC sender goroutines to stop and drains the archive channel.
+// Must be called when the archive reader (forwardGCQueries) shuts down to prevent
+// GC goroutines from blocking on a channel that nobody reads.
+func (s *RunningQueriesStorage) CloseArchChan() {
+	s.mx.Lock()
+	ch := s.archChan
+	done := s.gcDone
+	s.archChan = nil
+	s.gcDone = nil
+	s.mx.Unlock()
+
+	// Signal all in-flight GC sender goroutines to stop.
+	if done != nil {
+		close(done)
+	}
+	// Drain remaining items so no goroutine stays blocked on send.
+	if ch != nil {
+		for {
+			select {
+			case <-ch:
+			default:
+				return
+			}
+		}
 	}
 }
 
@@ -252,9 +302,61 @@ func (s *RunningQueriesStorage) garbageCollect() {
 		return endedJ
 	})
 
-	for i := 0; i < (s.maximumStoredQueries/100*s.freePercent) && i < len(ss); i++ {
+	toDelete := s.maximumStoredQueries * s.freePercent / 100
+	if toDelete < 1 && len(ss) > 0 {
+		toDelete = 1
+	}
+	if toDelete > len(ss) {
+		toDelete = len(ss)
+	}
+
+	var toArchive []GCQuery
+	for i := 0; i < toDelete; i++ {
+		ss[i].Value.QueryLock.RLock()
+		completed := ss[i].Value.Completed
+		ss[i].Value.QueryLock.RUnlock()
+		if completed && s.archChan != nil {
+			// Completed query — send to archive channel instead of losing data.
+			key := ss[i].Key
+			toArchive = append(toArchive, GCQuery{QKey: &key, QVal: ss[i].Value})
+		}
 		s.deleteQuery(ss[i].Key)
 	}
+
+	if metrics.YagpccMetrics != nil {
+		metrics.YagpccMetrics.GCRuns.Inc()
+		metrics.YagpccMetrics.GCDeletedQueries.Add(float64(toDelete))
+		metrics.YagpccMetrics.GCArchivedQueries.Add(float64(len(toArchive)))
+	}
+
+	// Send completed queries to archive channel in a separate goroutine
+	// to avoid blocking while holding the storage lock.
+	// Use select with gcDone to prevent hanging when the reader has shut down.
+	if len(toArchive) > 0 {
+		archChan := s.archChan
+		gcDone := s.gcDone
+		// gcDone is expected to be non-nil whenever archChan is configured.
+		// Keep a defensive fallback channel to avoid nil-channel select behavior
+		// if that invariant is ever broken.
+		if gcDone == nil {
+			gcDone = make(chan struct{})
+		}
+		go func() {
+			for i := range toArchive {
+				select {
+				case <-gcDone:
+					return
+				default:
+				}
+				select {
+				case archChan <- &toArchive[i]:
+				case <-gcDone:
+					return
+				}
+			}
+		}()
+	}
+
 	s.stat.NumGC += 1
 }
 
@@ -273,7 +375,6 @@ func (s *RunningQueriesStorage) newQuery(qKey *QueryKey, status int32, mQTimes M
 		QueryEnd:        qNow,
 		QuerySubmit:     qNow,
 		NestedLevel:     -1,
-		SegmentNodes:    make(SegmentIndexNodes),
 	}
 
 	if mQTimes.QueryStart != nil {

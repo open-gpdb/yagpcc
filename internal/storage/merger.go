@@ -97,10 +97,6 @@ func (s *RunningQueriesStorage) MergeSegmentData(queriesInfo *pb.GetQueriesInfoR
 			}
 			// now save data
 			rQ.QueriesData[*qKey] = qData
-			// mark as processed
-			if rQ.Completed {
-				rQ.SegmentNodes[uint32(qKey.SKey.Segindex)] = time.Now()
-			}
 			rQ.QueryLock.Unlock()
 		}
 		s.mx.RUnlock()

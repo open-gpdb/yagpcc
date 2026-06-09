@@ -57,13 +57,15 @@ type (
 		RQStorage          *storage.RunningQueriesStorage
 		procfsStorage      *storage.ProcfsStorage
 		statActivityLister statActivityLister
+
+		// segRefreshTimes tracks the last successful data-gathering time per segment hostname.
+		segRefreshMu    sync.RWMutex
+		segRefreshTimes map[string]time.Time
 	}
 )
 
 var (
-	segChan      chan segmentAddr
-	segCount     int
-	segCountLock sync.Mutex
+	segChan chan segmentAddr
 )
 
 func NewBackgroundStorage(l *zap.SugaredLogger,
@@ -79,6 +81,7 @@ func NewBackgroundStorage(l *zap.SugaredLogger,
 		RQStorage:          rqStorage,
 		procfsStorage:      procfsStorage,
 		statActivityLister: sActivityLister,
+		segRefreshTimes:    make(map[string]time.Time),
 	}
 }
 
@@ -118,9 +121,6 @@ func (bs *BackgroundStorage) SendSegmentRefreshMessages(ctx context.Context, pul
 					segConfig = append(segConfig, segC)
 				}
 			}
-			segCountLock.Lock()
-			segCount = len(segConfig)
-			segCountLock.Unlock()
 			// empty channel
 			localSegMap := make(segmentMap)
 		L:
@@ -153,6 +153,11 @@ func (bs *BackgroundStorage) SendSegmentRefreshMessages(ctx context.Context, pul
 				segments = append(segments, &segmentAddr{hostname: segHost.Hostname, port: portn, queueTime: time.Now()})
 			}
 			sort.Slice(segments, func(i, j int) bool { return segments[i].queueTime.Before(segments[j].queueTime) })
+
+			// Prune segRefreshTimes to stay in sync with gp_segment_configuration.
+			// Hosts that no longer run segments are removed so their stale timestamps
+			// don't block MinSegmentRefreshTime from advancing.
+			bs.syncSegmentHosts(segProcessed)
 
 			// add new hosts to channel
 			for _, segmentO := range segments {
@@ -202,10 +207,54 @@ func (bs *BackgroundStorage) processSegment(ctx context.Context, segmentName str
 		bs.l.Infof("Failed to merge data for %s with error %v", segmentName, err)
 		return
 	}
+	bs.recordSegmentRefresh(segmentName)
 	if metrics.YagpccMetrics != nil {
 		metrics.YagpccMetrics.HandleLatencies.With(map[string]string{"method": "processSegment"}).Observe(time.Since(start).Seconds())
 	}
 	bs.l.Debugf("Finish processing %v", segmentName)
+}
+
+// recordSegmentRefresh stores the current time as the last successful refresh for the given segment.
+func (bs *BackgroundStorage) recordSegmentRefresh(hostname string) {
+	bs.segRefreshMu.Lock()
+	bs.segRefreshTimes[hostname] = time.Now()
+	bs.segRefreshMu.Unlock()
+}
+
+// MinSegmentRefreshTime returns the earliest last-refresh time across all known segments.
+// If no segments have been refreshed yet, it returns the zero time.
+func (bs *BackgroundStorage) MinSegmentRefreshTime() time.Time {
+	bs.segRefreshMu.RLock()
+	defer bs.segRefreshMu.RUnlock()
+	var minTime time.Time
+	initialized := false
+	for _, t := range bs.segRefreshTimes {
+		if !initialized || t.Before(minTime) {
+			minTime = t
+			initialized = true
+		}
+	}
+	return minTime
+}
+
+// syncSegmentHosts removes entries from segRefreshTimes for hosts that are no
+// longer present in the active segment configuration. This keeps the map in sync
+// with gp_segment_configuration so that hosts which no longer run segments don't
+// hold back MinSegmentRefreshTime with stale timestamps.
+func (bs *BackgroundStorage) syncSegmentHosts(activeHosts map[string]bool) {
+	bs.segRefreshMu.Lock()
+	defer bs.segRefreshMu.Unlock()
+	for host := range bs.segRefreshTimes {
+		if !activeHosts[host] {
+			delete(bs.segRefreshTimes, host)
+		}
+	}
+	for host := range activeHosts {
+		if _, ok := bs.segRefreshTimes[host]; !ok {
+			// Zero time marks a newly active host that has not refreshed yet.
+			bs.segRefreshTimes[host] = time.Time{}
+		}
+	}
 }
 
 func (bs *BackgroundStorage) launchSegmentPullers(ctx context.Context, nPullers uint32, segConnectTimeoutSec float64, segGetTimeout float64, msgSize int) {
@@ -313,31 +362,55 @@ func (bs *BackgroundStorage) SendSessionMetrics(ctx context.Context, sessChan ch
 	}
 }
 
-func queryCompleted(qKey *storage.QueryKey, qVal *storage.RunningQuery, segmentGetTimeoutSec float64, l *zap.SugaredLogger) int {
+func (bs *BackgroundStorage) queryCompleted(qKey *storage.QueryKey, qVal *storage.RunningQuery, segmentGetTimeoutSec float64) int {
 	now := time.Now()
 	qVal.QueryLock.RLock()
 	qCompleted := qVal.Completed
-	qLenNodes := len(qVal.SegmentNodes)
 	qValEnded := qVal.QueryEnd
 	qVal.QueryLock.RUnlock()
 	if qCompleted {
-		segCountLock.Lock()
-		sCount := segCount
-		segCountLock.Unlock()
-		if qLenNodes >= sCount {
-			l.Debugf("Query %v completed and got metrics from all segments", *qKey)
-			return 1
-		}
 		if now.Sub(qValEnded) > time.Duration(segmentGetTimeoutSec*float64(time.Second)) {
-			l.Debugf("Query %v completed and exceeded segment timeout", *qKey)
+			bs.l.Debugf("Query %v completed and exceeded segment timeout", *qKey)
 			return 1
 		}
-		// Archive on master Completed; GC can evict before timeout fires.
-		l.Debugf("Query %v completed, archiving without all segments", *qKey)
-		return 1
+		// Check if all segments have been refreshed since the query ended.
+		// If the minimum segment refresh time is after the query end, every segment
+		// has had a chance to report metrics for this query.
+		minRefresh := bs.MinSegmentRefreshTime()
+		if !minRefresh.IsZero() && minRefresh.After(qValEnded) {
+			bs.l.Debugf("Query %v completed, all segments refreshed after query end", *qKey)
+			return 1
+		}
+		bs.l.Debugf("Query %v completed, waiting for segment refresh", *qKey)
+		return 0
 	}
 
 	return 0
+}
+
+// forwardGCQueries reads GC-evicted completed queries from gcChan and forwards
+// them to archChan so they get archived instead of being silently dropped.
+// On context cancellation it calls rqStorage.CloseArchChan() to signal in-flight
+// GC sender goroutines and drains the channel so they don't block forever.
+func forwardGCQueries(ctx context.Context, l *zap.SugaredLogger, rqStorage *storage.RunningQueriesStorage, gcChan chan *storage.GCQuery, archChan chan *EndedQuery) {
+	defer func() {
+		// Signal GC senders to stop and drain the channel so no goroutine hangs.
+		rqStorage.CloseArchChan()
+		l.Warn("Done forwardGCQueries")
+	}()
+	for {
+		select {
+		case gcQ := <-gcChan:
+			l.Debugf("Forwarding GC-evicted query %v to archive", *gcQ.QKey)
+			select {
+			case archChan <- &EndedQuery{QKey: gcQ.QKey, QVal: gcQ.QVal}:
+			case <-ctx.Done():
+				return
+			}
+		case <-ctx.Done():
+			return
+		}
+	}
 }
 
 func (bs *BackgroundStorage) TryRefreshSessionsFromGP(
@@ -384,7 +457,7 @@ func (bs *BackgroundStorage) ClearCompletedQueries(ctx context.Context,
 			qCompleted = 2
 			// should archive query
 		} else {
-			qCompleted = queryCompleted(&qKeyI, qValI, segmentGetTimeoutSec, bs.l)
+			qCompleted = bs.queryCompleted(&qKeyI, qValI, segmentGetTimeoutSec)
 		}
 		// qCompleted == 1 - archive query, but check if session has links on it
 		// qCompleted == 2 - delete query permanently, not wait anymore
@@ -566,6 +639,13 @@ func InitBG(
 	queryChan := make(chan *pbm.QueryStatWrite, cfg.ArchiverConfig.QueriesQueueSize)
 	sessChan := make(chan *gp.SessionDataWrite, cfg.ArchiverConfig.SessionsQueueSize)
 	segMetricsChan := make(chan *pbm.SegmentMetricsWrite, cfg.ArchiverConfig.SegmentsQueueSize)
+
+	// Create GC archive channel and wire it to the storage so that
+	// garbage-collected completed queries are forwarded to the archiver
+	// instead of being silently dropped.
+	gcArchChan := make(chan *storage.GCQuery, cfg.ArchiverConfig.ArchiverQueueSize)
+	backgroundStorage.RQStorage.SetArchChan(gcArchChan)
+	go forwardGCQueries(ctxI, l, backgroundStorage.RQStorage, gcArchChan, archChan)
 
 	errG.Go(func() error {
 		if sentinelErr := masterSentinel.RunUntilIsMaster(ctxI); sentinelErr != nil {

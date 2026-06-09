@@ -160,6 +160,22 @@ UDS /tmp/yagpcc_agent_uds.sock  — UDS   [master + segment]
 - **Segment yagpcc:** Keeps received metrics in **memory** (and may support clearing after send via GetMetricQueries options). No persistent database in this project.
 - **Master yagpcc:** Keeps aggregated sessions, queries, and metrics in **memory**. External systems (e.g. dashboards, historical store) consume via GetGPInfo (gRPC or CSV) and may persist data themselves.
 
+### Query completion and archival
+
+A completed query on the master is not archived immediately. The master waits until it is confident that **all segment hosts have had a chance to report metrics** for that query. This is determined by tracking the **last successful data-gathering time per segment host**:
+
+1. Each time the master successfully pulls data from a segment host (`processSegment`), it records the current time for that host.
+2. When checking whether a completed query can be archived, the master computes the **minimum refresh time** across all active segment hosts.
+3. If the minimum refresh time is **after** the query's end time, every segment has been polled at least once since the query finished — so all segment-level metrics have been collected. The query is then sent to the archiver.
+4. If the minimum refresh time is still before the query's end time, the master waits for the next refresh cycle.
+5. As a safety net, a **timeout** (`segment_get_timeout_sec`) ensures queries are eventually archived even if some segments are unreachable.
+
+The set of tracked segment hosts is kept in sync with `gp_segment_configuration`. When the cluster topology changes (e.g. a segment host is removed or added), stale entries are pruned so they don't block archival.
+
+### Garbage collection
+
+When the running-queries storage reaches its capacity (`maximum_stored_queries`), a garbage collection (GC) cycle frees 50 % of the storage. Queries are evicted oldest-first, with running (non-completed) queries evicted before completed ones. Completed queries evicted by GC are forwarded to the archiver pipeline so their data is not lost. See [Performance tuning — Garbage collection and archiving](performance-tuning.md#garbage-collection-and-archiving) for details.
+
 ---
 
 ## Related documentation

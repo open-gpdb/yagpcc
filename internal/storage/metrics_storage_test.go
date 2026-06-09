@@ -103,15 +103,15 @@ func TestGC(t *testing.T) {
 		}
 		s.newQuery(qKey, 0, mqTimes)
 	}
-	assert.Equal(t, len(s.runningQueries), s.maximumStoredQueries/100*80+2)
+	assert.Equal(t, len(s.runningQueries), s.maximumStoredQueries*50/100+2)
 	qKeyFirst := &QueryKey{
-		Ssid: int32(s.maximumStoredQueries/100*80 - 1),
+		Ssid: int32(s.maximumStoredQueries*50/100 - 1),
 	}
 	val, ok := s.runningQueries[*qKeyFirst]
 	assert.Equal(t, ok, true)
 	assert.WithinDuration(t, val.QueryStart, tStart.Add(-time.Duration(int(time.Second)*int(qKeyFirst.Ssid))), 0)
 	qKeyNotFound := &QueryKey{
-		Ssid: int32(s.maximumStoredQueries / 100 * 80),
+		Ssid: int32(s.maximumStoredQueries * 50 / 100),
 	}
 	_, ok = s.runningQueries[*qKeyNotFound]
 	assert.Equal(t, ok, false)
@@ -121,6 +121,171 @@ func TestGC(t *testing.T) {
 	val, ok = s.runningQueries[*qKeyLast]
 	assert.Equal(t, ok, true)
 	assert.WithinDuration(t, val.QueryStart, tStart.Add(-time.Duration(int(time.Second)*int(qKeyLast.Ssid))), 0)
+}
+
+func TestGCWithArchChan(t *testing.T) {
+	// Use maximumStoredQueries=1000 so that integer division
+	// (1000/100*20 = 200) produces a meaningful freePercent.
+	archChan := make(chan *GCQuery, 1000)
+	s := NewRunningQueriesStorage(
+		WithMaximumStoredQueries(1000),
+		WithFreePercent(20),
+		WithArchChan(archChan),
+	)
+
+	tStart := time.Now()
+	// Fill storage with completed queries
+	for i := 0; i < 1000; i++ {
+		qKey := &QueryKey{Ssid: int32(i)}
+		mqTimes := MeasuredQueryTimes{
+			QueryStart: timestamppb.New(tStart.Add(-time.Duration(int(time.Second) * (1000 - i)))),
+		}
+		rQ := s.newQuery(qKey, int32(pbc.QueryStatus_QUERY_STATUS_DONE), mqTimes)
+		rQ.Completed = true
+	}
+	assert.Equal(t, 1000, len(s.runningQueries))
+
+	// Trigger GC by adding one more query (exceeds maximumStoredQueries)
+	s.newQuery(&QueryKey{Ssid: 10000}, 0, MeasuredQueryTimes{
+		QueryStart: timestamppb.New(tStart),
+	})
+
+	// GC frees 1000/100*20 = 200 queries, then adds 1 new
+	// After GC: 1000 - 200 + 1 = 801
+	assert.Equal(t, 801, len(s.runningQueries))
+
+	// All 200 evicted queries were completed, so all should be sent to archChan
+	assert.Eventually(t, func() bool { return len(archChan) == 200 }, time.Second, 10*time.Millisecond)
+
+	// Verify the archived queries have valid keys
+	for i := 0; i < 200; i++ {
+		gcQ := <-archChan
+		assert.NotNil(t, gcQ.QKey)
+		assert.NotNil(t, gcQ.QVal)
+		assert.True(t, gcQ.QVal.Completed)
+	}
+}
+
+func TestGCWithArchChanMixedQueries(t *testing.T) {
+	// Use maximumStoredQueries=1000 so that integer division works correctly.
+	// GC sort order: running queries first (oldest), then completed queries (oldest).
+	// So when we have a mix, the oldest running queries are evicted first.
+	// Only completed (ended) queries are sent to archChan.
+	archChan := make(chan *GCQuery, 1000)
+	s := NewRunningQueriesStorage(
+		WithMaximumStoredQueries(1000),
+		WithFreePercent(20),
+		WithArchChan(archChan),
+	)
+
+	tStart := time.Now()
+	// Add 900 running queries (oldest — will be evicted first by GC sort)
+	for i := 0; i < 900; i++ {
+		qKey := &QueryKey{Ssid: int32(i)}
+		mqTimes := MeasuredQueryTimes{
+			QueryStart: timestamppb.New(tStart.Add(-time.Duration(int(time.Second) * (2000 - i)))),
+		}
+		s.newQuery(qKey, int32(pbc.QueryStatus_QUERY_STATUS_START), mqTimes)
+	}
+	// Add 100 completed queries (these come after running in GC sort)
+	for i := 900; i < 1000; i++ {
+		qKey := &QueryKey{Ssid: int32(i)}
+		mqTimes := MeasuredQueryTimes{
+			QueryStart: timestamppb.New(tStart.Add(-time.Duration(int(time.Second) * (1000 - i)))),
+		}
+		rQ := s.newQuery(qKey, int32(pbc.QueryStatus_QUERY_STATUS_DONE), mqTimes)
+		rQ.Completed = true
+	}
+	assert.Equal(t, 1000, len(s.runningQueries))
+
+	// Trigger GC — evicts 200 queries.
+	// GC sort: running queries first (sorted by start time), then completed.
+	// The 200 oldest running queries are evicted. None are completed.
+	s.newQuery(&QueryKey{Ssid: 10000}, 0, MeasuredQueryTimes{
+		QueryStart: timestamppb.New(tStart),
+	})
+
+	// GC frees 200 queries, then adds 1 new → 801
+	assert.Equal(t, 801, len(s.runningQueries))
+
+	// All 200 evicted queries were running (not ended), so none should be archived.
+	// Running queries are not sent to archChan to avoid double-counting.
+	assert.Never(t, func() bool { return len(archChan) > 0 }, time.Second, 10*time.Millisecond)
+}
+
+func TestGCWithArchChanPartiallyCompleted(t *testing.T) {
+	// Test where GC evicts a mix of completed and running queries.
+	// GC sort: running first, then completed. With 200 to evict,
+	// if we have 150 running and 850 completed, GC evicts all 150 running + 50 completed.
+	archChan := make(chan *GCQuery, 1000)
+	s := NewRunningQueriesStorage(
+		WithMaximumStoredQueries(1000),
+		WithFreePercent(20),
+		WithArchChan(archChan),
+	)
+
+	tStart := time.Now()
+	// Add 150 running queries (oldest)
+	for i := 0; i < 150; i++ {
+		qKey := &QueryKey{Ssid: int32(i)}
+		mqTimes := MeasuredQueryTimes{
+			QueryStart: timestamppb.New(tStart.Add(-time.Duration(int(time.Second) * (3000 - i)))),
+		}
+		s.newQuery(qKey, int32(pbc.QueryStatus_QUERY_STATUS_START), mqTimes)
+	}
+	// Add 850 completed queries
+	for i := 150; i < 1000; i++ {
+		qKey := &QueryKey{Ssid: int32(i)}
+		mqTimes := MeasuredQueryTimes{
+			QueryStart: timestamppb.New(tStart.Add(-time.Duration(int(time.Second) * (2000 - i)))),
+		}
+		rQ := s.newQuery(qKey, int32(pbc.QueryStatus_QUERY_STATUS_DONE), mqTimes)
+		rQ.Completed = true
+	}
+	assert.Equal(t, 1000, len(s.runningQueries))
+
+	// Trigger GC — evicts 200 queries.
+	// GC sort: 150 running (oldest first), then 850 completed (oldest first).
+	// Evicts: all 150 running + 50 oldest completed = 200 total.
+	s.newQuery(&QueryKey{Ssid: 10000}, 0, MeasuredQueryTimes{
+		QueryStart: timestamppb.New(tStart),
+	})
+
+	assert.Equal(t, 801, len(s.runningQueries))
+
+	// Only the 50 completed queries should be sent to archChan
+	assert.Eventually(t, func() bool { return len(archChan) == 50 }, time.Second, 10*time.Millisecond)
+
+	for i := 0; i < 50; i++ {
+		gcQ := <-archChan
+		assert.True(t, CheckQueryEnded(gcQ.QVal.QueryStatus))
+	}
+}
+
+func TestGCWithoutArchChan(t *testing.T) {
+	// Without archChan, GC should still work (just delete queries)
+	s := NewRunningQueriesStorage(
+		WithMaximumStoredQueries(1000),
+		WithFreePercent(20),
+	)
+
+	tStart := time.Now()
+	for i := 0; i < 1000; i++ {
+		qKey := &QueryKey{Ssid: int32(i)}
+		mqTimes := MeasuredQueryTimes{
+			QueryStart: timestamppb.New(tStart.Add(-time.Duration(int(time.Second) * (1000 - i)))),
+		}
+		rQ := s.newQuery(qKey, int32(pbc.QueryStatus_QUERY_STATUS_DONE), mqTimes)
+		rQ.Completed = true
+	}
+
+	// Trigger GC
+	s.newQuery(&QueryKey{Ssid: 10000}, 0, MeasuredQueryTimes{
+		QueryStart: timestamppb.New(tStart),
+	})
+
+	// After GC: 1000 - 200 + 1 = 801
+	assert.Equal(t, 801, len(s.runningQueries))
 }
 
 func TestMultipleSlices(t *testing.T) {
