@@ -380,9 +380,9 @@ const (
 //	0 - keep waiting (still running, or completed but segments not yet collected)
 //	1 - archive the query
 //
-// The reason is meaningful only when decision == 1 (reasonAllSegments or reasonTimeout);
-// otherwise it is reasonNone. The session-failed case is handled by the caller.
-func (bs *BackgroundStorage) queryCompleted(qKey *storage.QueryKey, qVal *storage.RunningQuery, segmentGetTimeoutSec float64) (int, archiveReason) {
+// The reason is meaningful only when decision == 1 (reasonAllSegments or reasonTimeout).
+// The session-failed case is handled by the caller (it archives with reasonSessionFailed).
+// Otherwise it is reasonNone.
 	now := time.Now()
 	qVal.QueryLock.RLock()
 	qCompleted := qVal.Completed
