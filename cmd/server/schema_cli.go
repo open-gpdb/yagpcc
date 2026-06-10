@@ -116,7 +116,7 @@ func runSchemaCLI(ctx context.Context, f schemaFlags, deps schemaCLIDeps) int {
 		return schemaCLIExitOK
 	}
 	if mixed := exclusiveFlagsViolation(f); mixed != "" {
-		fmt.Fprintln(deps.stderr, mixed)
+		_, _ = fmt.Fprintln(deps.stderr, mixed)
 		return schemaCLIExitFail
 	}
 
@@ -176,11 +176,11 @@ func runDumpSchema(f schemaFlags, deps schemaCLIDeps) int {
 	opts := clickhouse.DumpOptions{RetentionDays: retentionDaysFor(f, deps)}
 	out, err := clickhouse.DumpSchema(opts)
 	if err != nil {
-		fmt.Fprintf(deps.stderr, "dump-schema: %v\n", err)
+		_, _ = fmt.Fprintf(deps.stderr, "dump-schema: %v\n", err)
 		return schemaCLIExitFail
 	}
 	if _, err := io.WriteString(deps.stdout, out); err != nil {
-		fmt.Fprintf(deps.stderr, "dump-schema: write stdout: %v\n", err)
+		_, _ = fmt.Fprintf(deps.stderr, "dump-schema: write stdout: %v\n", err)
 		return schemaCLIExitFail
 	}
 	return schemaCLIExitOK
@@ -188,7 +188,7 @@ func runDumpSchema(f schemaFlags, deps schemaCLIDeps) int {
 
 func runDumpMigration(f schemaFlags, deps schemaCLIDeps) int {
 	if f.from < 0 || f.to < 0 {
-		fmt.Fprintf(deps.stderr,
+		_, _ = fmt.Fprintf(deps.stderr,
 			"--%s requires --%s and --%s (both >= 0)\n",
 			flagNameDumpMigration, flagNameFrom, flagNameTo,
 		)
@@ -197,11 +197,11 @@ func runDumpMigration(f schemaFlags, deps schemaCLIDeps) int {
 	opts := clickhouse.DumpOptions{RetentionDays: retentionDaysFor(f, deps)}
 	out, err := clickhouse.DumpMigration(f.from, f.to, opts)
 	if err != nil {
-		fmt.Fprintf(deps.stderr, "dump-migration: %v\n", err)
+		_, _ = fmt.Fprintf(deps.stderr, "dump-migration: %v\n", err)
 		return schemaCLIExitFail
 	}
 	if _, err := io.WriteString(deps.stdout, out); err != nil {
-		fmt.Fprintf(deps.stderr, "dump-migration: write stdout: %v\n", err)
+		_, _ = fmt.Fprintf(deps.stderr, "dump-migration: write stdout: %v\n", err)
 		return schemaCLIExitFail
 	}
 	return schemaCLIExitOK
@@ -244,12 +244,12 @@ func loadCHConfig(f schemaFlags, deps schemaCLIDeps) (*config.ClickhouseConfig, 
 func runMigrateOnly(ctx context.Context, f schemaFlags, deps schemaCLIDeps) int {
 	chCfg, err := loadCHConfig(f, deps)
 	if err != nil {
-		fmt.Fprintf(deps.stderr, "migrate-only: %v\n", err)
+		_, _ = fmt.Fprintf(deps.stderr, "migrate-only: %v\n", err)
 		return schemaCLIExitFail
 	}
 	conn, closeFn, err := deps.openConn(ctx, chCfg)
 	if err != nil {
-		fmt.Fprintf(deps.stderr, "migrate-only: open clickhouse: %v\n", err)
+		_, _ = fmt.Fprintf(deps.stderr, "migrate-only: open clickhouse: %v\n", err)
 		return schemaCLIExitFail
 	}
 	defer func() {
@@ -259,22 +259,22 @@ func runMigrateOnly(ctx context.Context, f schemaFlags, deps schemaCLIDeps) int 
 	}()
 	opts := clickhouse.MigrateOptions{RetentionDays: chCfg.RetentionDays}
 	if err := deps.applyMigrate(ctx, conn, opts); err != nil {
-		fmt.Fprintf(deps.stderr, "migrate-only: %v\n", err)
+		_, _ = fmt.Fprintf(deps.stderr, "migrate-only: %v\n", err)
 		return schemaCLIExitFail
 	}
-	fmt.Fprintln(deps.stdout, "migrate-only: ok")
+	_, _ = fmt.Fprintln(deps.stdout, "migrate-only: ok")
 	return schemaCLIExitOK
 }
 
 func runVerifySchema(ctx context.Context, f schemaFlags, deps schemaCLIDeps) int {
 	chCfg, err := loadCHConfig(f, deps)
 	if err != nil {
-		fmt.Fprintf(deps.stderr, "verify-schema: %v\n", err)
+		_, _ = fmt.Fprintf(deps.stderr, "verify-schema: %v\n", err)
 		return schemaCLIExitFail
 	}
 	conn, closeFn, err := deps.openConn(ctx, chCfg)
 	if err != nil {
-		fmt.Fprintf(deps.stderr, "verify-schema: open clickhouse: %v\n", err)
+		_, _ = fmt.Fprintf(deps.stderr, "verify-schema: open clickhouse: %v\n", err)
 		return schemaCLIExitFail
 	}
 	defer func() {
@@ -283,10 +283,10 @@ func runVerifySchema(ctx context.Context, f schemaFlags, deps schemaCLIDeps) int
 		}
 	}()
 	if err := deps.verifySchema(ctx, conn); err != nil {
-		fmt.Fprintf(deps.stderr, "verify-schema: %v\n", err)
+		_, _ = fmt.Fprintf(deps.stderr, "verify-schema: %v\n", err)
 		return schemaCLIExitFail
 	}
-	fmt.Fprintln(deps.stdout, "verify-schema: ok")
+	_, _ = fmt.Fprintln(deps.stdout, "verify-schema: ok")
 	return schemaCLIExitOK
 }
 
@@ -315,11 +315,11 @@ func maybeRunDumpOnlyFromConfig(f schemaFlags, deps schemaCLIDeps) (int, bool) {
 	}
 	out, derr := clickhouse.DumpSchema(opts)
 	if derr != nil {
-		fmt.Fprintf(deps.stderr, "schema_management=dump_only: %v\n", derr)
+		_, _ = fmt.Fprintf(deps.stderr, "schema_management=dump_only: %v\n", derr)
 		return schemaCLIExitFail, true
 	}
 	if _, werr := io.WriteString(deps.stdout, out); werr != nil {
-		fmt.Fprintf(deps.stderr, "schema_management=dump_only: write stdout: %v\n", werr)
+		_, _ = fmt.Fprintf(deps.stderr, "schema_management=dump_only: write stdout: %v\n", werr)
 		return schemaCLIExitFail, true
 	}
 	return schemaCLIExitOK, true

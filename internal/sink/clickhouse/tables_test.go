@@ -585,7 +585,7 @@ func makeSession(id int32) Session {
 	return Session{
 		SnapshotTime: now,
 		SessionID:    id,
-		PID:          int32(10000 + id),
+		PID:          10000 + id,
 		User:         "alice",
 		Database:     "warehouse",
 		Application:  "psql",

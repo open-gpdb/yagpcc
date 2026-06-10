@@ -555,10 +555,7 @@ func TestRun_FlushesEventsOnTickerAndOnShutdown(t *testing.T) {
 
 	// Wait until the flusher drains the row.
 	deadline := time.Now().Add(2 * time.Second)
-	for {
-		if w.events.BufferLen() == 0 {
-			break
-		}
+	for w.events.BufferLen() != 0 {
 		if time.Now().After(deadline) {
 			t.Fatal("periodic flusher did not drain the buffered event")
 		}

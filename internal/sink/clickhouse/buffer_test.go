@@ -285,7 +285,6 @@ func TestBuffer_BlockMultipleAppendersWakeFairly(t *testing.T) {
 	var wg sync.WaitGroup
 	wg.Add(n)
 	for i := 1; i <= n; i++ {
-		i := i
 		go func() {
 			defer wg.Done()
 			b.Append(i)

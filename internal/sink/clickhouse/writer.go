@@ -409,10 +409,7 @@ func (w *ClickhouseWriter) finalFlush() {
 	ctx, cancel := context.WithTimeout(context.Background(), shutdownFlushTimeout)
 	defer cancel()
 	total := 0
-	for {
-		if ctx.Err() != nil {
-			break
-		}
+	for ctx.Err() == nil {
 		n, err := w.events.Flush(ctx)
 		if err != nil {
 			w.logger.Warn("clickhouse final flush failed",
