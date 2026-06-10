@@ -383,6 +383,7 @@ const (
 // The reason is meaningful only when decision == 1 (reasonAllSegments or reasonTimeout).
 // The session-failed case is handled by the caller (it archives with reasonSessionFailed).
 // Otherwise it is reasonNone.
+func (bs *BackgroundStorage) queryCompleted(qKey *storage.QueryKey, qVal *storage.RunningQuery, segmentGetTimeoutSec float64) (int, archiveReason) {
 	now := time.Now()
 	qVal.QueryLock.RLock()
 	qCompleted := qVal.Completed
