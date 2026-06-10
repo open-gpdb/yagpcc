@@ -362,7 +362,28 @@ func (bs *BackgroundStorage) SendSessionMetrics(ctx context.Context, sessChan ch
 	}
 }
 
-func (bs *BackgroundStorage) queryCompleted(qKey *storage.QueryKey, qVal *storage.RunningQuery, segmentGetTimeoutSec float64) int {
+// archiveReason explains why a completed query is (or is not yet) being archived.
+// It is reported so the archive consumer and Prometheus can distinguish a fully
+// collected query from one that was archived with possibly partial segment data.
+type archiveReason int
+
+const (
+	reasonNone          archiveReason = iota // not archiving yet (running or still collecting)
+	reasonAllSegments                        // archived: every segment reported after query end
+	reasonTimeout                            // archived: segment timeout fired, data may be partial
+	reasonSessionFailed                      // archived: session disappeared before completion
+)
+
+// queryCompleted decides whether a query can be archived and, if so, why.
+// It returns (decision, reason) where decision is:
+//
+//	0 - keep waiting (still running, or completed but segments not yet collected)
+//	1 - archive the query
+//
+// The reason is meaningful only when decision == 1 (reasonAllSegments or reasonTimeout).
+// The session-failed case is handled by the caller (it archives with reasonSessionFailed).
+// Otherwise it is reasonNone.
+func (bs *BackgroundStorage) queryCompleted(qKey *storage.QueryKey, qVal *storage.RunningQuery, segmentGetTimeoutSec float64) (int, archiveReason) {
 	now := time.Now()
 	qVal.QueryLock.RLock()
 	qCompleted := qVal.Completed
@@ -371,7 +392,7 @@ func (bs *BackgroundStorage) queryCompleted(qKey *storage.QueryKey, qVal *storag
 	if qCompleted {
 		if now.Sub(qValEnded) > time.Duration(segmentGetTimeoutSec*float64(time.Second)) {
 			bs.l.Debugf("Query %v completed and exceeded segment timeout", *qKey)
-			return 1
+			return 1, reasonTimeout
 		}
 		// Check if all segments have been refreshed since the query ended.
 		// If the minimum segment refresh time is after the query end, every segment
@@ -379,13 +400,30 @@ func (bs *BackgroundStorage) queryCompleted(qKey *storage.QueryKey, qVal *storag
 		minRefresh := bs.MinSegmentRefreshTime()
 		if !minRefresh.IsZero() && minRefresh.After(qValEnded) {
 			bs.l.Debugf("Query %v completed, all segments refreshed after query end", *qKey)
-			return 1
+			return 1, reasonAllSegments
 		}
 		bs.l.Debugf("Query %v completed, waiting for segment refresh", *qKey)
-		return 0
+		return 0, reasonNone
 	}
 
-	return 0
+	return 0, reasonNone
+}
+
+// countArchived increments the archival-reason counter for a query that was just
+// sent to the archiver. Called exactly once per archived query (guarded by the
+// MarkSessionSent check) so pinned queries are not double-counted.
+func countArchived(reason archiveReason) {
+	if metrics.YagpccMetrics == nil {
+		return
+	}
+	switch reason {
+	case reasonAllSegments:
+		metrics.YagpccMetrics.QueriesArchivedComplete.Inc()
+	case reasonTimeout:
+		metrics.YagpccMetrics.QueriesArchivedTimeout.Inc()
+	case reasonSessionFailed:
+		metrics.YagpccMetrics.QueriesArchivedSessionFailed.Inc()
+	}
 }
 
 // forwardGCQueries reads GC-evicted completed queries from gcChan and forwards
@@ -453,11 +491,13 @@ func (bs *BackgroundStorage) ClearCompletedQueries(ctx context.Context,
 		}
 		valS, okS := bs.SessionStorage.GetSession(sessKey)
 		var qCompleted int
+		var reason archiveReason
 		if !okS {
 			qCompleted = 2
+			reason = reasonSessionFailed
 			// should archive query
 		} else {
-			qCompleted = bs.queryCompleted(&qKeyI, qValI, segmentGetTimeoutSec)
+			qCompleted, reason = bs.queryCompleted(&qKeyI, qValI, segmentGetTimeoutSec)
 		}
 		// qCompleted == 1 - archive query, but check if session has links on it
 		// qCompleted == 2 - delete query permanently, not wait anymore
@@ -495,6 +535,10 @@ func (bs *BackgroundStorage) ClearCompletedQueries(ctx context.Context,
 				qValI.QueryLock.RUnlock()
 				if !markSent {
 					archChan <- &EndedQuery{QKey: &qKeyI, QVal: qValI}
+					// Count the archived query by reason exactly once. Pinned
+					// queries (canBeDeleted == false) re-enter this loop on later
+					// cycles but are skipped here because MarkSessionSent is set.
+					countArchived(reason)
 				}
 				qValI.QueryLock.Lock()
 				qValI.MarkSessionSent = true

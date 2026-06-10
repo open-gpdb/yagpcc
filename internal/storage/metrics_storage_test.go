@@ -157,13 +157,16 @@ func TestGCWithArchChan(t *testing.T) {
 	// All 200 evicted queries were completed, so all should be sent to archChan
 	assert.Eventually(t, func() bool { return len(archChan) == 200 }, time.Second, 10*time.Millisecond)
 
-	// Verify the archived queries have valid keys
+	// Verify the archived queries have valid and distinct keys.
+	seenKeys := make(map[QueryKey]struct{}, 200)
 	for i := 0; i < 200; i++ {
 		gcQ := <-archChan
 		assert.NotNil(t, gcQ.QKey)
 		assert.NotNil(t, gcQ.QVal)
 		assert.True(t, gcQ.QVal.Completed)
+		seenKeys[*gcQ.QKey] = struct{}{}
 	}
+	assert.Len(t, seenKeys, 200)
 }
 
 func TestGCWithArchChanMixedQueries(t *testing.T) {

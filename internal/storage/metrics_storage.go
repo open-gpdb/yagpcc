@@ -317,8 +317,9 @@ func (s *RunningQueriesStorage) garbageCollect() {
 		ss[i].Value.QueryLock.RUnlock()
 		if completed && s.archChan != nil {
 			// Completed query — send to archive channel instead of losing data.
-			key := ss[i].Key
-			toArchive = append(toArchive, GCQuery{QKey: &key, QVal: ss[i].Value})
+			key := new(QueryKey)
+			*key = ss[i].Key
+			toArchive = append(toArchive, GCQuery{QKey: key, QVal: ss[i].Value})
 		}
 		s.deleteQuery(ss[i].Key)
 	}
