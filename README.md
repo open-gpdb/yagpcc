@@ -19,6 +19,8 @@
 | [API description](docs/API.md) | gRPC API reference (GetGPInfo, ActionService), CSV HTTP API, messages, and metrics. |
 | [Per-process resource statistics](docs/proc-stats-flow.md) | Procfs (`GetPidProcStat`) data flow per running query and proposed master-only 5/15/30-minute top-style averages (per-session and cluster-wide rollup). |
 | [**Performance tuning**](docs/performance-tuning.md) | Memory limits (`GOMEMLIMIT`), config knobs (procfs, segment pull, stored queries, aggregation), Prometheus metrics reference, and pprof profiling guide. |
+| [ClickHouse sink](docs/clickhouse-sink-architecture.md) | Optional master-only sink that streams query history into ClickHouse. |
+| [VictoriaMetrics vs ClickHouse](docs/vm-vs-ch.md) | Why yagpcc uses both stores and what data goes where. |
 
 ## Building
 
@@ -126,3 +128,60 @@ The UI is disabled by default (`ui_port: 0`). When enabled, the web UI is availa
 ```
 
 The binary expects `yagpcc.yaml` in the current working directory; it does not take a config path argument.
+
+## ClickHouse sink (optional, master-only)
+
+The master role can stream query history into ClickHouse for ad-hoc SQL
+analysis. It is opt-in (`enabled: false` by default) and runs in parallel
+with the JSON archiver — both can be enabled at the same time, only one,
+or neither.
+
+See [`docs/clickhouse-sink-architecture.md`](docs/clickhouse-sink-architecture.md)
+for the full design, schema, failure modes and Prometheus metrics. A short
+summary follows.
+
+### Required ClickHouse grants
+
+```sql
+CREATE USER yagpcc_writer IDENTIFIED BY '<password>';
+GRANT CREATE, ALTER, INSERT, SELECT ON yagpcc.* TO yagpcc_writer;
+```
+
+`CREATE, ALTER` are needed only for `schema_management: auto`. With
+`verify_only` (or after migrations have been applied out-of-band) the
+agent only needs `INSERT, SELECT`.
+
+### Enabling on master
+
+Set `YAGPCC_CH_PASSWORD` in the agent's environment and uncomment the
+`clickhouse:` block in `cmd/server/yagpcc_master.yaml` (or copy it into your
+own `yagpcc.yaml`):
+
+```yaml
+clickhouse:
+  enabled: true
+  addrs: ["clickhouse-mon:9000"]
+  database: yagpcc
+  user: yagpcc_writer
+  schema_management: auto      # auto | verify_only | dump_only
+  retention_days: 30
+  flush_interval: 10s
+  min_duration_ms: 100
+  session_snapshot_interval_sec: 10
+  sinks:
+    query_events: true
+    aggregated_metrics: true
+    session_snapshots: true
+```
+
+### CLI commands
+
+The following flags short-circuit normal startup and never touch the
+Greenplum cluster — only `yagpcc.yaml` and the embedded migrations:
+
+| Flag | What it does |
+|------|--------------|
+| `./devbin/yagpcc --dump-schema` | Print the rendered `CREATE TABLE` DDL for the current `ExpectedSchemaVersion`. |
+| `./devbin/yagpcc --dump-migration --from=N --to=M` | Print the SQL needed to move between two schema versions. |
+| `YAGPCC_CH_PASSWORD=… ./devbin/yagpcc --migrate-only` | Connect, apply pending migrations, exit (`0` ok, `2` failure). |
+| `YAGPCC_CH_PASSWORD=… ./devbin/yagpcc --verify-schema` | Connect, compare schema version, exit (`0` match, `2` mismatch). |

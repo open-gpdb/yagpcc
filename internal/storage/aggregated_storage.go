@@ -28,6 +28,7 @@ import (
 	"github.com/open-gpdb/yagpcc/internal/metrics"
 	"github.com/open-gpdb/yagpcc/internal/utils"
 	"go.uber.org/zap"
+	"google.golang.org/protobuf/proto"
 )
 
 type (
@@ -64,6 +65,29 @@ type (
 )
 
 type (
+	// AggBucketSnapshot is the per-bucket payload handed to AggCycleHook on
+	// every drain pass. Field semantics match AggregatedMetrics in the proto:
+	// time fields are float64(time.Duration) values (nanoseconds). TotalMetrics
+	// is a deep clone of the proto the storage held — owned exclusively by the
+	// snapshot so the hook can read it without holding the storage lock even
+	// when a concurrent AggQuery is mutating the original.
+	AggBucketSnapshot struct {
+		Key          AggKey
+		Calls        int64
+		TotalTimeNs  float64
+		MaxTimeNs    float64
+		MinTimeNs    float64
+		MeanTimeNs   float64
+		TotalMetrics *pbc.GPMetrics
+	}
+
+	// AggCycleHook is invoked once per ArchiveAggQuery cycle with the snapshot
+	// of buckets that were just drained. It runs after the storage lock is
+	// released, so the hook may perform slow IO without blocking the
+	// aggregator. Errors raised by the hook are the hook's responsibility —
+	// the storage neither retries nor undoes the drain.
+	AggCycleHook func(ctx context.Context, snapshots []AggBucketSnapshot)
+
 	AggregatedStorage struct {
 		mx                *sync.RWMutex
 		aggQueries        AggMap
@@ -71,6 +95,7 @@ type (
 		truncInterval     time.Duration
 		maxQueriesPerUser int
 		log               *zap.SugaredLogger
+		cycleHook         AggCycleHook
 	}
 )
 
@@ -114,6 +139,26 @@ func WithMaxQueriesPerUSer(maxQueriesPerUser int) AOption {
 	}
 }
 
+// WithCycleHook installs a callback that fires after every ArchiveAggQuery
+// drain pass with the snapshot of buckets that were just removed from the
+// map. Used by the master orchestrator to forward aggregated rows to the
+// ClickHouse sink alongside the JSON archiver. nil hooks are silently
+// ignored.
+func WithCycleHook(hook AggCycleHook) AOption {
+	return func(s *AggregatedStorage) {
+		s.cycleHook = hook
+	}
+}
+
+// SetCycleHook is the post-construction setter equivalent of WithCycleHook.
+// Used by app.go where the storage and the sink are built independently and
+// wired together later. Passing nil disables the hook.
+func (a *AggregatedStorage) SetCycleHook(hook AggCycleHook) {
+	a.mx.Lock()
+	defer a.mx.Unlock()
+	a.cycleHook = hook
+}
+
 var CurrentTime = time.Now
 
 func (a *AggregatedStorage) GetCurrentInterval() (time.Time, time.Time) {
@@ -130,6 +175,8 @@ func (a *AggregatedStorage) ArchiveAggQuery(ctx context.Context, queryChan chan 
 
 		default:
 			startI, _ := a.GetCurrentInterval()
+			var snapshots []AggBucketSnapshot
+			var hook AggCycleHook
 			a.mx.Lock()
 			for key, val := range a.aggQueries {
 				if key.EndTime.Before(startI) && startI.Sub(key.EndTime) >= a.truncInterval {
@@ -169,6 +216,31 @@ func (a *AggregatedStorage) ArchiveAggQuery(ctx context.Context, queryChan chan 
 					default:
 						queryChan <- stat
 					}
+					if a.cycleHook != nil {
+						// Deep-clone TotalMetrics under val.QueryLock.RLock so the
+						// snapshot owns its own copy. A concurrent AggQuery that
+						// already retrieved the same *AggVal from the map (before
+						// the surrounding a.mx.Lock blocked it) can later acquire
+						// val.QueryLock.Lock and mutate val.TotalMetrics via
+						// GroupGPMetrics — racing the hook's reads if we kept the
+						// shared pointer.
+						var totalCopy *pbc.GPMetrics
+						if val.TotalMetrics != nil {
+							totalCopy = proto.Clone(val.TotalMetrics).(*pbc.GPMetrics)
+						}
+						snap := AggBucketSnapshot{
+							Key:          key,
+							TotalMetrics: totalCopy,
+						}
+						if val.AggTimes != nil {
+							snap.Calls = val.AggTimes.Calls
+							snap.TotalTimeNs = val.AggTimes.TotalTime
+							snap.MaxTimeNs = val.AggTimes.MaxTime
+							snap.MinTimeNs = val.AggTimes.MinTime
+							snap.MeanTimeNs = val.AggTimes.MeanTime
+						}
+						snapshots = append(snapshots, snap)
+					}
 					val.QueryLock.RUnlock()
 					delete(a.aggQueries, key)
 					refKey := RefKey{UserName: key.UserName, DatabaseName: key.DatabaseName, StartTime: key.StartTime, EndTime: key.EndTime}
@@ -178,7 +250,11 @@ func (a *AggregatedStorage) ArchiveAggQuery(ctx context.Context, queryChan chan 
 					}
 				}
 			}
+			hook = a.cycleHook
 			a.mx.Unlock()
+			if hook != nil && len(snapshots) > 0 {
+				hook(ctx, snapshots)
+			}
 		}
 		err := utils.Delay(ctx, a.truncInterval-time.Since(start))
 		if err != nil {

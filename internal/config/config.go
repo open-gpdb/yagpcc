@@ -91,6 +91,7 @@ type Config struct {
 	MaxMessageSize             int64              `config:"max_message_size" yaml:"max_message_size"`
 	MaxOuterMessageSize        int64              `config:"max_outer_message_size" yaml:"max_outer_message_size"`
 	MaximumStoredQueries       uint32             `config:"maximum_stored_queries" yaml:"maximum_stored_queries"`
+	Clickhouse                 ClickhouseConfig   `json:"clickhouse" yaml:"clickhouse"`
 }
 
 var _ AppConfig = &Config{}
@@ -157,6 +158,7 @@ func DefaultConfig() (*Config, error) {
 		MaxMessageSize:             12 * 1024 * 1024,
 		MaxOuterMessageSize:        4 * 1024 * 1024,
 		MaximumStoredQueries:       50 * 1000,
+		Clickhouse:                 DefaultClickhouseConfig(),
 	}
 	return &config, nil
 }
@@ -176,6 +178,7 @@ func ReadFromFile(configFile string) (*Config, error) {
 		err = fmt.Errorf("failed to load config from %s: %s", configFile, err.Error())
 		return nil, err
 	}
+	config.Clickhouse.ApplyEnvOverrides()
 	err = config.Validate()
 	if err != nil {
 		return nil, err
@@ -195,6 +198,11 @@ func (cfg *Config) Validate() error {
 	}
 	if cfg.SessionSendMetricInterval <= 0 {
 		return fmt.Errorf("session_send_metric_interval must be > 0, got %v", cfg.SessionSendMetricInterval)
+	}
+	if cfg.Role == "master" {
+		if err := cfg.Clickhouse.Validate(); err != nil {
+			return err
+		}
 	}
 	return nil
 }
