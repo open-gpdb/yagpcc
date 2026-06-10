@@ -51,6 +51,13 @@ func configFilePath() string {
 	return fmt.Sprintf("%s/%s", *configPathValue, configFile)
 }
 
+func runtimeConfigFilePath() string {
+	if path := configFilePath(); path != "" {
+		return path
+	}
+	return configFile
+}
+
 func main() {
 	ctxC, ctxCancelF := context.WithCancel(context.Background())
 
@@ -79,7 +86,7 @@ func main() {
 	}
 
 	for {
-		err := app.Run(ctxC, fmt.Sprintf("%s/%s", *configPathValue, configFile))
+		err := app.Run(ctxC, runtimeConfigFilePath())
 		if err != nil {
 			fmt.Println(err)
 		}

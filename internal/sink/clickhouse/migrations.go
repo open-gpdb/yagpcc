@@ -146,8 +146,8 @@ func parseMigrationsFS(fsys fs.FS, root string) ([]Migration, error) {
 }
 
 // RenderTemplate substitutes {{.Field}} placeholders in sql using params via
-// text/template. Missing keys are rendered as <no value> by template defaults;
-// callers should pass complete params.
+// text/template. Missing keys are treated as an error, so callers must pass a
+// complete params map.
 func RenderTemplate(sql string, params map[string]any) (string, error) {
 	tpl, err := template.New("migration").Option("missingkey=error").Parse(sql)
 	if err != nil {

@@ -405,7 +405,6 @@ func (bs *BackgroundStorage) queryCompleted(qKey *storage.QueryKey, qVal *storag
 			bs.l.Debugf("Query %v completed and exceeded segment timeout", *qKey)
 			return 1, reasonTimeout
 		}
-<<<<<<< HEAD
 		// Check if all segments have been refreshed since the query ended.
 		// If the minimum segment refresh time is after the query end, every segment
 		// has had a chance to report metrics for this query.
@@ -416,11 +415,6 @@ func (bs *BackgroundStorage) queryCompleted(qKey *storage.QueryKey, qVal *storag
 		}
 		bs.l.Debugf("Query %v completed, waiting for segment refresh", *qKey)
 		return 0, reasonNone
-=======
-		// Archive on master Completed; GC can evict before timeout fires.
-		l.Debugf("Query %v completed, archiving without all segments", *qKey)
-		return 1
->>>>>>> origin/pr-36-head
 	}
 
 	return 0, reasonNone

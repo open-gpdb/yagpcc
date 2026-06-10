@@ -312,6 +312,8 @@ func TestArchiveAggQuery_CycleHookSnapshotIsDeepCloned(t *testing.T) {
 	origVal := aggStorage.aggQueries[AggKey{QueryID: 42, UserName: "u", DatabaseName: "d", StartTime: startI, EndTime: endI}]
 	aggStorage.mx.RUnlock()
 	require.NotNil(t, origVal)
+	prevCurrentTime := CurrentTime
+	t.Cleanup(func() { CurrentTime = prevCurrentTime })
 	CurrentTime = func() time.Time { return endQ.Add(2 * aggStorage.GetTruncInterval()) }
 
 	captured := make(chan AggBucketSnapshot, 1)

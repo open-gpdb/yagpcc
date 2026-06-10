@@ -151,8 +151,8 @@ path. Both can be enabled at the same time, only one, or neither.
   (Submit/FlushAggregates become no-ops). yagpcc keeps running so JSON
   archive can carry on as fallback.
 - `dump_only` — prints the rendered DDL to stdout and self-disables. The
-  `--dump-only` mode is meant for offline review; the corresponding CLI
-  flags are described below.
+  `schema_management: dump_only` mode is meant for offline review; the
+  corresponding CLI flag is `--dump-schema`.
 
 `ApplyMigrations` walks `current+1 .. ExpectedSchemaVersion`, executes the
 rendered `.up.sql` for each step and inserts a row into `_yagpcc_meta`.
@@ -257,8 +257,7 @@ the main app starts. They never read live cluster state — only
 
 `schema_management: dump_only` in the YAML achieves the same as
 `--dump-schema` but goes through the normal startup path; once the dump is
-printed the binary self-disables the sink and the master continues to run
-without ClickHouse.
+printed the process exits before the master starts.
 
 ## Prometheus metrics
 

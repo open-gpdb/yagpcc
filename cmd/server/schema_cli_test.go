@@ -282,6 +282,26 @@ func TestSchemaCommandRequested(t *testing.T) {
 	}
 }
 
+func TestRuntimeConfigFilePath(t *testing.T) {
+	prev := configPathValue
+	t.Cleanup(func() { configPathValue = prev })
+
+	t.Run("defaults to working directory config", func(t *testing.T) {
+		configPathValue = nil
+		if got := runtimeConfigFilePath(); got != configFile {
+			t.Fatalf("got %q want %q", got, configFile)
+		}
+	})
+
+	t.Run("uses configured directory", func(t *testing.T) {
+		path := "/tmp/configs"
+		configPathValue = &path
+		if got := runtimeConfigFilePath(); got != "/tmp/configs/"+configFile {
+			t.Fatalf("got %q", got)
+		}
+	})
+}
+
 func TestMaybeRunDumpOnlyFromConfig_NoConfigPath(t *testing.T) {
 	deps, _, _ := newCapturingDeps(enabledConfig())
 	_, ok := maybeRunDumpOnlyFromConfig(schemaFlags{}, deps)
