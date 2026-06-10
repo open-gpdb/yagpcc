@@ -33,6 +33,7 @@ import (
 	"github.com/open-gpdb/yagpcc/internal/config"
 	"github.com/open-gpdb/yagpcc/internal/gp"
 	"github.com/open-gpdb/yagpcc/internal/metrics"
+	"github.com/open-gpdb/yagpcc/internal/sink/clickhouse"
 	"github.com/open-gpdb/yagpcc/internal/storage"
 	"github.com/open-gpdb/yagpcc/internal/utils"
 	"go.uber.org/zap"
@@ -50,6 +51,16 @@ type (
 	}
 	segmentMap map[string]*segmentAddr
 
+	// ClickhouseSink is the subset of *clickhouse.ClickhouseWriter that the
+	// master needs at runtime: a query-event submit, an aggregated-bucket
+	// flush. The interface keeps the field testable (a fake satisfying just
+	// these two methods is enough for unit tests) while the real
+	// *clickhouse.ClickhouseWriter satisfies it via existing methods.
+	ClickhouseSink interface {
+		Submit(qT *pbm.TotalQueryData)
+		FlushAggregates(ctx context.Context, buckets []clickhouse.AggregatedBucket) (int, error)
+	}
+
 	BackgroundStorage struct {
 		l                  *zap.SugaredLogger
 		SessionStorage     *gp.SessionsStorage
@@ -57,6 +68,7 @@ type (
 		RQStorage          *storage.RunningQueriesStorage
 		procfsStorage      *storage.ProcfsStorage
 		statActivityLister statActivityLister
+		chWriter           ClickhouseSink
 
 		// segRefreshTimes tracks the last successful data-gathering time per segment hostname.
 		segRefreshMu    sync.RWMutex
@@ -662,6 +674,94 @@ func InitConnection(ctx context.Context, l *zap.SugaredLogger, cfg *config.Confi
 		return err
 	}
 	return nil
+}
+
+// SetClickhouseWriter wires an optional ClickHouse sink onto the background
+// storage. Passing nil leaves the sink disabled. Calls go through ClickhouseSink
+// (the local interface) so tests can inject a stub instead of a real
+// clickhouse.ClickhouseWriter.
+func (bs *BackgroundStorage) SetClickhouseWriter(w ClickhouseSink) {
+	bs.chWriter = w
+}
+
+// ClickhouseWriter returns the configured sink (may be nil). Used by app.go
+// to drive Run/Close on the underlying writer without exposing the field.
+func (bs *BackgroundStorage) ClickhouseWriter() ClickhouseSink {
+	return bs.chWriter
+}
+
+// submitToClickhouse forwards a finalised query record to the CH sink when
+// configured. Called from ArchiveOrAggregate for both archived and aggregated
+// queries — short queries are filtered out by the sink itself via
+// min_duration_ms, so this entry point passes everything through.
+func (bs *BackgroundStorage) submitToClickhouse(qT *pbm.TotalQueryData) {
+	if bs.chWriter == nil {
+		return
+	}
+	bs.chWriter.Submit(qT)
+}
+
+// aggSnapshotsToClickhouse converts the storage-level snapshot batch into
+// the clickhouse.AggregatedBucket shape and forwards it to the sink. Wired
+// into AggregatedStorage via WithCycleHook in app.go when the sink is
+// enabled. Errors are logged but otherwise swallowed: at-most-once is the
+// CH contract for v1, and the JSON archiver path has already accepted the
+// same batch via queryChan.
+func (bs *BackgroundStorage) aggSnapshotsToClickhouse(ctx context.Context, snapshots []storage.AggBucketSnapshot) {
+	if bs.chWriter == nil || len(snapshots) == 0 {
+		return
+	}
+	buckets := make([]clickhouse.AggregatedBucket, 0, len(snapshots))
+	for _, s := range snapshots {
+		buckets = append(buckets, snapshotToBucket(s))
+	}
+	if _, err := bs.chWriter.FlushAggregates(ctx, buckets); err != nil {
+		bs.l.Warnf("clickhouse aggregated flush failed: %v", err)
+	}
+}
+
+// snapshotToBucket converts one mature aggregated bucket from storage
+// representation (proto-derived nanoseconds, raw GPMetrics) into the
+// clickhouse.AggregatedBucket shape declared by 0001_init.up.sql. AggregatedMetrics
+// times in the proto are float64(time.Duration) — i.e. nanoseconds — so we
+// divide by 1e6 to get the millisecond-flavoured columns the DDL expects.
+func snapshotToBucket(s storage.AggBucketSnapshot) clickhouse.AggregatedBucket {
+	bucket := clickhouse.AggregatedBucket{
+		BucketTime:    s.Key.StartTime,
+		QueryID:       s.Key.QueryID,
+		PlanID:        s.Key.PlanID,
+		User:          s.Key.UserName,
+		Database:      s.Key.DatabaseName,
+		ResourceGroup: s.Key.Rsgname,
+		Executions:    uint64(s.Calls),
+	}
+	if m := s.TotalMetrics; m != nil {
+		if sys := m.SystemStat; sys != nil {
+			bucket.TotalCPUSec = sys.UserTimeSeconds + sys.KernelTimeSeconds
+			bucket.TotalRunningSec = sys.RunningTimeSeconds
+			bucket.TotalRSSBytes = sys.Rss
+			bucket.TotalIOBytes = sys.ReadBytes + sys.WriteBytes
+		}
+		if i := m.Instrumentation; i != nil {
+			bucket.TotalNTuples = i.Ntuples
+		}
+	}
+	const nsPerMs = 1_000_000.0
+	bucket.AvgDurationMs = s.MeanTimeNs / nsPerMs
+	if s.MaxTimeNs > 0 {
+		bucket.MaxDurationMs = uint64(s.MaxTimeNs / nsPerMs)
+	}
+	return bucket
+}
+
+// AggregatedSnapshotHook returns a storage cycle hook that forwards every
+// drained batch of aggregated buckets to the CH sink. Returns nil when the
+// sink is not configured so callers can skip installing the hook entirely.
+func (bs *BackgroundStorage) AggregatedSnapshotHook() storage.AggCycleHook {
+	if bs.chWriter == nil {
+		return nil
+	}
+	return bs.aggSnapshotsToClickhouse
 }
 
 func InitBG(

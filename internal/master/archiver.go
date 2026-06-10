@@ -177,6 +177,12 @@ func (bs *BackgroundStorage) ArchiveOrAggregate(ctx context.Context,
 				}
 			}
 
+			// CH sink runs in parallel with the JSON archiver/aggregator: even
+			// short queries (which only land in AggStorage above) are pushed
+			// into query_events. The sink filters by min_duration_ms itself so
+			// the master does not need a second threshold check here.
+			bs.submitToClickhouse(qT)
+
 		case <-ctx.Done():
 			bs.l.Warn("Done ArchiveOrAggregate")
 			return

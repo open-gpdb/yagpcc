@@ -69,3 +69,23 @@ jobs:
           version: v2.6
       - name: Unit tests (all packages)
         run: make unittest
+
+  clickhouse-integration:
+    # Heavier than the unit-test job (pulls a ClickHouse image and runs it via
+    # testcontainers-go). Triggered on push/PR; skip in workflow_dispatch
+    # quickdraws by passing a different ref/inputs if needed.
+    runs-on: ubuntu-latest
+    needs: tests
+    strategy:
+      matrix:
+        go-version: ['1.25']
+    steps:
+      - uses: actions/checkout@v5
+      - name: Setup Go
+        uses: actions/setup-go@v6
+        with:
+          go-version: ${{ matrix.go-version }}
+      - name: Download modules
+        run: go mod download
+      - name: ClickHouse sink integration tests
+        run: go test -tags=integration -v -count=1 -timeout=10m ./internal/sink/clickhouse/...

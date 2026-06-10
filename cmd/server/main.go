@@ -41,6 +41,16 @@ func registerConfigPathFlag(set *pflag.FlagSet) {
 	configPathValue = set.String(flagNameConfigPath, "", "Path where to look for configuration files")
 }
 
+// configFilePath returns the resolved path to yagpcc.yaml from the
+// --config-path flag, or "" when --config-path is not set so the schema CLI
+// can detect "no config provided".
+func configFilePath() string {
+	if configPathValue == nil || *configPathValue == "" {
+		return ""
+	}
+	return fmt.Sprintf("%s/%s", *configPathValue, configFile)
+}
+
 func main() {
 	ctxC, ctxCancelF := context.WithCancel(context.Background())
 
@@ -56,7 +66,17 @@ func main() {
 	}()
 
 	registerConfigPathFlag(pflag.CommandLine)
+	var schema schemaFlags
+	registerSchemaCLIFlags(pflag.CommandLine, &schema)
 	pflag.Parse()
+	schema.configPath = configFilePath()
+
+	if schema.schemaCommandRequested() {
+		os.Exit(runSchemaCLI(ctxC, schema, productionSchemaCLIDeps()))
+	}
+	if exit, ok := maybeRunDumpOnlyFromConfig(schema, productionSchemaCLIDeps()); ok {
+		os.Exit(exit)
+	}
 
 	for {
 		err := app.Run(ctxC, fmt.Sprintf("%s/%s", *configPathValue, configFile))

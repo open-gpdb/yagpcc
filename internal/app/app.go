@@ -18,6 +18,7 @@ package app
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net"
 	"net/http"
@@ -43,6 +44,7 @@ import (
 	"github.com/open-gpdb/yagpcc/internal/httpui"
 	"github.com/open-gpdb/yagpcc/internal/master"
 	"github.com/open-gpdb/yagpcc/internal/metrics"
+	"github.com/open-gpdb/yagpcc/internal/sink/clickhouse"
 	"github.com/open-gpdb/yagpcc/internal/storage"
 	"github.com/open-gpdb/yagpcc/internal/uds"
 	"go.uber.org/zap"
@@ -450,6 +452,39 @@ func Run(ctx context.Context, configFile string) error {
 	statActivityLister := stat_activity.NewLister(baseApp.L(), masterConnection)
 	backgroundStorage := master.NewBackgroundStorage(logger, sessionsStorage, rqStorage, aggStorage, procfsStorage, statActivityLister)
 
+	// ClickHouse sink: only constructed for master role and only when enabled
+	// in the config. The writer is opt-in (cfg.Clickhouse.Enabled defaults to
+	// false), so deployments without CH stay unaffected.
+	var chWriter *clickhouse.ClickhouseWriter
+	if cfg.Role == "master" && cfg.Clickhouse.Enabled {
+		chDeps := clickhouse.Deps{
+			Logger:     baseApp.L().Desugar(),
+			Registerer: prometheus.DefaultRegisterer,
+			Sessions:   newClickhouseSessionsProvider(sessionsStorage),
+		}
+		chCtx, chCancel := context.WithCancel(ctx)
+		chWriter, err = clickhouse.New(chCtx, &cfg.Clickhouse, chDeps)
+		if err != nil {
+			chCancel()
+			logger.Errorf("failed to start clickhouse sink: %v", err)
+			return err
+		}
+		backgroundStorage.SetClickhouseWriter(chWriter)
+		aggStorage.SetCycleHook(backgroundStorage.AggregatedSnapshotHook())
+		defer func() {
+			chCancel()
+			<-chWriter.Stopped()
+			if cerr := chWriter.Close(); cerr != nil {
+				logger.Warnf("clickhouse sink close error: %v", cerr)
+			}
+		}()
+		go func() {
+			if rerr := chWriter.Run(chCtx); rerr != nil && !errors.Is(rerr, context.Canceled) {
+				logger.Warnf("clickhouse sink Run returned: %v", rerr)
+			}
+		}()
+	}
+
 	agentApp, err := NewApp(baseApp, cfg, statActivityLister, backgroundStorage)
 	if err != nil {
 		logger.Fatalf("failed to start application %v", err)
@@ -618,5 +653,74 @@ func Run(ctx context.Context, configFile string) error {
 			logger.Info("All Ok, I'm alive")
 			time.Sleep(time.Second * 1)
 		}
+	}
+}
+
+// newClickhouseSessionsProvider builds the SessionsProvider closure handed to
+// the ClickHouse sink. It walks the live SessionsStorage map on every tick,
+// skips system sessions and rows without a backend_start, and emits one
+// clickhouse.Session per active row. The closure runs in the snapshot
+// scheduler goroutine — keep it cheap (read-only access to the storage map).
+func newClickhouseSessionsProvider(s *gp.SessionsStorage) clickhouse.SessionsProvider {
+	return func(ctx context.Context) []clickhouse.Session {
+		if s == nil {
+			return nil
+		}
+		raw := s.GetSessions()
+		out := make([]clickhouse.Session, 0, len(raw))
+		now := time.Now().UTC()
+		for _, info := range raw {
+			info.SessionLock.RLock()
+			if !gp.NotSystemSession(info) {
+				info.SessionLock.RUnlock()
+				continue
+			}
+			gpInfo := info.SessionData.GpStatInfo
+			if gpInfo == nil || gpInfo.BackendStart == nil {
+				info.SessionLock.RUnlock()
+				continue
+			}
+			out = append(out, gpStatActivityToCHSession(now, gpInfo))
+			info.SessionLock.RUnlock()
+		}
+		return out
+	}
+}
+
+// gpStatActivityToCHSession converts a single pg_stat_activity row into the
+// clickhouse.Session shape declared by 0001_init.up.sql. Pointer fields in
+// gp.GpStatActivity (ApplicationName, ClientAddr, State, Query) become empty
+// strings when nil; *time.Time stays nil so the Nullable(DateTime64) columns
+// can store NULL.
+func gpStatActivityToCHSession(snapshot time.Time, a *gp.GpStatActivity) clickhouse.Session {
+	deref := func(p *string) string {
+		if p == nil {
+			return ""
+		}
+		return *p
+	}
+	waiting := false
+	if a.Waiting != nil {
+		waiting = *a.Waiting
+	}
+	backendStart := time.Time{}
+	if a.BackendStart != nil {
+		backendStart = *a.BackendStart
+	}
+	return clickhouse.Session{
+		SnapshotTime: snapshot,
+		SessionID:    int32(a.SessID),
+		PID:          int32(a.Pid),
+		User:         a.Usename,
+		Database:     a.Datname,
+		Application:  deref(a.ApplicationName),
+		ClientAddr:   deref(a.ClientAddr),
+		BackendStart: backendStart,
+		XactStart:    a.XactStart,
+		QueryStart:   a.QueryStart,
+		StateChange:  a.StateChange,
+		State:        deref(a.State),
+		Waiting:      waiting,
+		Query:        deref(a.Query),
 	}
 }
