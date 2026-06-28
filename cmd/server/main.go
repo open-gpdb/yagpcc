@@ -78,8 +78,16 @@ func main() {
 		os.Exit(exit)
 	}
 
+	// Resolve the config path for the normal startup path. configFilePath()
+	// returns "" when --config-path is unset; fall back to configFile so we
+	// read yagpcc.yaml from the working directory instead of "/yagpcc.yaml".
+	appConfigPath := configFilePath()
+	if appConfigPath == "" {
+		appConfigPath = configFile
+	}
+
 	for {
-		err := app.Run(ctxC, fmt.Sprintf("%s/%s", *configPathValue, configFile))
+		err := app.Run(ctxC, appConfigPath)
 		if err != nil {
 			fmt.Println(err)
 		}

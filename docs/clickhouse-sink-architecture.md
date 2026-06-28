@@ -150,9 +150,9 @@ path. Both can be enabled at the same time, only one, or neither.
   `yagpcc_ch_schema_mismatch=1`, closes the connection and self-disables
   (Submit/FlushAggregates become no-ops). yagpcc keeps running so JSON
   archive can carry on as fallback.
-- `dump_only` — prints the rendered DDL to stdout and self-disables. The
-  `--dump-only` mode is meant for offline review; the corresponding CLI
-  flags are described below.
+- `dump_only` — prints the rendered DDL to stdout and exits before the
+  master starts. This is the config-driven equivalent of the `--dump-schema`
+  CLI flag (see "CLI commands" below) and is meant for offline review.
 
 `ApplyMigrations` walks `current+1 .. ExpectedSchemaVersion`, executes the
 rendered `.up.sql` for each step and inserts a row into `_yagpcc_meta`.
@@ -255,10 +255,11 @@ the main app starts. They never read live cluster state — only
 | `--migrate-only` | Load config, connect, `ApplyMigrations`, exit. | `0` on success, `2` on load/validate/connect/apply error. |
 | `--verify-schema` | Load config, connect, `VerifySchema`, exit. | `0` on match, `2` on upgrade/downgrade required or connect error. |
 
-`schema_management: dump_only` in the YAML achieves the same as
-`--dump-schema` but goes through the normal startup path; once the dump is
-printed the binary self-disables the sink and the master continues to run
-without ClickHouse.
+`schema_management: dump_only` in the YAML produces the same output as
+`--dump-schema`, but is triggered through the normal startup path: the config
+is loaded, the rendered DDL is printed, and the process then exits. It does
+**not** fall through to starting the master, so this mode is for offline
+review rather than a degraded ClickHouse-less run.
 
 ## Prometheus metrics
 
