@@ -99,10 +99,9 @@ func runArchiveOrAggregateOnce(t *testing.T, fake master.ClickhouseSink) int {
 
 	qKey := &storage.QueryKey{Ssid: 11, Ccnt: 1}
 	qVal := &storage.RunningQuery{
-		Completed:    true,
-		QueriesData:  storage.QueryMap{},
-		SegmentNodes: storage.SegmentIndexNodes{},
-		NestedLevel:  -1,
+		Completed:   true,
+		QueriesData: storage.QueryMap{},
+		NestedLevel: -1,
 	}
 
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)

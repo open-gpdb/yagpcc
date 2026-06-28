@@ -254,6 +254,14 @@ func InitMetrics() {
 		QueryStatuses:           promauto.NewCounterVec(prometheus.CounterOpts{Name: "query_statuses"}, requestQueryStatuses()),
 		QueriesInFlight:         promauto.NewGauge(prometheus.GaugeOpts{Name: "queries_in_flight"}),
 		ExecutingQueryLatencies: metrics.NewTimeGaugeHistogram("executing_query", "executing queries latencies", prometheus.DefaultRegisterer, requestQueryBuckets()),
+
+		GCRuns:            promauto.NewCounter(prometheus.CounterOpts{Name: "gc_runs"}),
+		GCDeletedQueries:  promauto.NewCounter(prometheus.CounterOpts{Name: "gc_deleted_queries"}),
+		GCArchivedQueries: promauto.NewCounter(prometheus.CounterOpts{Name: "gc_archived_queries"}),
+
+		QueriesArchivedComplete:      promauto.NewCounter(prometheus.CounterOpts{Name: "queries_archived_complete"}),
+		QueriesArchivedTimeout:       promauto.NewCounter(prometheus.CounterOpts{Name: "queries_archived_timeout"}),
+		QueriesArchivedSessionFailed: promauto.NewCounter(prometheus.CounterOpts{Name: "queries_archived_session_failed"}),
 	}
 }
 

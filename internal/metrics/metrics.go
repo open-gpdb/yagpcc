@@ -39,6 +39,18 @@ type YagpccMetricsType struct {
 	QueryStatuses           *prometheus.CounterVec
 	QueriesInFlight         prometheus.Gauge
 	ExecutingQueryLatencies *TimeGaugeHistogram
+
+	// GC metrics
+	GCRuns            prometheus.Counter
+	GCDeletedQueries  prometheus.Counter
+	GCArchivedQueries prometheus.Counter
+
+	// Archival-reason metrics: completed queries split by why they were archived.
+	// Complete = all segments reported; Timeout = segment timeout fired (data may be
+	// partial); SessionFailed = session disappeared before completion.
+	QueriesArchivedComplete      prometheus.Counter
+	QueriesArchivedTimeout       prometheus.Counter
+	QueriesArchivedSessionFailed prometheus.Counter
 }
 
 var YagpccMetrics *YagpccMetricsType
