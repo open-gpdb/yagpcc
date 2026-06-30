@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"os"
 	"os/signal"
+	"path/filepath"
 	"time"
 
 	"github.com/open-gpdb/yagpcc/internal/app"
@@ -59,7 +60,8 @@ func main() {
 	pflag.Parse()
 
 	for {
-		err := app.Run(ctxC, fmt.Sprintf("%s/%s", *configPathValue, configFile))
+		configPath := filepath.Join(*configPathValue, configFile)
+		err := app.Run(ctxC, configPath)
 		if err != nil {
 			fmt.Println(err)
 		}

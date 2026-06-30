@@ -58,7 +58,7 @@ The binary is produced at `devbin/yagpcc`.
 
 ## Configuration
 
-The application reads **`yagpcc.yaml`** from the current working directory. A valid config file is required to run.
+The application reads **`yagpcc.yaml`** from the current working directory by default. A valid config file is required to run. Use `--config-path` to specify a different directory.
 
 Config files differ by role:
 
@@ -72,7 +72,7 @@ Example configs are in **`cmd/server/`**:
 | `cmd/server/yagpcc_master.yaml` | master | Template for master node: set `master_connection.addrs`, `master_connection.password`, and optionally `sslrootcert`. |
 | `cmd/server/yagpcc_segment.yaml` | segment | Template for segment nodes. |
 
-Copy or adapt the right file to `yagpcc.yaml` in the directory from which you will run the binary (see [Running](#running)).
+Copy or adapt the right file to `yagpcc.yaml` in the directory from which you will run the binary, or use `--config-path` to point to its location (see [Running](#running)).
 
 Minimal structure:
 
@@ -125,4 +125,8 @@ The UI is disabled by default (`ui_port: 0`). When enabled, the web UI is availa
 ./devbin/yagpcc
 ```
 
-The binary expects `yagpcc.yaml` in the current working directory; it does not take a config path argument.
+By default, the binary looks for `yagpcc.yaml` in the current working directory. You can override this with `--config-path <directory>`:
+
+```bash
+./devbin/yagpcc --config-path /path/to/config
+```
