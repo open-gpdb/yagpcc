@@ -29,12 +29,17 @@ endif
 GINKGO_CLI=github.com/onsi/ginkgo/v2/ginkgo@v2.28.0
 PROTOC_GEN_GO=google.golang.org/protobuf/cmd/protoc-gen-go@v1.36.11
 PROTOC_GEN_GO_GRPC=google.golang.org/grpc/cmd/protoc-gen-go-grpc@v1.6.1
+BUF_CLI=github.com/bufbuild/buf/cmd/buf@v1.71.0
+
+# Ensure go-installed tools (protoc-gen-go, protoc-gen-go-grpc, buf) are on PATH.
+export PATH := $(shell go env GOPATH)/bin:$(PATH)
 
 ####################### BUILD #######################
 
 genproto:
 	go install $(PROTOC_GEN_GO)
 	go install $(PROTOC_GEN_GO_GRPC)
+	go install $(BUF_CLI)
 	buf generate
 
 genbin:
