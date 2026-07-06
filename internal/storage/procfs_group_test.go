@@ -251,4 +251,54 @@ func TestProcfsDiff_NilSubStructs(t *testing.T) {
 		assert.Nil(t, result.ProcStat)
 		assert.Nil(t, result.ProcIo)
 	})
+	t.Run("ProcSpill taken from last", func(t *testing.T) {
+		first := &pbc.GpPidProcInfo{ProcSpill: &pbc.ProcSpill{Size: 100, Files: 5}}
+		last := &pbc.GpPidProcInfo{ProcSpill: &pbc.ProcSpill{Size: 200, Files: 8}}
+		result, err := ProcfsDiff(first, last)
+		require.NoError(t, err)
+		require.NotNil(t, result.ProcSpill)
+		assert.Equal(t, int64(200), result.ProcSpill.Size)
+		assert.Equal(t, int64(8), result.ProcSpill.Files)
+	})
+	t.Run("ProcSpill nil in last propagates nil", func(t *testing.T) {
+		first := &pbc.GpPidProcInfo{ProcSpill: &pbc.ProcSpill{Size: 100, Files: 5}}
+		last := &pbc.GpPidProcInfo{}
+		result, err := ProcfsDiff(first, last)
+		require.NoError(t, err)
+		assert.Nil(t, result.ProcSpill)
+	})
+}
+
+// ---------------------------------------------------------------------------
+// GroupProcfsMetrics – ProcSpill
+// ---------------------------------------------------------------------------
+
+func TestGroupProcfsMetrics_ProcSpill_FirstSource(t *testing.T) {
+	dest := &pbc.GpPidProcInfo{}
+	source := &pbc.GpPidProcInfo{ProcSpill: &pbc.ProcSpill{Size: 1024, Files: 3}}
+	err := GroupProcfsMetrics(dest, source, AggMax, "host1", map[MapAggregateKey]int64{})
+	require.NoError(t, err)
+	require.NotNil(t, dest.ProcSpill)
+	assert.Equal(t, int64(1024), dest.ProcSpill.Size)
+	assert.Equal(t, int64(3), dest.ProcSpill.Files)
+}
+
+func TestGroupProcfsMetrics_ProcSpill_Accumulates(t *testing.T) {
+	dest := &pbc.GpPidProcInfo{ProcSpill: &pbc.ProcSpill{Size: 1024, Files: 3}}
+	source := &pbc.GpPidProcInfo{ProcSpill: &pbc.ProcSpill{Size: 512, Files: 2}}
+	err := GroupProcfsMetrics(dest, source, AggMax, "host1", map[MapAggregateKey]int64{})
+	require.NoError(t, err)
+	require.NotNil(t, dest.ProcSpill)
+	assert.Equal(t, int64(1536), dest.ProcSpill.Size)
+	assert.Equal(t, int64(5), dest.ProcSpill.Files)
+}
+
+func TestGroupProcfsMetrics_ProcSpill_NilSourceSkipped(t *testing.T) {
+	dest := &pbc.GpPidProcInfo{ProcSpill: &pbc.ProcSpill{Size: 1024, Files: 3}}
+	source := &pbc.GpPidProcInfo{} // no ProcSpill
+	err := GroupProcfsMetrics(dest, source, AggMax, "host1", map[MapAggregateKey]int64{})
+	require.NoError(t, err)
+	require.NotNil(t, dest.ProcSpill)
+	assert.Equal(t, int64(1024), dest.ProcSpill.Size)
+	assert.Equal(t, int64(3), dest.ProcSpill.Files)
 }

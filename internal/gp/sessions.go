@@ -613,6 +613,12 @@ func procfsStatToLastStat(procfsStat *pbc.GpPidProcInfo) (*pbc.GPMetrics, error)
 		result.SystemStat.WriteBytes = uint64(procfsStat.ProcIo.WriteBytes)
 		result.SystemStat.CancelledWriteBytes = uint64(procfsStat.ProcIo.CancelledWriteBytes)
 	}
+	if procfsStat.ProcSpill != nil {
+		result.Spill = &pbc.SpillInfo{
+			FileCount:  int32(procfsStat.ProcSpill.Files),
+			TotalBytes: procfsStat.ProcSpill.Size,
+		}
+	}
 	return result, nil
 }
 

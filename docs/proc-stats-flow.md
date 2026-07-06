@@ -96,8 +96,9 @@ message GetPidProcInfoResponse {
 [api/proto/common/yagpcc_metrics.proto](../api/proto/common/yagpcc_metrics.proto))
 carries the primary key (`gp_segment_id`, `sess_id`, `pid`), the process
 `cmdline`, and the parsed `ProcStat` (from `/proc/<pid>/stat`),
-`ProcStatus` (from `/proc/<pid>/status`), and `ProcIO` (from
-`/proc/<pid>/io`):
+`ProcStatus` (from `/proc/<pid>/status`), `ProcIO` (from
+`/proc/<pid>/io`), and `ProcSpill` (from `gp_workfile_usage_per_query`,
+injected on the master — see §1.3):
 
 ```
 message GpPidProcInfo {
@@ -108,6 +109,7 @@ message GpPidProcInfo {
     ProcStat    proc_stat     = 5;
     ProcStatus  proc_status   = 6;
     ProcIO      proc_io       = 7;
+    ProcSpill   proc_spill    = 9;   // injected from workfile_usage (master side)
 }
 
 message ProcIO {
@@ -119,18 +121,61 @@ message ProcIO {
     int64 write_bytes            = 6;  // bytes sent to storage
     int64 cancelled_write_bytes  = 7;  // writes never persisted
 }
+
+message ProcSpill {
+    int64 size  = 1;   // bytes spilled to disk by this PID (point-in-time snapshot)
+    int64 files = 2;   // number of spill files created by this PID (snapshot)
+}
 ```
 
 All `ProcIO` fields are cumulative kernel counters. The master computes
 **deltas** between two snapshots to derive interval-based metrics (see
-§1.4). The numeric fields in `ProcStat`, `ProcStatus`, and `ProcIO` are
+§1.5). The numeric fields in `ProcStat`, `ProcStatus`, and `ProcIO` are
 intentionally **signed** (`int32` / `int64` rather than the `uint*` types
 used by `prometheus/procfs`) so the same layout can also carry deltas
 without needing a parallel signed-delta schema. Counter values themselves
 never exceed `2^63` for any realistic process lifetime, so the conversion
 is lossless.
 
-### 1.3 Segment side (stateless)
+`ProcSpill` is different: it is a **point-in-time snapshot** (the current
+number of bytes and files in `gp_toolkit.gp_workfile_usage_per_query` at
+query time), not a monotonically increasing counter. It is therefore not
+diffed — `ProcfsDiff` passes through the `last` value unchanged, and
+aggregation simply sums the latest values across all PIDs in the session.
+
+### 1.3 Workfile usage enrichment (master side, before storage)
+
+Spill-file statistics (`ProcSpill`) are **not** collected via procfs on
+the segment hosts. Instead, the master queries
+`gp_toolkit.gp_workfile_usage_per_query` once per `RefreshProcfs` cycle
+and **enriches** the just-gathered `[]*GpPidProcInfo` before storing them
+in the ring buffer.
+
+| Item | Location |
+|------|----------|
+| SQL query | `workfileUsageQuery` in [internal/gp/workfile_usage/lister.go](../internal/gp/workfile_usage/lister.go) |
+| Row type | `WorkfileUsageEntry{Pid, SessID, CommandCnt, SegID, Size, NumFiles}` in [internal/gp/workfile_usage/models.go](../internal/gp/workfile_usage/models.go) |
+| Background lister | [`workfile_usage.Lister`](../internal/gp/workfile_usage/lister.go) — started in `InitBG()`, polls every `defaultCollectionInterval` (2 s) |
+| Enrichment function | [`enrichWithWorkfileUsage(procInfos, usageEntries)`](../internal/master/background.go) |
+| Call site | [`RefreshProcfs()`](../internal/master/background.go) — called immediately after `GatherProcfsStat()` and before `RegisterProcfsStat()` |
+
+The enrichment step works as follows:
+
+1. `RefreshProcfs` reads the current snapshot from the workfile-usage
+   lister via `List(ctx)`.
+2. It builds a lookup map keyed by `workfileUsageKey{SegID, Pid}`.
+3. For each `GpPidProcInfo` returned by `GatherProcfsStat()`,
+   `enrichWithWorkfileUsage()` looks up the corresponding entry in the
+   map. If found, it sets `proc.ProcSpill = &ProcSpill{Size: e.Size, Files: e.NumFiles}`.
+4. If no matching entry exists (the PID has no active spill), `ProcSpill`
+   remains `nil`.
+
+The workfile-usage lister itself queries the Greenplum master over a
+regular database connection; unlike procfs data, spill-file statistics
+are maintained by the database engine and are available directly from the
+master without a per-host fan-out.
+
+### 1.4 Segment side (stateless)
 
 The segment-host yagpcc keeps **no local state** for proc-stats. On every
 `GetPidProcStat` call it:
@@ -163,7 +208,7 @@ authoritative path for per-tick procfs sampling and works for every
 backend in `pg_stat_activity` (including system processes that
 `yagp-hooks-collector` never sees).
 
-### 1.4 Master aggregation (snapshot-pair diffing, per session)
+### 1.5 Master aggregation (snapshot-pair diffing, per session)
 
 The master does **not** use EMA (exponential moving averages). Instead,
 it stores raw snapshots in a ring buffer and computes deltas between any
@@ -177,14 +222,17 @@ The flow is driven by two independent ticker goroutines launched in
 1. Fires every `procfs_refresh_interval` (config).
 2. Creates a [`ProcfsGatherStorage`](../internal/master/procfs_gather.go)
    and calls `GatherProcfsStat()` to fan out to all segment hosts.
-3. Calls
+3. Calls `enrichWithWorkfileUsage()` to inject `ProcSpill` data from the
+   workfile-usage lister into the gathered results (see §1.3).
+4. Calls
    [`ProcfsStorage.RegisterProcfsStat(time.Now(), result)`](../internal/storage/procfs_storage.go)
    to append the gathered `[]*GpPidProcInfo` as a new timestamped
    snapshot in the ring buffer.
-4. `RegisterProcfsStat` builds two maps for fast access:
+5. `RegisterProcfsStat` builds two maps for fast access:
    - `pidProcData` (`ProcMap`): keyed by `ProcKey{GpSegmentId, SessId, Pid}` → `*ProcStat`
    - `pidProcIndex` (`ProcIndexMap`): keyed by `ProcIndexKey{SessId}` → `[]*ProcIndexData{GpSegmentId, Pid}`
-5. Calls `TidyUpProcfsStat()` to trim the ring buffer to
+   - Each `ProcStat` now also stores `ProcSpill` from the enrichment step.
+6. Calls `TidyUpProcfsStat()` to trim the ring buffer to
    `maximumStoredPoints` (default 30).
 
 **Session refresh loop** — [`RefreshSessions()`](../internal/master/background.go):
@@ -211,21 +259,24 @@ The flow is driven by two independent ticker goroutines launched in
 
 This means each session's `LastMetrics` (exposed on `SessionState` via
 the existing `GetGPSessions` / `GetGPQuery` RPCs) contains the
-**5-minute delta** of cluster-wide procfs counters for that session:
+**5-minute delta** of cluster-wide procfs counters, plus the **current
+spill-file totals**, for that session:
 
-| `LastMetrics.SystemStat` field | Source |
-|-------------------------------|--------|
-| `UserTimeSeconds` | `Σ_segments Δ(ProcStat.Utime)` |
-| `KernelTimeSeconds` | `Σ_segments Δ(ProcStat.Stime)` |
-| `Vsize` | per-host sum of `ProcStat.Vsize` (latest snapshot) |
-| `Rss` | per-host sum of `ProcStat.Rss` (latest snapshot) |
-| `Rchar` | `Σ_segments Δ(ProcIO.Rchar)` |
-| `Wchar` | `Σ_segments Δ(ProcIO.Wchar)` |
-| `Syscr` | `Σ_segments Δ(ProcIO.Syscr)` |
-| `Syscw` | `Σ_segments Δ(ProcIO.Syscw)` |
-| `ReadBytes` | `Σ_segments Δ(ProcIO.ReadBytes)` |
-| `WriteBytes` | `Σ_segments Δ(ProcIO.WriteBytes)` |
-| `CancelledWriteBytes` | `Σ_segments Δ(ProcIO.CancelledWriteBytes)` |
+| `LastMetrics` field | Source | Semantics |
+|--------------------|--------|-----------|
+| `SystemStat.UserTimeSeconds` | `Σ_segments Δ(ProcStat.Utime)` | 5-min CPU delta |
+| `SystemStat.KernelTimeSeconds` | `Σ_segments Δ(ProcStat.Stime)` | 5-min kernel time delta |
+| `SystemStat.Vsize` | per-host sum of `ProcStat.Vsize` (latest) | snapshot |
+| `SystemStat.Rss` | per-host sum of `ProcStat.Rss` (latest) | snapshot |
+| `SystemStat.Rchar` | `Σ_segments Δ(ProcIO.Rchar)` | 5-min IO delta |
+| `SystemStat.Wchar` | `Σ_segments Δ(ProcIO.Wchar)` | 5-min IO delta |
+| `SystemStat.Syscr` | `Σ_segments Δ(ProcIO.Syscr)` | 5-min IO delta |
+| `SystemStat.Syscw` | `Σ_segments Δ(ProcIO.Syscw)` | 5-min IO delta |
+| `SystemStat.ReadBytes` | `Σ_segments Δ(ProcIO.ReadBytes)` | 5-min IO delta |
+| `SystemStat.WriteBytes` | `Σ_segments Δ(ProcIO.WriteBytes)` | 5-min IO delta |
+| `SystemStat.CancelledWriteBytes` | `Σ_segments Δ(ProcIO.CancelledWriteBytes)` | 5-min IO delta |
+| `Spill.FileCount` | `Σ_pids ProcSpill.Files` (latest snapshot) | current total |
+| `Spill.TotalBytes` | `Σ_pids ProcSpill.Size` (latest snapshot) | current total |
 
 The `Δ` notation means `nonNegativeDiff(first, last)` — if the counter
 decreased (PID reuse or counter reset), the diff is clamped to zero.
@@ -236,11 +287,21 @@ intermediate map keyed by `(MetricName, Hostname)`, then the per-host
 total is used as the final value. This avoids double-counting when
 multiple segments on the same host report the same process.
 
-### 1.5 End-to-end sequence
+Spill metrics (`Spill.FileCount`, `Spill.TotalBytes`) are **not diffed**.
+`ProcSpill` is a point-in-time snapshot from `gp_workfile_usage_per_query`,
+so `ProcfsDiff` passes the `last` value through unchanged. The per-session
+sum (`Σ_pids`) in `GroupProcfsMetrics` therefore reflects the current
+total spill across all worker PIDs for the session at the time of the most
+recent `RefreshProcfs` cycle. If a session has no active spill,
+`ProcSpill` is `nil` for all its PIDs and `LastMetrics.Spill` will be
+`nil` in the response.
+
+### 1.6 End-to-end sequence
 
 ```mermaid
 sequenceDiagram
     participant GP as Greenplum master (libpq)
+    participant WU as workfile_usage lister
     participant M as Master yagpcc
     participant PS as ProcfsStorage (ring buffer)
     participant SS as SessionsStorage
@@ -257,16 +318,19 @@ sequenceDiagram
         Procfs-->>SH: raw procfs data
         SH-->>M: GpPidProcInfo[]
     end
-    M->>PS: RegisterProcfsStat(time.Now(), collected)
-    Note over PS: append snapshot,<br/>trim ring buffer
+    M->>WU: List(ctx) — read cached workfile_usage snapshot
+    WU-->>M: []WorkfileUsageEntry{SegID, Pid, Size, NumFiles}
+    Note over M: enrichWithWorkfileUsage():<br/>match (SegID, Pid) → set ProcSpill on each GpPidProcInfo
+    M->>PS: RegisterProcfsStat(time.Now(), enriched)
+    Note over PS: append snapshot (includes ProcSpill),<br/>trim ring buffer
 
     Note over M: RefreshSessions ticker fires
     M->>SS: TryRefreshSessionsFromGP()
     SS->>PS: GetProcfsSessions(sessIds)
     Note over PS: get5Min() → find nearest<br/>snapshot to 5min ago
-    Note over PS: for each session:<br/>ProcfsDiff(old, new)<br/>GroupProcfsMetrics(AggSegmentHost)
-    PS-->>SS: map[sessId]*GpPidProcInfo
-    Note over SS: procfsStatToLastStat() →<br/>write LongRunningGPMetrics
+    Note over PS: for each session:<br/>ProcfsDiff(old, new) — ProcSpill taken from last<br/>GroupProcfsMetrics(AggSegmentHost) — sum ProcSpill across PIDs
+    PS-->>SS: map[sessId]*GpPidProcInfo (ProcSpill = Σ per-PID spill)
+    Note over SS: procfsStatToLastStat() →<br/>SpillInfo{FileCount, TotalBytes} → LongRunningGPMetrics.Spill
 ```
 
 ---
@@ -316,6 +380,7 @@ type ProcStat struct {
     ProcStat   *pbc.ProcStat
     ProcStatus *pbc.ProcStatus
     ProcIO     *pbc.ProcIO
+    ProcSpill  *pbc.ProcSpill  // injected from workfile_usage; nil when no active spill
 }
 
 type ProcMap      map[ProcKey]*ProcStat
@@ -368,11 +433,13 @@ per-session deltas exposed via `LastMetrics`.
 [`ProcfsDiff(first, last)`](../internal/storage/procfs_group.go) produces
 a `GpPidProcInfo` where:
 
-- Snapshot fields (`Pid`, `Comm`, `State`, `Cmdline`, `ProcStatus`, …)
-  are taken from `last`.
+- Snapshot fields (`Pid`, `Comm`, `State`, `Cmdline`, `ProcStatus`,
+  `ProcSpill`, …) are taken from `last`.
 - Cumulative counters (`Utime`, `Stime`, `MinFlt`, `MajFlt`, `Rchar`,
   `WriteBytes`, …) are diffed via `nonNegativeDiff(first, last)` — if
   `last < first` (counter reset / PID reuse), the result is `0`.
+- `ProcSpill` is taken verbatim from `last` (it is a snapshot, not a
+  cumulative counter, so no diff is computed).
 
 **Per-session aggregation** —
 [`GroupProcfsMetrics(dest, source, aggKind, segHostname, intermediateResults)`](../internal/storage/procfs_group.go)
@@ -387,6 +454,10 @@ merges one process's diff into a session-level accumulator:
   `(MetricName, Hostname)` to first sum within each host, then either
   take the per-host value (`AggSegmentHost`) or the max across hosts
   (`AggMax`). The per-session path uses `AggSegmentHost`.
+- Spill gauges (`ProcSpill.Size`, `ProcSpill.Files`) are **summed**
+  across all PIDs in the session. On the first merge the source value is
+  cloned; on subsequent merges the fields are added. A nil `ProcSpill`
+  on a source entry is silently skipped.
 
 ### 2.5 Lifecycle / eviction
 
@@ -411,7 +482,7 @@ the existing `SessionState.LastMetrics` field:
 2. For each session with procfs data,
    [`procfsStatToLastStat()`](../internal/gp/sessions.go) converts the
    aggregated `GpPidProcInfo` into a `GPMetrics` with a populated
-   `SystemStat`:
+   `SystemStat` and, when spill data is present, a `SpillInfo`:
 
    ```go
    result.SystemStat = &pbc.SystemStat{
@@ -422,6 +493,13 @@ the existing `SessionState.LastMetrics` field:
        Rss:               uint64(procfsStat.ProcStat.Rss),
        // ProcIO fields mapped to SystemStat IO fields...
    }
+   // SpillInfo is only set when ProcSpill was present in the snapshot
+   if procfsStat.ProcSpill != nil {
+       result.Spill = &pbc.SpillInfo{
+           FileCount:  int32(procfsStat.ProcSpill.Files),
+           TotalBytes: procfsStat.ProcSpill.Size,
+       }
+   }
    ```
 
 3. This is written to `SessionData.LongRunningGPMetrics`, which is
@@ -431,9 +509,47 @@ the existing `SessionState.LastMetrics` field:
 Consumers calling `GetGPSessions` or `GetGPQuery` see the 5-minute
 cluster-wide CPU / RSS / IO deltas for each session in `LastMetrics`,
 alongside any hook-collected metrics in `TotalMetrics` and
-`QueryMetrics`.
+`QueryMetrics`. If the session is currently producing spill files,
+`LastMetrics.Spill` will also be populated with the current aggregate
+spill byte count and file count across all its worker PIDs.
 
-### 2.7 Configuration
+### 2.7 Spill-info data flow summary
+
+```
+gp_workfile_usage_per_query
+        │  (polled by workfile_usage.Lister, every 2 s)
+        ▼
+WorkfileUsageEntry{SegID, Pid, Size, NumFiles}
+        │
+        │  enrichWithWorkfileUsage() — keyed by (SegID, Pid)
+        ▼
+GpPidProcInfo.ProcSpill{Size, Files}   ← per-PID snapshot
+        │
+        │  RegisterProcfsStat() → stored in ProcStat.ProcSpill
+        ▼
+Ring buffer snapshot (ProcfsStatType)
+        │
+        │  ProcfsDiff(first, last) — ProcSpill taken from last (no diff)
+        ▼
+per-PID diff (ProcSpill = latest snapshot value)
+        │
+        │  GroupProcfsMetrics() — sum ProcSpill.Size and .Files across all PIDs
+        ▼
+session-level GpPidProcInfo.ProcSpill = Σ_pids (Size, Files)
+        │
+        │  procfsStatToLastStat()
+        ▼
+GPMetrics.Spill = SpillInfo{
+    FileCount:  int32(ProcSpill.Files),
+    TotalBytes: ProcSpill.Size,
+}
+        │
+        │  written to SessionData.LongRunningGPMetrics
+        ▼
+SessionState.LastMetrics.Spill  (returned by GetGPSessions / GetGPQuery)
+```
+
+### 2.8 Configuration
 
 | Knob | Default | Defined in |
 |------|---------|------------|
@@ -443,6 +559,8 @@ alongside any hook-collected metrics in `TotalMetrics` and
 | `maximumStoredPoints` | `30` | [internal/storage/procfs_storage.go](../internal/storage/procfs_storage.go) — `WithMaximumStoredPoints()` option |
 | `WithBackgroundAllSessionsCollectionInterval` | `60s` | [internal/gp/stat_activity/lister.go](../internal/gp/stat_activity/lister.go) — PID list refresh cadence |
 | `WithBackgroundAllSessionsCacheTTL` | `600s` | same |
+| `defaultCollectionInterval` (workfile_usage) | `2s` | [internal/gp/workfile_usage/lister.go](../internal/gp/workfile_usage/lister.go) — spill data refresh cadence |
+| `defaultCacheTTL` (workfile_usage) | `180s` | same — max age before `List()` returns a stale error |
 
 ---
 

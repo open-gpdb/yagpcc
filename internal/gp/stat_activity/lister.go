@@ -23,6 +23,7 @@ import (
 	"time"
 
 	"github.com/open-gpdb/yagpcc/internal/gp"
+	"github.com/open-gpdb/yagpcc/internal/gp/lister"
 
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promauto"
@@ -135,6 +136,38 @@ select
 from
   pg_stat_activity;
 		`
+
+	locksQuery = `
+			SELECT
+				w.mppsessionid AS BlockSessID,
+				w.mode AS WaitMode,
+				coalesce(cast(cast(l.relation AS regclass) AS text), l.locktype) AS LockedItem,
+				l.mode AS LockedMode,
+				l.mppsessionid AS BlockedBySessID
+			FROM
+				pg_locks l,
+				pg_locks w
+			WHERE l.transactionid = w.transactionid
+				AND l.granted = true
+				AND w.granted = false
+				AND l.transactionid is not NULL
+			UNION ALL
+			SELECT
+				w.mppsessionid AS BlockSessID,
+				w.mode AS WaitMode,
+				coalesce(cast(cast(l.relation AS regclass) AS text), l.locktype) AS LockedItem,
+				l.mode AS LockedMode,
+				l.mppsessionid AS BlockedBySessID
+			FROM
+				pg_locks l,
+				pg_locks w
+			WHERE l.database = w.database
+				AND l.relation = w.relation
+				AND l.granted = true
+				AND w.granted = false
+				AND l.locktype = 'relation'
+				AND l.gp_segment_id = w.gp_segment_id
+		`
 )
 
 func (l *Lister) List(context.Context) ([]*gp.GpStatActivity, error) {
@@ -145,12 +178,12 @@ func (l *Lister) List(context.Context) ([]*gp.GpStatActivity, error) {
 		return nil, fmt.Errorf("background collection was not started")
 	}
 
-	sessions, err := l.backgroundSessions.readStale()
+	sessions, err := l.backgroundSessions.ReadStale()
 	if err != nil {
 		return nil, fmt.Errorf("error reading sessions: %w", err)
 	}
 
-	locks, err := l.backgroundLocks.readStale()
+	locks, err := l.backgroundLocks.ReadStale()
 	if err != nil {
 		l.log.Warnf("returning stat activity data without locks info due to error: %s", err.Error())
 		return l.leftJoin(sessions, nil), nil
@@ -167,7 +200,7 @@ func (l *Lister) ListAllSessions(context.Context) ([]SessionPid, error) {
 		return nil, fmt.Errorf("background collection was not started")
 	}
 
-	sessions, err := l.allSessions.readStale()
+	sessions, err := l.allSessions.ReadStale()
 	if err != nil {
 		return nil, fmt.Errorf("error reading all sessions: %w", err)
 	}
@@ -186,22 +219,22 @@ func (l *Lister) Start(ctx context.Context) error {
 
 	l.log.Infof("initializing cache")
 
-	if err := l.backgroundSessions.collectOnce(ctx); err != nil {
+	if err := l.backgroundSessions.CollectOnce(ctx); err != nil {
 		return fmt.Errorf("error initializing sessions cache: %w", err)
 	}
 
-	if err := l.backgroundLocks.collectOnce(ctx); err != nil {
-		return fmt.Errorf("error initializing locks cache: %w", err)
+	if err := l.backgroundLocks.CollectOnce(ctx); err != nil {
+		l.log.Warnf("error initializing locks cache, continuing without lock data: %s", err.Error())
 	}
 
-	if err := l.allSessions.collectOnce(ctx); err != nil {
+	if err := l.allSessions.CollectOnce(ctx); err != nil {
 		return fmt.Errorf("error initializing all sessions cache: %w", err)
 	}
 
 	l.backgroundCtx, l.backgroundCancel = context.WithCancel(context.Background())
-	go l.backgroundSessions.collectBackground(l.backgroundCtx)
-	go l.backgroundLocks.collectBackground(l.backgroundCtx)
-	go l.allSessions.collectBackground(l.backgroundCtx)
+	go l.backgroundSessions.CollectBackground(l.backgroundCtx)
+	go l.backgroundLocks.CollectBackground(l.backgroundCtx)
+	go l.allSessions.CollectBackground(l.backgroundCtx)
 
 	return nil
 }
@@ -222,11 +255,11 @@ func (l *Lister) Stop() {
 	l.backgroundCancel = nil
 }
 
-func NewLister(log log, db db, opts ...Option) *Lister {
+func NewLister(log lister.Log, db lister.DB, opts ...Option) *Lister {
 	metricsLatencyHandler := getMetricsLatencyHandler()
 
-	makeOperationLatencyHandler := func(operation string) latencyHandler {
-		return func(status operationStatus, duration time.Duration) {
+	makeOperationLatencyHandler := func(operation string) lister.LatencyHandler {
+		return func(status lister.OperationStatus, duration time.Duration) {
 			metricsLatencyHandler.
 				With(map[string]string{metricsLabelOperation: operation, metricsLabelStatus: string(status)}).
 				Observe(duration.Seconds())
@@ -234,15 +267,13 @@ func NewLister(log log, db db, opts ...Option) *Lister {
 	}
 
 	l := &Lister{
-		log:                   log,
-		db:                    db,
-		mx:                    &sync.Mutex{},
-		backgroundCtx:         nil,
-		backgroundCancel:      nil,
-		backgroundSessions:    newBackgroundSessions(log, db, makeOperationLatencyHandler),
-		backgroundLocks:       newBackgroundLocks(log, db, makeOperationLatencyHandler),
-		allSessions:           newBackgroundAllSessions(log, db, makeOperationLatencyHandler),
-		metricsLatencyHandler: metricsLatencyHandler,
+		log:                log,
+		mx:                 &sync.Mutex{},
+		backgroundCtx:      nil,
+		backgroundCancel:   nil,
+		backgroundSessions: newBackgroundSessions(log, db, makeOperationLatencyHandler),
+		backgroundLocks:    newBackgroundLocks(log, db, makeOperationLatencyHandler),
+		allSessions:        newBackgroundAllSessions(log, db, makeOperationLatencyHandler),
 	}
 
 	for _, o := range opts {
@@ -320,65 +351,63 @@ type Option func(*Lister)
 
 func WithBackgroundSessionsCollectionInterval(interval time.Duration) Option {
 	return func(l *Lister) {
-		l.backgroundSessions.collectionInterval = interval
+		l.backgroundSessions.CollectionInterval = interval
 	}
 }
 
 func WithBackgroundLocksCollectionInterval(interval time.Duration) Option {
 	return func(l *Lister) {
-		l.backgroundLocks.collectionInterval = interval
+		l.backgroundLocks.CollectionInterval = interval
 	}
 }
 
 func WithBackgroundSessionsCacheTTL(ttl time.Duration) Option {
 	return func(l *Lister) {
-		l.backgroundSessions.cacheTTL = ttl
+		l.backgroundSessions.CacheTTL = ttl
 	}
 }
 
 func WithBackgroundLocksCacheTTL(ttl time.Duration) Option {
 	return func(l *Lister) {
-		l.backgroundLocks.cacheTTL = ttl
+		l.backgroundLocks.CacheTTL = ttl
 	}
 }
 
 func WithBackgroundAllSessionsCollectionInterval(interval time.Duration) Option {
 	return func(l *Lister) {
-		l.allSessions.collectionInterval = interval
+		l.allSessions.CollectionInterval = interval
 	}
 }
 
 func WithBackgroundAllSessionsCacheTTL(ttl time.Duration) Option {
 	return func(l *Lister) {
-		l.allSessions.cacheTTL = ttl
+		l.allSessions.CacheTTL = ttl
 	}
 }
 
 func WithCustomBackgroundSessionsQuery(query string) Option {
 	return func(l *Lister) {
-		l.backgroundSessions.query = query
+		l.backgroundSessions.Query = query
 	}
 }
 
 func WithCustomAllSessionsQuery(query string) Option {
 	return func(l *Lister) {
-		l.allSessions.query = query
+		l.allSessions.Query = query
 	}
 }
 
 type Lister struct {
-	log                   log
-	db                    db
-	mx                    *sync.Mutex
-	backgroundCtx         context.Context
-	backgroundCancel      context.CancelFunc
-	backgroundSessions    *background[Session]
-	allSessions           *background[SessionPid]
-	backgroundLocks       *background[SessionLock]
-	metricsLatencyHandler *prometheus.HistogramVec
+	log                lister.Log
+	mx                 *sync.Mutex
+	backgroundCtx      context.Context
+	backgroundCancel   context.CancelFunc
+	backgroundSessions *lister.Background[Session]
+	allSessions        *lister.Background[SessionPid]
+	backgroundLocks    *lister.Background[SessionLock]
 }
 
-func newBackgroundSessions(log log, db db, makeOperationLatencyHandler func(string) latencyHandler) *background[Session] {
+func newBackgroundSessions(log lister.Log, db lister.DB, makeLatency func(string) lister.LatencyHandler) *lister.Background[Session] {
 	const (
 		operationCollect   = "background_collection_sessions"
 		operationStaleRead = "stale_read_sessions"
@@ -388,22 +417,19 @@ func newBackgroundSessions(log log, db db, makeOperationLatencyHandler func(stri
 		defaultCacheTTL           = 180 * time.Second
 	)
 
-	return &background[Session]{
-		log:                      log,
-		query:                    gp6SessionsQuery,
-		db:                       db,
-		staleReadLatencyHandler:  makeOperationLatencyHandler(operationStaleRead),
-		collectionTimeout:        defaultCollectionTimeout,
-		collectionLatencyHandler: makeOperationLatencyHandler(operationCollect),
-		collectionInterval:       defaultCollectionInterval,
-		cacheMX:                  &sync.Mutex{},
-		cache:                    nil,
-		cachedAt:                 time.Time{},
-		cacheTTL:                 defaultCacheTTL,
-	}
+	bg := lister.NewBackground[Session](
+		log, db,
+		gp6SessionsQuery,
+		makeLatency(operationCollect),
+		makeLatency(operationStaleRead),
+	)
+	bg.CollectionInterval = defaultCollectionInterval
+	bg.CollectionTimeout = defaultCollectionTimeout
+	bg.CacheTTL = defaultCacheTTL
+	return bg
 }
 
-func newBackgroundAllSessions(log log, db db, makeOperationLatencyHandler func(string) latencyHandler) *background[SessionPid] {
+func newBackgroundAllSessions(log lister.Log, db lister.DB, makeLatency func(string) lister.LatencyHandler) *lister.Background[SessionPid] {
 	const (
 		operationCollect   = "background_collection_all_sessions"
 		operationStaleRead = "stale_read_all_sessions"
@@ -413,22 +439,19 @@ func newBackgroundAllSessions(log log, db db, makeOperationLatencyHandler func(s
 		defaultCacheTTL           = 600 * time.Second
 	)
 
-	return &background[SessionPid]{
-		log:                      log,
-		query:                    gp6AllSessionsQuery,
-		db:                       db,
-		staleReadLatencyHandler:  makeOperationLatencyHandler(operationStaleRead),
-		collectionTimeout:        defaultCollectionTimeout,
-		collectionLatencyHandler: makeOperationLatencyHandler(operationCollect),
-		collectionInterval:       defaultCollectionInterval,
-		cacheMX:                  &sync.Mutex{},
-		cache:                    nil,
-		cachedAt:                 time.Time{},
-		cacheTTL:                 defaultCacheTTL,
-	}
+	bg := lister.NewBackground[SessionPid](
+		log, db,
+		gp6AllSessionsQuery,
+		makeLatency(operationCollect),
+		makeLatency(operationStaleRead),
+	)
+	bg.CollectionInterval = defaultCollectionInterval
+	bg.CollectionTimeout = defaultCollectionTimeout
+	bg.CacheTTL = defaultCacheTTL
+	return bg
 }
 
-func newBackgroundLocks(log log, db db, makeOperationLatencyHandler func(string) latencyHandler) *background[SessionLock] {
+func newBackgroundLocks(log lister.Log, db lister.DB, makeLatency func(string) lister.LatencyHandler) *lister.Background[SessionLock] {
 	const (
 		operationCollect   = "background_collection_locks"
 		operationStaleRead = "stale_read_locks"
@@ -438,49 +461,16 @@ func newBackgroundLocks(log log, db db, makeOperationLatencyHandler func(string)
 		defaultCacheTTL           = 300 * time.Second
 	)
 
-	return &background[SessionLock]{
-		log: log,
-		query: `
-			SELECT
-				w.mppsessionid AS BlockSessID,
-				w.mode AS WaitMode,
-				coalesce(cast(cast(l.relation AS regclass) AS text), l.locktype) AS LockedItem,
-				l.mode AS LockedMode,
-				l.mppsessionid AS BlockedBySessID
-			FROM
-				pg_locks l,
-				pg_locks w
-			WHERE l.transactionid = w.transactionid
-				AND l.granted = true
-				AND w.granted = false
-				AND l.transactionid is not NULL
-			UNION ALL
-			SELECT
-				w.mppsessionid AS BlockSessID,
-				w.mode AS WaitMode,
-				coalesce(cast(cast(l.relation AS regclass) AS text), l.locktype) AS LockedItem,
-				l.mode AS LockedMode,
-				l.mppsessionid AS BlockedBySessID
-			FROM
-				pg_locks l,
-				pg_locks w
-			WHERE l.database = w.database
-				AND l.relation = w.relation
-				AND l.granted = true
-				AND w.granted = false
-				AND l.locktype = 'relation'
-				AND l.gp_segment_id = w.gp_segment_id
-		`,
-		db:                       db,
-		staleReadLatencyHandler:  makeOperationLatencyHandler(operationStaleRead),
-		collectionTimeout:        defaultCollectionTimeout,
-		collectionLatencyHandler: makeOperationLatencyHandler(operationCollect),
-		collectionInterval:       defaultCollectionInterval,
-		cacheMX:                  &sync.Mutex{},
-		cache:                    nil,
-		cachedAt:                 time.Time{},
-		cacheTTL:                 defaultCacheTTL,
-	}
+	bg := lister.NewBackground[SessionLock](
+		log, db,
+		locksQuery,
+		makeLatency(operationCollect),
+		makeLatency(operationStaleRead),
+	)
+	bg.CollectionInterval = defaultCollectionInterval
+	bg.CollectionTimeout = defaultCollectionTimeout
+	bg.CacheTTL = defaultCacheTTL
+	return bg
 }
 
 func (l *Lister) leftJoin(sessions []Session, locks []SessionLock) []*gp.GpStatActivity {
@@ -536,86 +526,3 @@ func (l *Lister) leftJoin(sessions []Session, locks []SessionLock) []*gp.GpStatA
 
 	return statActivity
 }
-
-type background[T any] struct {
-	log                      log
-	query                    string
-	db                       db
-	staleReadLatencyHandler  latencyHandler
-	collectionTimeout        time.Duration
-	collectionInterval       time.Duration
-	collectionLatencyHandler latencyHandler
-	cacheMX                  *sync.Mutex
-	cache                    []T
-	cachedAt                 time.Time
-	cacheTTL                 time.Duration
-}
-
-func (b *background[T]) readStale() ([]T, error) {
-	b.cacheMX.Lock()
-	defer b.cacheMX.Unlock()
-
-	staleness := time.Since(b.cachedAt)
-	if staleness > b.cacheTTL {
-		b.staleReadLatencyHandler(operationFailed, staleness)
-		return nil, fmt.Errorf("cached value is stale")
-	}
-
-	value := make([]T, len(b.cache))
-	copy(value, b.cache)
-
-	b.staleReadLatencyHandler(operationSucceeded, staleness)
-	return value, nil
-}
-
-func (b *background[T]) collectOnce(ctx context.Context) error {
-	ctx, cancel := context.WithTimeout(ctx, b.collectionTimeout)
-	defer cancel()
-
-	startedAt := time.Now()
-
-	result := make([]T, 0)
-	if err := b.db.ExecQuery(ctx, b.query, &result); err != nil {
-		b.collectionLatencyHandler(operationFailed, time.Since(startedAt))
-		return fmt.Errorf("error executing query: %w", err)
-	}
-
-	b.cacheMX.Lock()
-	b.cache = result
-	b.cachedAt = time.Now()
-	b.cacheMX.Unlock()
-
-	b.collectionLatencyHandler(operationSucceeded, time.Since(startedAt))
-	return nil
-}
-
-func (b *background[T]) collectBackground(ctx context.Context) {
-	var zero T
-	typeName := fmt.Sprintf("%T", zero)
-
-	b.log.Infof("background collection for %s started", typeName)
-
-	t := time.NewTicker(b.collectionInterval)
-	defer t.Stop()
-
-	for {
-		select {
-		case <-ctx.Done():
-			b.log.Infof("background collection for %s stopped", typeName)
-			return
-		case <-t.C:
-			if err := b.collectOnce(ctx); err != nil {
-				b.log.Warnf("error during background collection %s: %s", typeName, err.Error())
-			}
-		}
-	}
-}
-
-type latencyHandler func(operationStatus, time.Duration)
-
-type operationStatus string
-
-const (
-	operationSucceeded operationStatus = "ok"
-	operationFailed    operationStatus = "fail"
-)

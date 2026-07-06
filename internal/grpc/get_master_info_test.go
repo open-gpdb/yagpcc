@@ -303,3 +303,57 @@ func TestMasterMethods(t *testing.T) {
 		assert.Equal(t, 0, len(response.SessionsState))
 	})
 }
+
+func TestGetGPSessions_SpillStat(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	sessionMocker := NewMockStatActivityLister(ctrl)
+	clientSet, cleanup := setupGRPCClientSet(t, sessionMocker)
+	defer cleanup()
+
+	sessID := int64(42)
+	pid := int64(1234)
+	base := time.Now().Add(-time.Second)
+
+	// Register two procfs snapshots for the session so that the diff
+	// (get5Min) works. ProcSpill is a snapshot value (taken from last),
+	// so both snapshots carry spill data; only the latest matters.
+	clientSet.procfsStorage.RegisterProcfsStat(base, []*pbc.GpPidProcInfo{
+		{
+			GpSegmentId: 0, SessId: sessID, Pid: pid,
+			ProcStat:  &pbc.ProcStat{Utime: 0},
+			ProcSpill: &pbc.ProcSpill{Size: 0, Files: 0},
+		},
+	})
+	clientSet.procfsStorage.RegisterProcfsStat(base.Add(time.Second), []*pbc.GpPidProcInfo{
+		{
+			GpSegmentId: 0, SessId: sessID, Pid: pid,
+			ProcStat:  &pbc.ProcStat{Utime: 10},
+			ProcSpill: &pbc.ProcSpill{Size: 8192, Files: 4},
+		},
+	})
+
+	// Seed the session and trigger procfs recalculation.
+	sessionMocker.EXPECT().List(gomock.Any()).Return([]*gp.GpStatActivity{
+		{SessID: int(sessID), Pid: int(pid), Usename: "testuser", Datname: "testdb"},
+	}, nil)
+	sessionMocker.EXPECT().ListAllSessions(gomock.Any()).AnyTimes()
+
+	_, err := clientSet.GetGetGPInfoClient().GetGPSessions(context.Background(), &pbm.GetGPSessionsReq{})
+	require.NoError(t, err)
+
+	// Issue a second request now that the session storage is populated.
+	sessionMocker.EXPECT().List(gomock.Any()).Return([]*gp.GpStatActivity{
+		{SessID: int(sessID), Pid: int(pid), Usename: "testuser", Datname: "testdb"},
+	}, nil)
+	sessionMocker.EXPECT().ListAllSessions(gomock.Any()).AnyTimes()
+
+	response, err := clientSet.GetGetGPInfoClient().GetGPSessions(context.Background(), &pbm.GetGPSessionsReq{})
+	require.NoError(t, err)
+	require.Len(t, response.SessionsState, 1)
+
+	lastMetrics := response.SessionsState[0].LastMetrics
+	require.NotNil(t, lastMetrics, "LastMetrics should be populated after procfs recalculation")
+	require.NotNil(t, lastMetrics.Spill, "SpillInfo should be populated from ProcSpill data")
+	assert.Equal(t, int32(4), lastMetrics.Spill.FileCount)
+	assert.Equal(t, int64(8192), lastMetrics.Spill.TotalBytes)
+}

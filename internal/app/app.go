@@ -38,6 +38,7 @@ import (
 	"github.com/open-gpdb/yagpcc/internal/gp"
 	"github.com/open-gpdb/yagpcc/internal/gp/master_sentinel"
 	"github.com/open-gpdb/yagpcc/internal/gp/stat_activity"
+	"github.com/open-gpdb/yagpcc/internal/gp/workfile_usage"
 	"github.com/open-gpdb/yagpcc/internal/grpc"
 	"github.com/open-gpdb/yagpcc/internal/httpcsv"
 	"github.com/open-gpdb/yagpcc/internal/httpui"
@@ -266,7 +267,6 @@ func InitMetrics() {
 func NewApp(
 	baseApp *baseapp.App,
 	config *config.Config,
-	statActivityLister *stat_activity.Lister,
 	backgroundStorage *master.BackgroundStorage,
 ) (*AgentApp, error) {
 	s := gogrpc.NewServer(
@@ -448,9 +448,10 @@ func Run(ctx context.Context, configFile string) error {
 
 	masterSentinel := master_sentinel.NewSentinel(baseApp.L(), masterConnection)
 	statActivityLister := stat_activity.NewLister(baseApp.L(), masterConnection)
-	backgroundStorage := master.NewBackgroundStorage(logger, sessionsStorage, rqStorage, aggStorage, procfsStorage, statActivityLister)
+	workFileLister := workfile_usage.NewLister(baseApp.L(), masterConnection)
+	backgroundStorage := master.NewBackgroundStorage(logger, sessionsStorage, rqStorage, aggStorage, procfsStorage, statActivityLister, workFileLister)
 
-	agentApp, err := NewApp(baseApp, cfg, statActivityLister, backgroundStorage)
+	agentApp, err := NewApp(baseApp, cfg, backgroundStorage)
 	if err != nil {
 		logger.Fatalf("failed to start application %v", err)
 		return err

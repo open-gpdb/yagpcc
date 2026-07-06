@@ -14,29 +14,16 @@
 // implied. See the License for the specific language governing
 // permissions and limitations under the License.
 
-package master
+package workfile_usage
 
-import (
-	"context"
-
-	"github.com/open-gpdb/yagpcc/internal/gp"
-	"github.com/open-gpdb/yagpcc/internal/gp/stat_activity"
-	"github.com/open-gpdb/yagpcc/internal/gp/workfile_usage"
-)
-
-type statActivityLister interface {
-	Start(ctx context.Context) error
-	Stop()
-	List(ctx context.Context) ([]*gp.GpStatActivity, error)
-	ListAllSessions(ctx context.Context) ([]stat_activity.SessionPid, error)
-}
-
-type workFileLister interface {
-	Start(ctx context.Context) error
-	Stop()
-	List(ctx context.Context) ([]workfile_usage.WorkfileUsageEntry, error)
-}
-
-type masterSentinel interface {
-	RunUntilIsMaster(ctx context.Context) error
+// WorkfileUsageEntry holds data from gp_toolkit.gp_workfile_usage_per_query.
+// The pair (SegID, Pid) is the key used to correlate with procfs stat data.
+// datname, usename and query are intentionally omitted per requirements.
+type WorkfileUsageEntry struct {
+	Pid        int
+	SessID     int
+	CommandCnt int
+	SegID      int
+	Size       int64
+	NumFiles   int64
 }

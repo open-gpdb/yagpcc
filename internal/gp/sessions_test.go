@@ -629,6 +629,29 @@ func TestProcfsStatToLastStat_RunningTimeSecondsAndVmPeakKb(t *testing.T) {
 	assert.Equal(t, uint64(8192), result.SystemStat.VmPeakKb)
 }
 
+func TestProcfsStatToLastStat_WithProcSpill(t *testing.T) {
+	info := &pbc.GpPidProcInfo{
+		ProcSpill: &pbc.ProcSpill{
+			Size:  4096,
+			Files: 7,
+		},
+	}
+	result, err := procfsStatToLastStat(info)
+	require.NoError(t, err)
+	require.NotNil(t, result.Spill)
+	assert.Equal(t, int32(7), result.Spill.FileCount)
+	assert.Equal(t, int64(4096), result.Spill.TotalBytes)
+}
+
+func TestProcfsStatToLastStat_NilProcSpill_NoSpillInfo(t *testing.T) {
+	info := &pbc.GpPidProcInfo{
+		ProcStat: &pbc.ProcStat{Utime: 10},
+	}
+	result, err := procfsStatToLastStat(info)
+	require.NoError(t, err)
+	assert.Nil(t, result.Spill)
+}
+
 // --- RecalculateProcfsUsage ---
 
 func newTestSessionsStorage(t *testing.T, procfsStorage *storage.ProcfsStorage) *SessionsStorage {

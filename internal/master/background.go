@@ -32,6 +32,7 @@ import (
 	pbc "github.com/open-gpdb/yagpcc/api/proto/common"
 	"github.com/open-gpdb/yagpcc/internal/config"
 	"github.com/open-gpdb/yagpcc/internal/gp"
+	"github.com/open-gpdb/yagpcc/internal/gp/workfile_usage"
 	"github.com/open-gpdb/yagpcc/internal/metrics"
 	"github.com/open-gpdb/yagpcc/internal/storage"
 	"github.com/open-gpdb/yagpcc/internal/utils"
@@ -57,6 +58,7 @@ type (
 		RQStorage          *storage.RunningQueriesStorage
 		procfsStorage      *storage.ProcfsStorage
 		statActivityLister statActivityLister
+		workFileLister     workFileLister
 
 		// segRefreshTimes tracks the last successful data-gathering time per segment hostname.
 		segRefreshMu    sync.RWMutex
@@ -73,7 +75,9 @@ func NewBackgroundStorage(l *zap.SugaredLogger,
 	rqStorage *storage.RunningQueriesStorage,
 	aggStorage *storage.AggregatedStorage,
 	procfsStorage *storage.ProcfsStorage,
-	sActivityLister statActivityLister) *BackgroundStorage {
+	sActivityLister statActivityLister,
+	workFileLister workFileLister,
+) *BackgroundStorage {
 	return &BackgroundStorage{
 		l:                  l,
 		SessionStorage:     sessionStorage,
@@ -81,6 +85,7 @@ func NewBackgroundStorage(l *zap.SugaredLogger,
 		RQStorage:          rqStorage,
 		procfsStorage:      procfsStorage,
 		statActivityLister: sActivityLister,
+		workFileLister:     workFileLister,
 		segRefreshTimes:    make(map[string]time.Time),
 	}
 }
@@ -620,6 +625,51 @@ func (bs *BackgroundStorage) RefreshQueries(ctx context.Context,
 	}
 }
 
+// workfileUsageKey is the lookup key used to correlate workfile_usage rows
+// with procfs proc-info records.
+type workfileUsageKey struct {
+	segID int64
+	pid   int64
+}
+
+// enrichWithWorkfileUsage fills the ProcSpill field of every GpPidProcInfo entry
+// in procInfos using the spill data fetched from gp_workfile_usage_per_query.
+// Entries without a matching workfile_usage row are left with ProcSpill == nil.
+func enrichWithWorkfileUsage(procInfos []*pbc.GpPidProcInfo, usageEntries []workfile_usage.WorkfileUsageEntry) {
+	if len(procInfos) == 0 || len(usageEntries) == 0 {
+		return
+	}
+
+	// Build a lookup map from (SegID, Pid) → aggregated spill totals.
+	// A single (SegID, Pid) pair should appear at most once in the view, but
+	// we sum defensively in case the view returns multiple rows for the same key.
+	type spillAccum struct {
+		size  int64
+		files int64
+	}
+	index := make(map[workfileUsageKey]*spillAccum, len(usageEntries))
+	for _, e := range usageEntries {
+		key := workfileUsageKey{segID: int64(e.SegID), pid: int64(e.Pid)}
+		acc, ok := index[key]
+		if !ok {
+			acc = &spillAccum{}
+			index[key] = acc
+		}
+		acc.size += e.Size
+		acc.files += e.NumFiles
+	}
+
+	for _, info := range procInfos {
+		key := workfileUsageKey{segID: info.GpSegmentId, pid: info.Pid}
+		if acc, ok := index[key]; ok {
+			info.ProcSpill = &pbc.ProcSpill{
+				Size:  acc.size,
+				Files: acc.files,
+			}
+		}
+	}
+}
+
 func (bs *BackgroundStorage) RefreshProcfs(ctx context.Context, procfsRefreshInterval time.Duration, nPullers int, portn uint32, msgSize int) error {
 	if procfsRefreshInterval <= 0 {
 		return fmt.Errorf("procfsRefreshInterval must be > 0, got %v", procfsRefreshInterval)
@@ -643,6 +693,16 @@ func (bs *BackgroundStorage) RefreshProcfs(ctx context.Context, procfsRefreshInt
 				bs.l.Errorf("fail to get procfs data %v", err)
 				continue
 			}
+
+			// Enrich each proc-info entry with spill-file statistics sourced from
+			// gp_toolkit.gp_workfile_usage_per_query. Failures are non-fatal: we
+			// log a warning and continue without spill data for this cycle.
+			if usageEntries, wfErr := bs.workFileLister.List(ctx); wfErr != nil {
+				bs.l.Warnf("failed to read workfile usage, ProcSpill will be unset: %v", wfErr)
+			} else {
+				enrichWithWorkfileUsage(result, usageEntries)
+			}
+
 			bs.procfsStorage.RegisterProcfsStat(currTime, result)
 			// measure only successful latencies
 			if metrics.YagpccMetrics != nil {
@@ -706,6 +766,12 @@ func InitBG(
 	}
 	if err = backgroundStorage.statActivityLister.Start(ctx); err != nil {
 		return fmt.Errorf("error starting stat activity lister: %w", err)
+	}
+	if backgroundStorage.workFileLister == nil {
+		return fmt.Errorf("workfile lister is nil")
+	}
+	if err = backgroundStorage.workFileLister.Start(ctx); err != nil {
+		return fmt.Errorf("error starting workfile lister")
 	}
 
 	errG.Go(func() error {

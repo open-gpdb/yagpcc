@@ -14,19 +14,10 @@
 // implied. See the License for the specific language governing
 // permissions and limitations under the License.
 
-//go:generate mockgen -source=deps.go -package=stat_activity_test -mock_names db=MockDB,log=MockLog,metricsProvider=MockMetricsProvider,metricsTimeVec=MockMetricsTimeVec,metricsTimer=MockMetricsTimer -destination mocks_test.go
+// Interfaces Log and DB are defined in internal/gp/lister and re-exported
+// here as type aliases so that hand-written mocks in this package remain
+// compatible and the go:generate directive below stays meaningful.
+//
+//go:generate mockgen -source=../lister/deps.go -package=stat_activity_test -mock_names DB=MockDB,Log=MockLog -destination mocks_test.go
 
 package stat_activity
-
-import (
-	"context"
-)
-
-type log interface {
-	Infof(format string, args ...any)
-	Warnf(format string, args ...any)
-}
-
-type db interface {
-	ExecQuery(ctx context.Context, query string, dest any) error
-}

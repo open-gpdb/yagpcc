@@ -2376,6 +2376,60 @@ func (x *ProcIO) GetCancelledWriteBytes() int64 {
 	return 0
 }
 
+type ProcSpill struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// Bytes spilled to disk by the process. Counter.
+	Size int64 `protobuf:"varint,1,opt,name=size,proto3" json:"size,omitempty"`
+	// Number of spill files gereated by the process. Counter.
+	Files         int64 `protobuf:"varint,2,opt,name=files,proto3" json:"files,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ProcSpill) Reset() {
+	*x = ProcSpill{}
+	mi := &file_api_proto_common_yagpcc_metrics_proto_msgTypes[14]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ProcSpill) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ProcSpill) ProtoMessage() {}
+
+func (x *ProcSpill) ProtoReflect() protoreflect.Message {
+	mi := &file_api_proto_common_yagpcc_metrics_proto_msgTypes[14]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ProcSpill.ProtoReflect.Descriptor instead.
+func (*ProcSpill) Descriptor() ([]byte, []int) {
+	return file_api_proto_common_yagpcc_metrics_proto_rawDescGZIP(), []int{14}
+}
+
+func (x *ProcSpill) GetSize() int64 {
+	if x != nil {
+		return x.Size
+	}
+	return 0
+}
+
+func (x *ProcSpill) GetFiles() int64 {
+	if x != nil {
+		return x.Files
+	}
+	return 0
+}
+
 type GpPidProcInfo struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
 	// primary key for process info
@@ -2388,13 +2442,14 @@ type GpPidProcInfo struct {
 	ProcStat      *ProcStat   `protobuf:"bytes,6,opt,name=proc_stat,json=procStat,proto3" json:"proc_stat,omitempty"`
 	ProcStatus    *ProcStatus `protobuf:"bytes,7,opt,name=proc_status,json=procStatus,proto3" json:"proc_status,omitempty"`
 	ProcIo        *ProcIO     `protobuf:"bytes,8,opt,name=proc_io,json=procIo,proto3" json:"proc_io,omitempty"`
+	ProcSpill     *ProcSpill  `protobuf:"bytes,9,opt,name=proc_spill,json=procSpill,proto3" json:"proc_spill,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
 
 func (x *GpPidProcInfo) Reset() {
 	*x = GpPidProcInfo{}
-	mi := &file_api_proto_common_yagpcc_metrics_proto_msgTypes[14]
+	mi := &file_api_proto_common_yagpcc_metrics_proto_msgTypes[15]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2406,7 +2461,7 @@ func (x *GpPidProcInfo) String() string {
 func (*GpPidProcInfo) ProtoMessage() {}
 
 func (x *GpPidProcInfo) ProtoReflect() protoreflect.Message {
-	mi := &file_api_proto_common_yagpcc_metrics_proto_msgTypes[14]
+	mi := &file_api_proto_common_yagpcc_metrics_proto_msgTypes[15]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2419,7 +2474,7 @@ func (x *GpPidProcInfo) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GpPidProcInfo.ProtoReflect.Descriptor instead.
 func (*GpPidProcInfo) Descriptor() ([]byte, []int) {
-	return file_api_proto_common_yagpcc_metrics_proto_rawDescGZIP(), []int{14}
+	return file_api_proto_common_yagpcc_metrics_proto_rawDescGZIP(), []int{15}
 }
 
 func (x *GpPidProcInfo) GetGpSegmentId() int64 {
@@ -2478,6 +2533,13 @@ func (x *GpPidProcInfo) GetProcIo() *ProcIO {
 	return nil
 }
 
+func (x *GpPidProcInfo) GetProcSpill() *ProcSpill {
+	if x != nil {
+		return x.ProcSpill
+	}
+	return nil
+}
+
 type AggregatedMetrics struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Calls         int64                  `protobuf:"varint,1,opt,name=calls,proto3" json:"calls,omitempty"`
@@ -2492,7 +2554,7 @@ type AggregatedMetrics struct {
 
 func (x *AggregatedMetrics) Reset() {
 	*x = AggregatedMetrics{}
-	mi := &file_api_proto_common_yagpcc_metrics_proto_msgTypes[15]
+	mi := &file_api_proto_common_yagpcc_metrics_proto_msgTypes[16]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2504,7 +2566,7 @@ func (x *AggregatedMetrics) String() string {
 func (*AggregatedMetrics) ProtoMessage() {}
 
 func (x *AggregatedMetrics) ProtoReflect() protoreflect.Message {
-	mi := &file_api_proto_common_yagpcc_metrics_proto_msgTypes[15]
+	mi := &file_api_proto_common_yagpcc_metrics_proto_msgTypes[16]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2517,7 +2579,7 @@ func (x *AggregatedMetrics) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use AggregatedMetrics.ProtoReflect.Descriptor instead.
 func (*AggregatedMetrics) Descriptor() ([]byte, []int) {
-	return file_api_proto_common_yagpcc_metrics_proto_rawDescGZIP(), []int{15}
+	return file_api_proto_common_yagpcc_metrics_proto_rawDescGZIP(), []int{16}
 }
 
 func (x *AggregatedMetrics) GetCalls() int64 {
@@ -2772,7 +2834,10 @@ const file_api_proto_common_yagpcc_metrics_proto_rawDesc = "" +
 	"read_bytes\x18\x05 \x01(\x03R\treadBytes\x12\x1f\n" +
 	"\vwrite_bytes\x18\x06 \x01(\x03R\n" +
 	"writeBytes\x122\n" +
-	"\x15cancelled_write_bytes\x18\a \x01(\x03R\x13cancelledWriteBytes\"\x9b\x02\n" +
+	"\x15cancelled_write_bytes\x18\a \x01(\x03R\x13cancelledWriteBytes\"5\n" +
+	"\tProcSpill\x12\x12\n" +
+	"\x04size\x18\x01 \x01(\x03R\x04size\x12\x14\n" +
+	"\x05files\x18\x02 \x01(\x03R\x05files\"\xcd\x02\n" +
 	"\rGpPidProcInfo\x12\"\n" +
 	"\rgp_segment_id\x18\x01 \x01(\x03R\vgpSegmentId\x12\x17\n" +
 	"\asess_id\x18\x02 \x01(\x03R\x06sessId\x12\x10\n" +
@@ -2782,7 +2847,9 @@ const file_api_proto_common_yagpcc_metrics_proto_rawDesc = "" +
 	"\tproc_stat\x18\x06 \x01(\v2\x10.yagpcc.ProcStatR\bprocStat\x123\n" +
 	"\vproc_status\x18\a \x01(\v2\x12.yagpcc.ProcStatusR\n" +
 	"procStatus\x12'\n" +
-	"\aproc_io\x18\b \x01(\v2\x0e.yagpcc.ProcIOR\x06procIo\"\xbc\x01\n" +
+	"\aproc_io\x18\b \x01(\v2\x0e.yagpcc.ProcIOR\x06procIo\x120\n" +
+	"\n" +
+	"proc_spill\x18\t \x01(\v2\x11.yagpcc.ProcSpillR\tprocSpill\"\xbc\x01\n" +
 	"\x11AggregatedMetrics\x12\x14\n" +
 	"\x05calls\x18\x01 \x01(\x03R\x05calls\x12\x19\n" +
 	"\bmin_time\x18\x02 \x01(\x01R\aminTime\x12\x19\n" +
@@ -2820,7 +2887,7 @@ func file_api_proto_common_yagpcc_metrics_proto_rawDescGZIP() []byte {
 }
 
 var file_api_proto_common_yagpcc_metrics_proto_enumTypes = make([]protoimpl.EnumInfo, 2)
-var file_api_proto_common_yagpcc_metrics_proto_msgTypes = make([]protoimpl.MessageInfo, 16)
+var file_api_proto_common_yagpcc_metrics_proto_msgTypes = make([]protoimpl.MessageInfo, 17)
 var file_api_proto_common_yagpcc_metrics_proto_goTypes = []any{
 	(QueryStatus)(0),              // 0: yagpcc.QueryStatus
 	(PlanGenerator)(0),            // 1: yagpcc.PlanGenerator
@@ -2838,15 +2905,16 @@ var file_api_proto_common_yagpcc_metrics_proto_goTypes = []any{
 	(*ProcStat)(nil),              // 13: yagpcc.ProcStat
 	(*ProcStatus)(nil),            // 14: yagpcc.ProcStatus
 	(*ProcIO)(nil),                // 15: yagpcc.ProcIO
-	(*GpPidProcInfo)(nil),         // 16: yagpcc.GpPidProcInfo
-	(*AggregatedMetrics)(nil),     // 17: yagpcc.AggregatedMetrics
-	(*timestamppb.Timestamp)(nil), // 18: google.protobuf.Timestamp
+	(*ProcSpill)(nil),             // 16: yagpcc.ProcSpill
+	(*GpPidProcInfo)(nil),         // 17: yagpcc.GpPidProcInfo
+	(*AggregatedMetrics)(nil),     // 18: yagpcc.AggregatedMetrics
+	(*timestamppb.Timestamp)(nil), // 19: google.protobuf.Timestamp
 }
 var file_api_proto_common_yagpcc_metrics_proto_depIdxs = []int32{
 	1,  // 0: yagpcc.QueryInfo.generator:type_name -> yagpcc.PlanGenerator
-	18, // 1: yagpcc.QueryInfo.submit_time:type_name -> google.protobuf.Timestamp
-	18, // 2: yagpcc.QueryInfo.start_time:type_name -> google.protobuf.Timestamp
-	18, // 3: yagpcc.QueryInfo.end_time:type_name -> google.protobuf.Timestamp
+	19, // 1: yagpcc.QueryInfo.submit_time:type_name -> google.protobuf.Timestamp
+	19, // 2: yagpcc.QueryInfo.start_time:type_name -> google.protobuf.Timestamp
+	19, // 3: yagpcc.QueryInfo.end_time:type_name -> google.protobuf.Timestamp
 	8,  // 4: yagpcc.GPMetrics.systemStat:type_name -> yagpcc.SystemStat
 	11, // 5: yagpcc.GPMetrics.instrumentation:type_name -> yagpcc.MetricInstrumentation
 	12, // 6: yagpcc.GPMetrics.spill:type_name -> yagpcc.SpillInfo
@@ -2856,11 +2924,12 @@ var file_api_proto_common_yagpcc_metrics_proto_depIdxs = []int32{
 	13, // 10: yagpcc.GpPidProcInfo.proc_stat:type_name -> yagpcc.ProcStat
 	14, // 11: yagpcc.GpPidProcInfo.proc_status:type_name -> yagpcc.ProcStatus
 	15, // 12: yagpcc.GpPidProcInfo.proc_io:type_name -> yagpcc.ProcIO
-	13, // [13:13] is the sub-list for method output_type
-	13, // [13:13] is the sub-list for method input_type
-	13, // [13:13] is the sub-list for extension type_name
-	13, // [13:13] is the sub-list for extension extendee
-	0,  // [0:13] is the sub-list for field type_name
+	16, // 13: yagpcc.GpPidProcInfo.proc_spill:type_name -> yagpcc.ProcSpill
+	14, // [14:14] is the sub-list for method output_type
+	14, // [14:14] is the sub-list for method input_type
+	14, // [14:14] is the sub-list for extension type_name
+	14, // [14:14] is the sub-list for extension extendee
+	0,  // [0:14] is the sub-list for field type_name
 }
 
 func init() { file_api_proto_common_yagpcc_metrics_proto_init() }
@@ -2874,7 +2943,7 @@ func file_api_proto_common_yagpcc_metrics_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_api_proto_common_yagpcc_metrics_proto_rawDesc), len(file_api_proto_common_yagpcc_metrics_proto_rawDesc)),
 			NumEnums:      2,
-			NumMessages:   16,
+			NumMessages:   17,
 			NumExtensions: 0,
 			NumServices:   0,
 		},
