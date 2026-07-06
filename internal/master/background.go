@@ -771,7 +771,7 @@ func InitBG(
 		return fmt.Errorf("workfile lister is nil")
 	}
 	if err = backgroundStorage.workFileLister.Start(ctx); err != nil {
-		return fmt.Errorf("error starting workfile lister")
+		return fmt.Errorf("error starting workfile lister: %w", err)
 	}
 
 	errG.Go(func() error {

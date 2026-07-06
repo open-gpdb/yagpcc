@@ -41,10 +41,7 @@ func (m *MockLog) EXPECT() *MockLogMockRecorder { return m.recorder }
 
 func (m *MockLog) Infof(format string, args ...any) {
 	m.ctrl.T.Helper()
-	varargs := []interface{}{format}
-	for _, a := range args {
-		varargs = append(varargs, a)
-	}
+	varargs := append([]interface{}{format}, args...)
 	m.ctrl.Call(m, "Infof", varargs...)
 }
 
@@ -56,10 +53,7 @@ func (mr *MockLogMockRecorder) Infof(format interface{}, args ...interface{}) *g
 
 func (m *MockLog) Warnf(format string, args ...any) {
 	m.ctrl.T.Helper()
-	varargs := []interface{}{format}
-	for _, a := range args {
-		varargs = append(varargs, a)
-	}
+	varargs := append([]interface{}{format}, args...)
 	m.ctrl.Call(m, "Warnf", varargs...)
 }
 
