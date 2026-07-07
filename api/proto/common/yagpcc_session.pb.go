@@ -511,8 +511,12 @@ type SessionState struct {
 	RunningQuerySlices int64 `protobuf:"varint,16,opt,name=running_query_slices,json=runningQuerySlices,proto3" json:"running_query_slices,omitempty"`
 	// Aggregate session stat how many query calls was performed
 	AggregatedMetrics *AggregatedMetrics `protobuf:"bytes,17,opt,name=aggregated_metrics,json=aggregatedMetrics,proto3" json:"aggregated_metrics,omitempty"`
-	unknownFields     protoimpl.UnknownFields
-	sizeCache         protoimpl.SizeCache
+	// Runtime statistics
+	RuntimeMetrics *RuntimeMetrics `protobuf:"bytes,18,opt,name=runtime_metrics,json=runtimeMetrics,proto3" json:"runtime_metrics,omitempty"`
+	// Data quality statistics
+	DataQuality   *DataQuality `protobuf:"bytes,19,opt,name=data_quality,json=dataQuality,proto3" json:"data_quality,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
 }
 
 func (x *SessionState) Reset() {
@@ -664,6 +668,20 @@ func (x *SessionState) GetAggregatedMetrics() *AggregatedMetrics {
 	return nil
 }
 
+func (x *SessionState) GetRuntimeMetrics() *RuntimeMetrics {
+	if x != nil {
+		return x.RuntimeMetrics
+	}
+	return nil
+}
+
+func (x *SessionState) GetDataQuality() *DataQuality {
+	if x != nil {
+		return x.DataQuality
+	}
+	return nil
+}
+
 var File_api_proto_common_yagpcc_session_proto protoreflect.FileDescriptor
 
 const file_api_proto_common_yagpcc_session_proto_rawDesc = "" +
@@ -716,7 +734,7 @@ const file_api_proto_common_yagpcc_session_proto_rawDesc = "" +
 	"\vquery_level\x18\x04 \x01(\x03R\n" +
 	"queryLevel\x12;\n" +
 	"\vquery_start\x18\x05 \x01(\v2\x1a.google.protobuf.TimestampR\n" +
-	"queryStart\"\xa2\a\n" +
+	"queryStart\"\x9b\b\n" +
 	"\fSessionState\x12.\n" +
 	"\x04time\x18\x01 \x01(\v2\x1a.google.protobuf.TimestampR\x04time\x12\x1d\n" +
 	"\n" +
@@ -737,7 +755,9 @@ const file_api_proto_common_yagpcc_session_proto_rawDesc = "" +
 	"\x15blocked_session_level\x18\x0e \x01(\x03R\x13blockedSessionLevel\x12.\n" +
 	"\x13running_query_error\x18\x0f \x01(\tR\x11runningQueryError\x120\n" +
 	"\x14running_query_slices\x18\x10 \x01(\x03R\x12runningQuerySlices\x12H\n" +
-	"\x12aggregated_metrics\x18\x11 \x01(\v2\x19.yagpcc.AggregatedMetricsR\x11aggregatedMetricsBGB\rMasterYAGPCCMZ6github.com/open-gpdb/yagpcc/api/proto/common;greenplumb\x06proto3"
+	"\x12aggregated_metrics\x18\x11 \x01(\v2\x19.yagpcc.AggregatedMetricsR\x11aggregatedMetrics\x12?\n" +
+	"\x0fruntime_metrics\x18\x12 \x01(\v2\x16.yagpcc.RuntimeMetricsR\x0eruntimeMetrics\x126\n" +
+	"\fdata_quality\x18\x13 \x01(\v2\x13.yagpcc.DataQualityR\vdataQualityBGB\rMasterYAGPCCMZ6github.com/open-gpdb/yagpcc/api/proto/common;greenplumb\x06proto3"
 
 var (
 	file_api_proto_common_yagpcc_session_proto_rawDescOnce sync.Once
@@ -763,6 +783,8 @@ var file_api_proto_common_yagpcc_session_proto_goTypes = []any{
 	(QueryStatus)(0),              // 7: yagpcc.QueryStatus
 	(*GPMetrics)(nil),             // 8: yagpcc.GPMetrics
 	(*AggregatedMetrics)(nil),     // 9: yagpcc.AggregatedMetrics
+	(*RuntimeMetrics)(nil),        // 10: yagpcc.RuntimeMetrics
+	(*DataQuality)(nil),           // 11: yagpcc.DataQuality
 }
 var file_api_proto_common_yagpcc_session_proto_depIdxs = []int32{
 	4,  // 0: yagpcc.SessionInfo.backend_start:type_name -> google.protobuf.Timestamp
@@ -784,11 +806,13 @@ var file_api_proto_common_yagpcc_session_proto_depIdxs = []int32{
 	8,  // 16: yagpcc.SessionState.query_metrics:type_name -> yagpcc.GPMetrics
 	2,  // 17: yagpcc.SessionState.running_queries_stack:type_name -> yagpcc.QueryDesc
 	9,  // 18: yagpcc.SessionState.aggregated_metrics:type_name -> yagpcc.AggregatedMetrics
-	19, // [19:19] is the sub-list for method output_type
-	19, // [19:19] is the sub-list for method input_type
-	19, // [19:19] is the sub-list for extension type_name
-	19, // [19:19] is the sub-list for extension extendee
-	0,  // [0:19] is the sub-list for field type_name
+	10, // 19: yagpcc.SessionState.runtime_metrics:type_name -> yagpcc.RuntimeMetrics
+	11, // 20: yagpcc.SessionState.data_quality:type_name -> yagpcc.DataQuality
+	21, // [21:21] is the sub-list for method output_type
+	21, // [21:21] is the sub-list for method input_type
+	21, // [21:21] is the sub-list for extension type_name
+	21, // [21:21] is the sub-list for extension extendee
+	0,  // [0:21] is the sub-list for field type_name
 }
 
 func init() { file_api_proto_common_yagpcc_session_proto_init() }

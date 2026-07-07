@@ -967,6 +967,638 @@ func (SessionFilterEnum) EnumDescriptor() ([]byte, []int) {
 	return file_api_proto_agent_master_yagpcc_get_service_proto_rawDescGZIP(), []int{4}
 }
 
+type GetGpPidProcInfoReq struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	QueryKey      *common.QueryKey       `protobuf:"bytes,1,opt,name=query_key,json=queryKey,proto3" json:"query_key,omitempty"`
+	Segindex      int32                  `protobuf:"varint,2,opt,name=segindex,proto3" json:"segindex,omitempty"`
+	SliceId       int64                  `protobuf:"varint,3,opt,name=slice_id,json=sliceId,proto3" json:"slice_id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetGpPidProcInfoReq) Reset() {
+	*x = GetGpPidProcInfoReq{}
+	mi := &file_api_proto_agent_master_yagpcc_get_service_proto_msgTypes[0]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetGpPidProcInfoReq) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetGpPidProcInfoReq) ProtoMessage() {}
+
+func (x *GetGpPidProcInfoReq) ProtoReflect() protoreflect.Message {
+	mi := &file_api_proto_agent_master_yagpcc_get_service_proto_msgTypes[0]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetGpPidProcInfoReq.ProtoReflect.Descriptor instead.
+func (*GetGpPidProcInfoReq) Descriptor() ([]byte, []int) {
+	return file_api_proto_agent_master_yagpcc_get_service_proto_rawDescGZIP(), []int{0}
+}
+
+func (x *GetGpPidProcInfoReq) GetQueryKey() *common.QueryKey {
+	if x != nil {
+		return x.QueryKey
+	}
+	return nil
+}
+
+func (x *GetGpPidProcInfoReq) GetSegindex() int32 {
+	if x != nil {
+		return x.Segindex
+	}
+	return 0
+}
+
+func (x *GetGpPidProcInfoReq) GetSliceId() int64 {
+	if x != nil {
+		return x.SliceId
+	}
+	return 0
+}
+
+type GetGPQueryRunningMatricsReq struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	QueryKey      *common.QueryKey       `protobuf:"bytes,1,opt,name=query_key,json=queryKey,proto3" json:"query_key,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetGPQueryRunningMatricsReq) Reset() {
+	*x = GetGPQueryRunningMatricsReq{}
+	mi := &file_api_proto_agent_master_yagpcc_get_service_proto_msgTypes[1]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetGPQueryRunningMatricsReq) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetGPQueryRunningMatricsReq) ProtoMessage() {}
+
+func (x *GetGPQueryRunningMatricsReq) ProtoReflect() protoreflect.Message {
+	mi := &file_api_proto_agent_master_yagpcc_get_service_proto_msgTypes[1]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetGPQueryRunningMatricsReq.ProtoReflect.Descriptor instead.
+func (*GetGPQueryRunningMatricsReq) Descriptor() ([]byte, []int) {
+	return file_api_proto_agent_master_yagpcc_get_service_proto_rawDescGZIP(), []int{1}
+}
+
+func (x *GetGPQueryRunningMatricsReq) GetQueryKey() *common.QueryKey {
+	if x != nil {
+		return x.QueryKey
+	}
+	return nil
+}
+
+type CellMetrics struct {
+	state          protoimpl.MessageState `protogen:"open.v1"`
+	SliceId        int64                  `protobuf:"varint,1,opt,name=slice_id,json=sliceId,proto3" json:"slice_id,omitempty"`
+	Segindex       int32                  `protobuf:"varint,2,opt,name=segindex,proto3" json:"segindex,omitempty"`
+	RuntimeMetrics *common.RuntimeMetrics `protobuf:"bytes,3,opt,name=runtime_metrics,json=runtimeMetrics,proto3" json:"runtime_metrics,omitempty"`
+	unknownFields  protoimpl.UnknownFields
+	sizeCache      protoimpl.SizeCache
+}
+
+func (x *CellMetrics) Reset() {
+	*x = CellMetrics{}
+	mi := &file_api_proto_agent_master_yagpcc_get_service_proto_msgTypes[2]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *CellMetrics) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*CellMetrics) ProtoMessage() {}
+
+func (x *CellMetrics) ProtoReflect() protoreflect.Message {
+	mi := &file_api_proto_agent_master_yagpcc_get_service_proto_msgTypes[2]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use CellMetrics.ProtoReflect.Descriptor instead.
+func (*CellMetrics) Descriptor() ([]byte, []int) {
+	return file_api_proto_agent_master_yagpcc_get_service_proto_rawDescGZIP(), []int{2}
+}
+
+func (x *CellMetrics) GetSliceId() int64 {
+	if x != nil {
+		return x.SliceId
+	}
+	return 0
+}
+
+func (x *CellMetrics) GetSegindex() int32 {
+	if x != nil {
+		return x.Segindex
+	}
+	return 0
+}
+
+func (x *CellMetrics) GetRuntimeMetrics() *common.RuntimeMetrics {
+	if x != nil {
+		return x.RuntimeMetrics
+	}
+	return nil
+}
+
+type GetGPQueryRunningMatricsResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	SliceId       []int64                `protobuf:"varint,1,rep,packed,name=slice_id,json=sliceId,proto3" json:"slice_id,omitempty"`
+	Segindex      []int32                `protobuf:"varint,2,rep,packed,name=segindex,proto3" json:"segindex,omitempty"`
+	CellMetrics   []*CellMetrics         `protobuf:"bytes,3,rep,name=cell_metrics,json=cellMetrics,proto3" json:"cell_metrics,omitempty"`
+	Skew          *common.Skew           `protobuf:"bytes,4,opt,name=skew,proto3" json:"skew,omitempty"`
+	DataQuality   *common.DataQuality    `protobuf:"bytes,5,opt,name=data_quality,json=dataQuality,proto3" json:"data_quality,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetGPQueryRunningMatricsResponse) Reset() {
+	*x = GetGPQueryRunningMatricsResponse{}
+	mi := &file_api_proto_agent_master_yagpcc_get_service_proto_msgTypes[3]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetGPQueryRunningMatricsResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetGPQueryRunningMatricsResponse) ProtoMessage() {}
+
+func (x *GetGPQueryRunningMatricsResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_api_proto_agent_master_yagpcc_get_service_proto_msgTypes[3]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetGPQueryRunningMatricsResponse.ProtoReflect.Descriptor instead.
+func (*GetGPQueryRunningMatricsResponse) Descriptor() ([]byte, []int) {
+	return file_api_proto_agent_master_yagpcc_get_service_proto_rawDescGZIP(), []int{3}
+}
+
+func (x *GetGPQueryRunningMatricsResponse) GetSliceId() []int64 {
+	if x != nil {
+		return x.SliceId
+	}
+	return nil
+}
+
+func (x *GetGPQueryRunningMatricsResponse) GetSegindex() []int32 {
+	if x != nil {
+		return x.Segindex
+	}
+	return nil
+}
+
+func (x *GetGPQueryRunningMatricsResponse) GetCellMetrics() []*CellMetrics {
+	if x != nil {
+		return x.CellMetrics
+	}
+	return nil
+}
+
+func (x *GetGPQueryRunningMatricsResponse) GetSkew() *common.Skew {
+	if x != nil {
+		return x.Skew
+	}
+	return nil
+}
+
+func (x *GetGPQueryRunningMatricsResponse) GetDataQuality() *common.DataQuality {
+	if x != nil {
+		return x.DataQuality
+	}
+	return nil
+}
+
+type GetGPHostsRunningQueriesReq struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetGPHostsRunningQueriesReq) Reset() {
+	*x = GetGPHostsRunningQueriesReq{}
+	mi := &file_api_proto_agent_master_yagpcc_get_service_proto_msgTypes[4]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetGPHostsRunningQueriesReq) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetGPHostsRunningQueriesReq) ProtoMessage() {}
+
+func (x *GetGPHostsRunningQueriesReq) ProtoReflect() protoreflect.Message {
+	mi := &file_api_proto_agent_master_yagpcc_get_service_proto_msgTypes[4]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetGPHostsRunningQueriesReq.ProtoReflect.Descriptor instead.
+func (*GetGPHostsRunningQueriesReq) Descriptor() ([]byte, []int) {
+	return file_api_proto_agent_master_yagpcc_get_service_proto_rawDescGZIP(), []int{4}
+}
+
+type RunningHostInfo struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	HostName      string                 `protobuf:"bytes,1,opt,name=host_name,json=hostName,proto3" json:"host_name,omitempty"`
+	Segindex      []int32                `protobuf:"varint,2,rep,packed,name=segindex,proto3" json:"segindex,omitempty"`
+	ActiveQueries int64                  `protobuf:"varint,3,opt,name=active_queries,json=activeQueries,proto3" json:"active_queries,omitempty"`
+	ActiveSlices  int64                  `protobuf:"varint,4,opt,name=active_slices,json=activeSlices,proto3" json:"active_slices,omitempty"`
+	CpuUsage      float64                `protobuf:"fixed64,5,opt,name=cpu_usage,json=cpuUsage,proto3" json:"cpu_usage,omitempty"`
+	MemoryUsage   int64                  `protobuf:"varint,6,opt,name=memory_usage,json=memoryUsage,proto3" json:"memory_usage,omitempty"`
+	DiskUsage     int64                  `protobuf:"varint,7,opt,name=disk_usage,json=diskUsage,proto3" json:"disk_usage,omitempty"`
+	SpillBytes    int64                  `protobuf:"varint,8,opt,name=spill_bytes,json=spillBytes,proto3" json:"spill_bytes,omitempty"`
+	Skew          *common.Skew           `protobuf:"bytes,9,opt,name=skew,proto3" json:"skew,omitempty"`
+	DataQuality   *common.DataQuality    `protobuf:"bytes,10,opt,name=data_quality,json=dataQuality,proto3" json:"data_quality,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *RunningHostInfo) Reset() {
+	*x = RunningHostInfo{}
+	mi := &file_api_proto_agent_master_yagpcc_get_service_proto_msgTypes[5]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *RunningHostInfo) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*RunningHostInfo) ProtoMessage() {}
+
+func (x *RunningHostInfo) ProtoReflect() protoreflect.Message {
+	mi := &file_api_proto_agent_master_yagpcc_get_service_proto_msgTypes[5]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use RunningHostInfo.ProtoReflect.Descriptor instead.
+func (*RunningHostInfo) Descriptor() ([]byte, []int) {
+	return file_api_proto_agent_master_yagpcc_get_service_proto_rawDescGZIP(), []int{5}
+}
+
+func (x *RunningHostInfo) GetHostName() string {
+	if x != nil {
+		return x.HostName
+	}
+	return ""
+}
+
+func (x *RunningHostInfo) GetSegindex() []int32 {
+	if x != nil {
+		return x.Segindex
+	}
+	return nil
+}
+
+func (x *RunningHostInfo) GetActiveQueries() int64 {
+	if x != nil {
+		return x.ActiveQueries
+	}
+	return 0
+}
+
+func (x *RunningHostInfo) GetActiveSlices() int64 {
+	if x != nil {
+		return x.ActiveSlices
+	}
+	return 0
+}
+
+func (x *RunningHostInfo) GetCpuUsage() float64 {
+	if x != nil {
+		return x.CpuUsage
+	}
+	return 0
+}
+
+func (x *RunningHostInfo) GetMemoryUsage() int64 {
+	if x != nil {
+		return x.MemoryUsage
+	}
+	return 0
+}
+
+func (x *RunningHostInfo) GetDiskUsage() int64 {
+	if x != nil {
+		return x.DiskUsage
+	}
+	return 0
+}
+
+func (x *RunningHostInfo) GetSpillBytes() int64 {
+	if x != nil {
+		return x.SpillBytes
+	}
+	return 0
+}
+
+func (x *RunningHostInfo) GetSkew() *common.Skew {
+	if x != nil {
+		return x.Skew
+	}
+	return nil
+}
+
+func (x *RunningHostInfo) GetDataQuality() *common.DataQuality {
+	if x != nil {
+		return x.DataQuality
+	}
+	return nil
+}
+
+type GetGPHostsRunningQueriesResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Hosts         []*RunningHostInfo     `protobuf:"bytes,1,rep,name=hosts,proto3" json:"hosts,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetGPHostsRunningQueriesResponse) Reset() {
+	*x = GetGPHostsRunningQueriesResponse{}
+	mi := &file_api_proto_agent_master_yagpcc_get_service_proto_msgTypes[6]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetGPHostsRunningQueriesResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetGPHostsRunningQueriesResponse) ProtoMessage() {}
+
+func (x *GetGPHostsRunningQueriesResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_api_proto_agent_master_yagpcc_get_service_proto_msgTypes[6]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetGPHostsRunningQueriesResponse.ProtoReflect.Descriptor instead.
+func (*GetGPHostsRunningQueriesResponse) Descriptor() ([]byte, []int) {
+	return file_api_proto_agent_master_yagpcc_get_service_proto_rawDescGZIP(), []int{6}
+}
+
+func (x *GetGPHostsRunningQueriesResponse) GetHosts() []*RunningHostInfo {
+	if x != nil {
+		return x.Hosts
+	}
+	return nil
+}
+
+type GetGPHostRunningQueriesReq struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	HostName      string                 `protobuf:"bytes,1,opt,name=host_name,json=hostName,proto3" json:"host_name,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetGPHostRunningQueriesReq) Reset() {
+	*x = GetGPHostRunningQueriesReq{}
+	mi := &file_api_proto_agent_master_yagpcc_get_service_proto_msgTypes[7]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetGPHostRunningQueriesReq) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetGPHostRunningQueriesReq) ProtoMessage() {}
+
+func (x *GetGPHostRunningQueriesReq) ProtoReflect() protoreflect.Message {
+	mi := &file_api_proto_agent_master_yagpcc_get_service_proto_msgTypes[7]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetGPHostRunningQueriesReq.ProtoReflect.Descriptor instead.
+func (*GetGPHostRunningQueriesReq) Descriptor() ([]byte, []int) {
+	return file_api_proto_agent_master_yagpcc_get_service_proto_rawDescGZIP(), []int{7}
+}
+
+func (x *GetGPHostRunningQueriesReq) GetHostName() string {
+	if x != nil {
+		return x.HostName
+	}
+	return ""
+}
+
+type RunningQueryInfo struct {
+	state          protoimpl.MessageState `protogen:"open.v1"`
+	QueryKey       *common.QueryKey       `protobuf:"bytes,1,opt,name=query_key,json=queryKey,proto3" json:"query_key,omitempty"`
+	UserName       string                 `protobuf:"bytes,2,opt,name=user_name,json=userName,proto3" json:"user_name,omitempty"`
+	DbName         string                 `protobuf:"bytes,3,opt,name=db_name,json=dbName,proto3" json:"db_name,omitempty"`
+	QueryText      string                 `protobuf:"bytes,4,opt,name=query_text,json=queryText,proto3" json:"query_text,omitempty"`
+	RuntimeMetrics *common.RuntimeMetrics `protobuf:"bytes,5,opt,name=runtime_metrics,json=runtimeMetrics,proto3" json:"runtime_metrics,omitempty"`
+	unknownFields  protoimpl.UnknownFields
+	sizeCache      protoimpl.SizeCache
+}
+
+func (x *RunningQueryInfo) Reset() {
+	*x = RunningQueryInfo{}
+	mi := &file_api_proto_agent_master_yagpcc_get_service_proto_msgTypes[8]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *RunningQueryInfo) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*RunningQueryInfo) ProtoMessage() {}
+
+func (x *RunningQueryInfo) ProtoReflect() protoreflect.Message {
+	mi := &file_api_proto_agent_master_yagpcc_get_service_proto_msgTypes[8]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use RunningQueryInfo.ProtoReflect.Descriptor instead.
+func (*RunningQueryInfo) Descriptor() ([]byte, []int) {
+	return file_api_proto_agent_master_yagpcc_get_service_proto_rawDescGZIP(), []int{8}
+}
+
+func (x *RunningQueryInfo) GetQueryKey() *common.QueryKey {
+	if x != nil {
+		return x.QueryKey
+	}
+	return nil
+}
+
+func (x *RunningQueryInfo) GetUserName() string {
+	if x != nil {
+		return x.UserName
+	}
+	return ""
+}
+
+func (x *RunningQueryInfo) GetDbName() string {
+	if x != nil {
+		return x.DbName
+	}
+	return ""
+}
+
+func (x *RunningQueryInfo) GetQueryText() string {
+	if x != nil {
+		return x.QueryText
+	}
+	return ""
+}
+
+func (x *RunningQueryInfo) GetRuntimeMetrics() *common.RuntimeMetrics {
+	if x != nil {
+		return x.RuntimeMetrics
+	}
+	return nil
+}
+
+type GetGPHostRunningQueriesResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	HostName      string                 `protobuf:"bytes,1,opt,name=host_name,json=hostName,proto3" json:"host_name,omitempty"`
+	Segindex      []int32                `protobuf:"varint,2,rep,packed,name=segindex,proto3" json:"segindex,omitempty"`
+	Queries       []*RunningQueryInfo    `protobuf:"bytes,3,rep,name=queries,proto3" json:"queries,omitempty"`
+	DataQuality   *common.DataQuality    `protobuf:"bytes,4,opt,name=data_quality,json=dataQuality,proto3" json:"data_quality,omitempty"`
+	NextPageToken string                 `protobuf:"bytes,5,opt,name=next_page_token,json=nextPageToken,proto3" json:"next_page_token,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetGPHostRunningQueriesResponse) Reset() {
+	*x = GetGPHostRunningQueriesResponse{}
+	mi := &file_api_proto_agent_master_yagpcc_get_service_proto_msgTypes[9]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetGPHostRunningQueriesResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetGPHostRunningQueriesResponse) ProtoMessage() {}
+
+func (x *GetGPHostRunningQueriesResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_api_proto_agent_master_yagpcc_get_service_proto_msgTypes[9]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetGPHostRunningQueriesResponse.ProtoReflect.Descriptor instead.
+func (*GetGPHostRunningQueriesResponse) Descriptor() ([]byte, []int) {
+	return file_api_proto_agent_master_yagpcc_get_service_proto_rawDescGZIP(), []int{9}
+}
+
+func (x *GetGPHostRunningQueriesResponse) GetHostName() string {
+	if x != nil {
+		return x.HostName
+	}
+	return ""
+}
+
+func (x *GetGPHostRunningQueriesResponse) GetSegindex() []int32 {
+	if x != nil {
+		return x.Segindex
+	}
+	return nil
+}
+
+func (x *GetGPHostRunningQueriesResponse) GetQueries() []*RunningQueryInfo {
+	if x != nil {
+		return x.Queries
+	}
+	return nil
+}
+
+func (x *GetGPHostRunningQueriesResponse) GetDataQuality() *common.DataQuality {
+	if x != nil {
+		return x.DataQuality
+	}
+	return nil
+}
+
+func (x *GetGPHostRunningQueriesResponse) GetNextPageToken() string {
+	if x != nil {
+		return x.NextPageToken
+	}
+	return ""
+}
+
 type GetTotalSessionsReq struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	unknownFields protoimpl.UnknownFields
@@ -975,7 +1607,7 @@ type GetTotalSessionsReq struct {
 
 func (x *GetTotalSessionsReq) Reset() {
 	*x = GetTotalSessionsReq{}
-	mi := &file_api_proto_agent_master_yagpcc_get_service_proto_msgTypes[0]
+	mi := &file_api_proto_agent_master_yagpcc_get_service_proto_msgTypes[10]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -987,7 +1619,7 @@ func (x *GetTotalSessionsReq) String() string {
 func (*GetTotalSessionsReq) ProtoMessage() {}
 
 func (x *GetTotalSessionsReq) ProtoReflect() protoreflect.Message {
-	mi := &file_api_proto_agent_master_yagpcc_get_service_proto_msgTypes[0]
+	mi := &file_api_proto_agent_master_yagpcc_get_service_proto_msgTypes[10]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1000,7 +1632,7 @@ func (x *GetTotalSessionsReq) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetTotalSessionsReq.ProtoReflect.Descriptor instead.
 func (*GetTotalSessionsReq) Descriptor() ([]byte, []int) {
-	return file_api_proto_agent_master_yagpcc_get_service_proto_rawDescGZIP(), []int{0}
+	return file_api_proto_agent_master_yagpcc_get_service_proto_rawDescGZIP(), []int{10}
 }
 
 type GetGPQueriesReq struct {
@@ -1015,7 +1647,7 @@ type GetGPQueriesReq struct {
 
 func (x *GetGPQueriesReq) Reset() {
 	*x = GetGPQueriesReq{}
-	mi := &file_api_proto_agent_master_yagpcc_get_service_proto_msgTypes[1]
+	mi := &file_api_proto_agent_master_yagpcc_get_service_proto_msgTypes[11]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1027,7 +1659,7 @@ func (x *GetGPQueriesReq) String() string {
 func (*GetGPQueriesReq) ProtoMessage() {}
 
 func (x *GetGPQueriesReq) ProtoReflect() protoreflect.Message {
-	mi := &file_api_proto_agent_master_yagpcc_get_service_proto_msgTypes[1]
+	mi := &file_api_proto_agent_master_yagpcc_get_service_proto_msgTypes[11]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1040,7 +1672,7 @@ func (x *GetGPQueriesReq) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetGPQueriesReq.ProtoReflect.Descriptor instead.
 func (*GetGPQueriesReq) Descriptor() ([]byte, []int) {
-	return file_api_proto_agent_master_yagpcc_get_service_proto_rawDescGZIP(), []int{1}
+	return file_api_proto_agent_master_yagpcc_get_service_proto_rawDescGZIP(), []int{11}
 }
 
 func (x *GetGPQueriesReq) GetField() []*SessionFieldWrapper {
@@ -1081,7 +1713,7 @@ type SessionStat struct {
 
 func (x *SessionStat) Reset() {
 	*x = SessionStat{}
-	mi := &file_api_proto_agent_master_yagpcc_get_service_proto_msgTypes[2]
+	mi := &file_api_proto_agent_master_yagpcc_get_service_proto_msgTypes[12]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1093,7 +1725,7 @@ func (x *SessionStat) String() string {
 func (*SessionStat) ProtoMessage() {}
 
 func (x *SessionStat) ProtoReflect() protoreflect.Message {
-	mi := &file_api_proto_agent_master_yagpcc_get_service_proto_msgTypes[2]
+	mi := &file_api_proto_agent_master_yagpcc_get_service_proto_msgTypes[12]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1106,7 +1738,7 @@ func (x *SessionStat) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SessionStat.ProtoReflect.Descriptor instead.
 func (*SessionStat) Descriptor() ([]byte, []int) {
-	return file_api_proto_agent_master_yagpcc_get_service_proto_rawDescGZIP(), []int{2}
+	return file_api_proto_agent_master_yagpcc_get_service_proto_rawDescGZIP(), []int{12}
 }
 
 func (x *SessionStat) GetState() string {
@@ -1132,7 +1764,7 @@ type GetTotalSessionsResponse struct {
 
 func (x *GetTotalSessionsResponse) Reset() {
 	*x = GetTotalSessionsResponse{}
-	mi := &file_api_proto_agent_master_yagpcc_get_service_proto_msgTypes[3]
+	mi := &file_api_proto_agent_master_yagpcc_get_service_proto_msgTypes[13]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1144,7 +1776,7 @@ func (x *GetTotalSessionsResponse) String() string {
 func (*GetTotalSessionsResponse) ProtoMessage() {}
 
 func (x *GetTotalSessionsResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_api_proto_agent_master_yagpcc_get_service_proto_msgTypes[3]
+	mi := &file_api_proto_agent_master_yagpcc_get_service_proto_msgTypes[13]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1157,7 +1789,7 @@ func (x *GetTotalSessionsResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetTotalSessionsResponse.ProtoReflect.Descriptor instead.
 func (*GetTotalSessionsResponse) Descriptor() ([]byte, []int) {
-	return file_api_proto_agent_master_yagpcc_get_service_proto_rawDescGZIP(), []int{3}
+	return file_api_proto_agent_master_yagpcc_get_service_proto_rawDescGZIP(), []int{13}
 }
 
 func (x *GetTotalSessionsResponse) GetSessionsStat() []*SessionStat {
@@ -1182,7 +1814,7 @@ type GetGPSessionsReq struct {
 
 func (x *GetGPSessionsReq) Reset() {
 	*x = GetGPSessionsReq{}
-	mi := &file_api_proto_agent_master_yagpcc_get_service_proto_msgTypes[4]
+	mi := &file_api_proto_agent_master_yagpcc_get_service_proto_msgTypes[14]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1194,7 +1826,7 @@ func (x *GetGPSessionsReq) String() string {
 func (*GetGPSessionsReq) ProtoMessage() {}
 
 func (x *GetGPSessionsReq) ProtoReflect() protoreflect.Message {
-	mi := &file_api_proto_agent_master_yagpcc_get_service_proto_msgTypes[4]
+	mi := &file_api_proto_agent_master_yagpcc_get_service_proto_msgTypes[14]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1207,7 +1839,7 @@ func (x *GetGPSessionsReq) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetGPSessionsReq.ProtoReflect.Descriptor instead.
 func (*GetGPSessionsReq) Descriptor() ([]byte, []int) {
-	return file_api_proto_agent_master_yagpcc_get_service_proto_rawDescGZIP(), []int{4}
+	return file_api_proto_agent_master_yagpcc_get_service_proto_rawDescGZIP(), []int{14}
 }
 
 func (x *GetGPSessionsReq) GetShowSystem() bool {
@@ -1269,7 +1901,7 @@ type GetGPSessionsResponse struct {
 
 func (x *GetGPSessionsResponse) Reset() {
 	*x = GetGPSessionsResponse{}
-	mi := &file_api_proto_agent_master_yagpcc_get_service_proto_msgTypes[5]
+	mi := &file_api_proto_agent_master_yagpcc_get_service_proto_msgTypes[15]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1281,7 +1913,7 @@ func (x *GetGPSessionsResponse) String() string {
 func (*GetGPSessionsResponse) ProtoMessage() {}
 
 func (x *GetGPSessionsResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_api_proto_agent_master_yagpcc_get_service_proto_msgTypes[5]
+	mi := &file_api_proto_agent_master_yagpcc_get_service_proto_msgTypes[15]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1294,7 +1926,7 @@ func (x *GetGPSessionsResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetGPSessionsResponse.ProtoReflect.Descriptor instead.
 func (*GetGPSessionsResponse) Descriptor() ([]byte, []int) {
-	return file_api_proto_agent_master_yagpcc_get_service_proto_rawDescGZIP(), []int{5}
+	return file_api_proto_agent_master_yagpcc_get_service_proto_rawDescGZIP(), []int{15}
 }
 
 func (x *GetGPSessionsResponse) GetSessionsState() []*common.SessionState {
@@ -1320,7 +1952,7 @@ type GetGPQueryReq struct {
 
 func (x *GetGPQueryReq) Reset() {
 	*x = GetGPQueryReq{}
-	mi := &file_api_proto_agent_master_yagpcc_get_service_proto_msgTypes[6]
+	mi := &file_api_proto_agent_master_yagpcc_get_service_proto_msgTypes[16]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1332,7 +1964,7 @@ func (x *GetGPQueryReq) String() string {
 func (*GetGPQueryReq) ProtoMessage() {}
 
 func (x *GetGPQueryReq) ProtoReflect() protoreflect.Message {
-	mi := &file_api_proto_agent_master_yagpcc_get_service_proto_msgTypes[6]
+	mi := &file_api_proto_agent_master_yagpcc_get_service_proto_msgTypes[16]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1345,7 +1977,7 @@ func (x *GetGPQueryReq) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetGPQueryReq.ProtoReflect.Descriptor instead.
 func (*GetGPQueryReq) Descriptor() ([]byte, []int) {
-	return file_api_proto_agent_master_yagpcc_get_service_proto_rawDescGZIP(), []int{6}
+	return file_api_proto_agent_master_yagpcc_get_service_proto_rawDescGZIP(), []int{16}
 }
 
 func (x *GetGPQueryReq) GetQueryKey() *common.QueryKey {
@@ -1364,7 +1996,7 @@ type GetGPQueryResponse struct {
 
 func (x *GetGPQueryResponse) Reset() {
 	*x = GetGPQueryResponse{}
-	mi := &file_api_proto_agent_master_yagpcc_get_service_proto_msgTypes[7]
+	mi := &file_api_proto_agent_master_yagpcc_get_service_proto_msgTypes[17]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1376,7 +2008,7 @@ func (x *GetGPQueryResponse) String() string {
 func (*GetGPQueryResponse) ProtoMessage() {}
 
 func (x *GetGPQueryResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_api_proto_agent_master_yagpcc_get_service_proto_msgTypes[7]
+	mi := &file_api_proto_agent_master_yagpcc_get_service_proto_msgTypes[17]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1389,7 +2021,7 @@ func (x *GetGPQueryResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetGPQueryResponse.ProtoReflect.Descriptor instead.
 func (*GetGPQueryResponse) Descriptor() ([]byte, []int) {
-	return file_api_proto_agent_master_yagpcc_get_service_proto_rawDescGZIP(), []int{7}
+	return file_api_proto_agent_master_yagpcc_get_service_proto_rawDescGZIP(), []int{17}
 }
 
 func (x *GetGPQueryResponse) GetQueriesData() *TotalQueryData {
@@ -1408,7 +2040,7 @@ type GetGPSessionReq struct {
 
 func (x *GetGPSessionReq) Reset() {
 	*x = GetGPSessionReq{}
-	mi := &file_api_proto_agent_master_yagpcc_get_service_proto_msgTypes[8]
+	mi := &file_api_proto_agent_master_yagpcc_get_service_proto_msgTypes[18]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1420,7 +2052,7 @@ func (x *GetGPSessionReq) String() string {
 func (*GetGPSessionReq) ProtoMessage() {}
 
 func (x *GetGPSessionReq) ProtoReflect() protoreflect.Message {
-	mi := &file_api_proto_agent_master_yagpcc_get_service_proto_msgTypes[8]
+	mi := &file_api_proto_agent_master_yagpcc_get_service_proto_msgTypes[18]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1433,7 +2065,7 @@ func (x *GetGPSessionReq) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetGPSessionReq.ProtoReflect.Descriptor instead.
 func (*GetGPSessionReq) Descriptor() ([]byte, []int) {
-	return file_api_proto_agent_master_yagpcc_get_service_proto_rawDescGZIP(), []int{8}
+	return file_api_proto_agent_master_yagpcc_get_service_proto_rawDescGZIP(), []int{18}
 }
 
 func (x *GetGPSessionReq) GetSessionKey() *common.SessionKey {
@@ -1452,7 +2084,7 @@ type GetGPSessionResponse struct {
 
 func (x *GetGPSessionResponse) Reset() {
 	*x = GetGPSessionResponse{}
-	mi := &file_api_proto_agent_master_yagpcc_get_service_proto_msgTypes[9]
+	mi := &file_api_proto_agent_master_yagpcc_get_service_proto_msgTypes[19]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1464,7 +2096,7 @@ func (x *GetGPSessionResponse) String() string {
 func (*GetGPSessionResponse) ProtoMessage() {}
 
 func (x *GetGPSessionResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_api_proto_agent_master_yagpcc_get_service_proto_msgTypes[9]
+	mi := &file_api_proto_agent_master_yagpcc_get_service_proto_msgTypes[19]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1477,7 +2109,7 @@ func (x *GetGPSessionResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetGPSessionResponse.ProtoReflect.Descriptor instead.
 func (*GetGPSessionResponse) Descriptor() ([]byte, []int) {
-	return file_api_proto_agent_master_yagpcc_get_service_proto_rawDescGZIP(), []int{9}
+	return file_api_proto_agent_master_yagpcc_get_service_proto_rawDescGZIP(), []int{19}
 }
 
 func (x *GetGPSessionResponse) GetSessionsState() *common.SessionState {
@@ -1497,7 +2129,7 @@ type TotalQueryData struct {
 
 func (x *TotalQueryData) Reset() {
 	*x = TotalQueryData{}
-	mi := &file_api_proto_agent_master_yagpcc_get_service_proto_msgTypes[10]
+	mi := &file_api_proto_agent_master_yagpcc_get_service_proto_msgTypes[20]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1509,7 +2141,7 @@ func (x *TotalQueryData) String() string {
 func (*TotalQueryData) ProtoMessage() {}
 
 func (x *TotalQueryData) ProtoReflect() protoreflect.Message {
-	mi := &file_api_proto_agent_master_yagpcc_get_service_proto_msgTypes[10]
+	mi := &file_api_proto_agent_master_yagpcc_get_service_proto_msgTypes[20]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1522,7 +2154,7 @@ func (x *TotalQueryData) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use TotalQueryData.ProtoReflect.Descriptor instead.
 func (*TotalQueryData) Descriptor() ([]byte, []int) {
-	return file_api_proto_agent_master_yagpcc_get_service_proto_rawDescGZIP(), []int{10}
+	return file_api_proto_agent_master_yagpcc_get_service_proto_rawDescGZIP(), []int{20}
 }
 
 func (x *TotalQueryData) GetQueryStat() *QueryStat {
@@ -1560,13 +2192,15 @@ type QueryStat struct {
 	SessionState      string                    `protobuf:"bytes,17,opt,name=session_state,json=sessionState,proto3" json:"session_state,omitempty"`
 	Message           string                    `protobuf:"bytes,18,opt,name=message,proto3" json:"message,omitempty"`
 	Slices            int64                     `protobuf:"varint,19,opt,name=slices,proto3" json:"slices,omitempty"` // the number of registered slices for a query
+	Skew              *common.Skew              `protobuf:"bytes,20,opt,name=skew,proto3" json:"skew,omitempty"`      // calculated query skew
+	DataQuality       *common.DataQuality       `protobuf:"bytes,21,opt,name=data_quality,json=dataQuality,proto3" json:"data_quality,omitempty"`
 	unknownFields     protoimpl.UnknownFields
 	sizeCache         protoimpl.SizeCache
 }
 
 func (x *QueryStat) Reset() {
 	*x = QueryStat{}
-	mi := &file_api_proto_agent_master_yagpcc_get_service_proto_msgTypes[11]
+	mi := &file_api_proto_agent_master_yagpcc_get_service_proto_msgTypes[21]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1578,7 +2212,7 @@ func (x *QueryStat) String() string {
 func (*QueryStat) ProtoMessage() {}
 
 func (x *QueryStat) ProtoReflect() protoreflect.Message {
-	mi := &file_api_proto_agent_master_yagpcc_get_service_proto_msgTypes[11]
+	mi := &file_api_proto_agent_master_yagpcc_get_service_proto_msgTypes[21]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1591,7 +2225,7 @@ func (x *QueryStat) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use QueryStat.ProtoReflect.Descriptor instead.
 func (*QueryStat) Descriptor() ([]byte, []int) {
-	return file_api_proto_agent_master_yagpcc_get_service_proto_rawDescGZIP(), []int{11}
+	return file_api_proto_agent_master_yagpcc_get_service_proto_rawDescGZIP(), []int{21}
 }
 
 func (x *QueryStat) GetClusterId() string {
@@ -1727,6 +2361,20 @@ func (x *QueryStat) GetSlices() int64 {
 	return 0
 }
 
+func (x *QueryStat) GetSkew() *common.Skew {
+	if x != nil {
+		return x.Skew
+	}
+	return nil
+}
+
+func (x *QueryStat) GetDataQuality() *common.DataQuality {
+	if x != nil {
+		return x.DataQuality
+	}
+	return nil
+}
+
 type QueryStatWrite struct {
 	state             protoimpl.MessageState    `protogen:"open.v1"`
 	ClusterId         string                    `protobuf:"bytes,1,opt,name=cluster_id,json=clusterId,proto3" json:"cluster_id,omitempty"`
@@ -1754,7 +2402,7 @@ type QueryStatWrite struct {
 
 func (x *QueryStatWrite) Reset() {
 	*x = QueryStatWrite{}
-	mi := &file_api_proto_agent_master_yagpcc_get_service_proto_msgTypes[12]
+	mi := &file_api_proto_agent_master_yagpcc_get_service_proto_msgTypes[22]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1766,7 +2414,7 @@ func (x *QueryStatWrite) String() string {
 func (*QueryStatWrite) ProtoMessage() {}
 
 func (x *QueryStatWrite) ProtoReflect() protoreflect.Message {
-	mi := &file_api_proto_agent_master_yagpcc_get_service_proto_msgTypes[12]
+	mi := &file_api_proto_agent_master_yagpcc_get_service_proto_msgTypes[22]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1779,7 +2427,7 @@ func (x *QueryStatWrite) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use QueryStatWrite.ProtoReflect.Descriptor instead.
 func (*QueryStatWrite) Descriptor() ([]byte, []int) {
-	return file_api_proto_agent_master_yagpcc_get_service_proto_rawDescGZIP(), []int{12}
+	return file_api_proto_agent_master_yagpcc_get_service_proto_rawDescGZIP(), []int{22}
 }
 
 func (x *QueryStatWrite) GetClusterId() string {
@@ -1927,13 +2575,14 @@ type SegmentMetrics struct {
 	SegmentMetrics *common.GPMetrics      `protobuf:"bytes,9,opt,name=segment_metrics,json=segmentMetrics,proto3" json:"segment_metrics,omitempty"`
 	QueryKey       *common.QueryKey       `protobuf:"bytes,11,opt,name=query_key,json=queryKey,proto3" json:"query_key,omitempty"`    // set is used outside of TotalQueryData
 	QueryInfo      *common.QueryInfo      `protobuf:"bytes,12,opt,name=query_info,json=queryInfo,proto3" json:"query_info,omitempty"` // set is used outside of TotalQueryData
+	Skew           *common.Skew           `protobuf:"bytes,13,opt,name=skew,proto3" json:"skew,omitempty"`
 	unknownFields  protoimpl.UnknownFields
 	sizeCache      protoimpl.SizeCache
 }
 
 func (x *SegmentMetrics) Reset() {
 	*x = SegmentMetrics{}
-	mi := &file_api_proto_agent_master_yagpcc_get_service_proto_msgTypes[13]
+	mi := &file_api_proto_agent_master_yagpcc_get_service_proto_msgTypes[23]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1945,7 +2594,7 @@ func (x *SegmentMetrics) String() string {
 func (*SegmentMetrics) ProtoMessage() {}
 
 func (x *SegmentMetrics) ProtoReflect() protoreflect.Message {
-	mi := &file_api_proto_agent_master_yagpcc_get_service_proto_msgTypes[13]
+	mi := &file_api_proto_agent_master_yagpcc_get_service_proto_msgTypes[23]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1958,7 +2607,7 @@ func (x *SegmentMetrics) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SegmentMetrics.ProtoReflect.Descriptor instead.
 func (*SegmentMetrics) Descriptor() ([]byte, []int) {
-	return file_api_proto_agent_master_yagpcc_get_service_proto_rawDescGZIP(), []int{13}
+	return file_api_proto_agent_master_yagpcc_get_service_proto_rawDescGZIP(), []int{23}
 }
 
 func (x *SegmentMetrics) GetClusterId() string {
@@ -2031,6 +2680,13 @@ func (x *SegmentMetrics) GetQueryInfo() *common.QueryInfo {
 	return nil
 }
 
+func (x *SegmentMetrics) GetSkew() *common.Skew {
+	if x != nil {
+		return x.Skew
+	}
+	return nil
+}
+
 type SegmentMetricsWrite struct {
 	state          protoimpl.MessageState `protogen:"open.v1"`
 	ClusterId      string                 `protobuf:"bytes,1,opt,name=cluster_id,json=clusterId,proto3" json:"cluster_id,omitempty"`
@@ -2049,7 +2705,7 @@ type SegmentMetricsWrite struct {
 
 func (x *SegmentMetricsWrite) Reset() {
 	*x = SegmentMetricsWrite{}
-	mi := &file_api_proto_agent_master_yagpcc_get_service_proto_msgTypes[14]
+	mi := &file_api_proto_agent_master_yagpcc_get_service_proto_msgTypes[24]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2061,7 +2717,7 @@ func (x *SegmentMetricsWrite) String() string {
 func (*SegmentMetricsWrite) ProtoMessage() {}
 
 func (x *SegmentMetricsWrite) ProtoReflect() protoreflect.Message {
-	mi := &file_api_proto_agent_master_yagpcc_get_service_proto_msgTypes[14]
+	mi := &file_api_proto_agent_master_yagpcc_get_service_proto_msgTypes[24]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2074,7 +2730,7 @@ func (x *SegmentMetricsWrite) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SegmentMetricsWrite.ProtoReflect.Descriptor instead.
 func (*SegmentMetricsWrite) Descriptor() ([]byte, []int) {
-	return file_api_proto_agent_master_yagpcc_get_service_proto_rawDescGZIP(), []int{14}
+	return file_api_proto_agent_master_yagpcc_get_service_proto_rawDescGZIP(), []int{24}
 }
 
 func (x *SegmentMetricsWrite) GetClusterId() string {
@@ -2157,7 +2813,7 @@ type SessionFieldWrapper struct {
 
 func (x *SessionFieldWrapper) Reset() {
 	*x = SessionFieldWrapper{}
-	mi := &file_api_proto_agent_master_yagpcc_get_service_proto_msgTypes[15]
+	mi := &file_api_proto_agent_master_yagpcc_get_service_proto_msgTypes[25]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2169,7 +2825,7 @@ func (x *SessionFieldWrapper) String() string {
 func (*SessionFieldWrapper) ProtoMessage() {}
 
 func (x *SessionFieldWrapper) ProtoReflect() protoreflect.Message {
-	mi := &file_api_proto_agent_master_yagpcc_get_service_proto_msgTypes[15]
+	mi := &file_api_proto_agent_master_yagpcc_get_service_proto_msgTypes[25]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2182,7 +2838,7 @@ func (x *SessionFieldWrapper) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SessionFieldWrapper.ProtoReflect.Descriptor instead.
 func (*SessionFieldWrapper) Descriptor() ([]byte, []int) {
-	return file_api_proto_agent_master_yagpcc_get_service_proto_rawDescGZIP(), []int{15}
+	return file_api_proto_agent_master_yagpcc_get_service_proto_rawDescGZIP(), []int{25}
 }
 
 func (x *SessionFieldWrapper) GetFieldName() SessionField {
@@ -2209,7 +2865,7 @@ type SessionFilter struct {
 
 func (x *SessionFilter) Reset() {
 	*x = SessionFilter{}
-	mi := &file_api_proto_agent_master_yagpcc_get_service_proto_msgTypes[16]
+	mi := &file_api_proto_agent_master_yagpcc_get_service_proto_msgTypes[26]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2221,7 +2877,7 @@ func (x *SessionFilter) String() string {
 func (*SessionFilter) ProtoMessage() {}
 
 func (x *SessionFilter) ProtoReflect() protoreflect.Message {
-	mi := &file_api_proto_agent_master_yagpcc_get_service_proto_msgTypes[16]
+	mi := &file_api_proto_agent_master_yagpcc_get_service_proto_msgTypes[26]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2234,7 +2890,7 @@ func (x *SessionFilter) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SessionFilter.ProtoReflect.Descriptor instead.
 func (*SessionFilter) Descriptor() ([]byte, []int) {
-	return file_api_proto_agent_master_yagpcc_get_service_proto_rawDescGZIP(), []int{16}
+	return file_api_proto_agent_master_yagpcc_get_service_proto_rawDescGZIP(), []int{26}
 }
 
 func (x *SessionFilter) GetFieldName() SessionFilterEnum {
@@ -2260,7 +2916,7 @@ type GetGPExtensionsReq struct {
 
 func (x *GetGPExtensionsReq) Reset() {
 	*x = GetGPExtensionsReq{}
-	mi := &file_api_proto_agent_master_yagpcc_get_service_proto_msgTypes[17]
+	mi := &file_api_proto_agent_master_yagpcc_get_service_proto_msgTypes[27]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2272,7 +2928,7 @@ func (x *GetGPExtensionsReq) String() string {
 func (*GetGPExtensionsReq) ProtoMessage() {}
 
 func (x *GetGPExtensionsReq) ProtoReflect() protoreflect.Message {
-	mi := &file_api_proto_agent_master_yagpcc_get_service_proto_msgTypes[17]
+	mi := &file_api_proto_agent_master_yagpcc_get_service_proto_msgTypes[27]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2285,7 +2941,7 @@ func (x *GetGPExtensionsReq) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetGPExtensionsReq.ProtoReflect.Descriptor instead.
 func (*GetGPExtensionsReq) Descriptor() ([]byte, []int) {
-	return file_api_proto_agent_master_yagpcc_get_service_proto_rawDescGZIP(), []int{17}
+	return file_api_proto_agent_master_yagpcc_get_service_proto_rawDescGZIP(), []int{27}
 }
 
 func (x *GetGPExtensionsReq) GetDatabaseName() string {
@@ -2303,7 +2959,7 @@ type ListDatabasesReq struct {
 
 func (x *ListDatabasesReq) Reset() {
 	*x = ListDatabasesReq{}
-	mi := &file_api_proto_agent_master_yagpcc_get_service_proto_msgTypes[18]
+	mi := &file_api_proto_agent_master_yagpcc_get_service_proto_msgTypes[28]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2315,7 +2971,7 @@ func (x *ListDatabasesReq) String() string {
 func (*ListDatabasesReq) ProtoMessage() {}
 
 func (x *ListDatabasesReq) ProtoReflect() protoreflect.Message {
-	mi := &file_api_proto_agent_master_yagpcc_get_service_proto_msgTypes[18]
+	mi := &file_api_proto_agent_master_yagpcc_get_service_proto_msgTypes[28]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2328,7 +2984,7 @@ func (x *ListDatabasesReq) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListDatabasesReq.ProtoReflect.Descriptor instead.
 func (*ListDatabasesReq) Descriptor() ([]byte, []int) {
-	return file_api_proto_agent_master_yagpcc_get_service_proto_rawDescGZIP(), []int{18}
+	return file_api_proto_agent_master_yagpcc_get_service_proto_rawDescGZIP(), []int{28}
 }
 
 type DatabaseInfo struct {
@@ -2340,7 +2996,7 @@ type DatabaseInfo struct {
 
 func (x *DatabaseInfo) Reset() {
 	*x = DatabaseInfo{}
-	mi := &file_api_proto_agent_master_yagpcc_get_service_proto_msgTypes[19]
+	mi := &file_api_proto_agent_master_yagpcc_get_service_proto_msgTypes[29]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2352,7 +3008,7 @@ func (x *DatabaseInfo) String() string {
 func (*DatabaseInfo) ProtoMessage() {}
 
 func (x *DatabaseInfo) ProtoReflect() protoreflect.Message {
-	mi := &file_api_proto_agent_master_yagpcc_get_service_proto_msgTypes[19]
+	mi := &file_api_proto_agent_master_yagpcc_get_service_proto_msgTypes[29]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2365,7 +3021,7 @@ func (x *DatabaseInfo) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DatabaseInfo.ProtoReflect.Descriptor instead.
 func (*DatabaseInfo) Descriptor() ([]byte, []int) {
-	return file_api_proto_agent_master_yagpcc_get_service_proto_rawDescGZIP(), []int{19}
+	return file_api_proto_agent_master_yagpcc_get_service_proto_rawDescGZIP(), []int{29}
 }
 
 func (x *DatabaseInfo) GetName() string {
@@ -2384,7 +3040,7 @@ type ListDatabasesResponse struct {
 
 func (x *ListDatabasesResponse) Reset() {
 	*x = ListDatabasesResponse{}
-	mi := &file_api_proto_agent_master_yagpcc_get_service_proto_msgTypes[20]
+	mi := &file_api_proto_agent_master_yagpcc_get_service_proto_msgTypes[30]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2396,7 +3052,7 @@ func (x *ListDatabasesResponse) String() string {
 func (*ListDatabasesResponse) ProtoMessage() {}
 
 func (x *ListDatabasesResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_api_proto_agent_master_yagpcc_get_service_proto_msgTypes[20]
+	mi := &file_api_proto_agent_master_yagpcc_get_service_proto_msgTypes[30]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2409,7 +3065,7 @@ func (x *ListDatabasesResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListDatabasesResponse.ProtoReflect.Descriptor instead.
 func (*ListDatabasesResponse) Descriptor() ([]byte, []int) {
-	return file_api_proto_agent_master_yagpcc_get_service_proto_rawDescGZIP(), []int{20}
+	return file_api_proto_agent_master_yagpcc_get_service_proto_rawDescGZIP(), []int{30}
 }
 
 func (x *ListDatabasesResponse) GetDatabases() []*DatabaseInfo {
@@ -2432,7 +3088,7 @@ type Extension struct {
 
 func (x *Extension) Reset() {
 	*x = Extension{}
-	mi := &file_api_proto_agent_master_yagpcc_get_service_proto_msgTypes[21]
+	mi := &file_api_proto_agent_master_yagpcc_get_service_proto_msgTypes[31]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2444,7 +3100,7 @@ func (x *Extension) String() string {
 func (*Extension) ProtoMessage() {}
 
 func (x *Extension) ProtoReflect() protoreflect.Message {
-	mi := &file_api_proto_agent_master_yagpcc_get_service_proto_msgTypes[21]
+	mi := &file_api_proto_agent_master_yagpcc_get_service_proto_msgTypes[31]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2457,7 +3113,7 @@ func (x *Extension) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Extension.ProtoReflect.Descriptor instead.
 func (*Extension) Descriptor() ([]byte, []int) {
-	return file_api_proto_agent_master_yagpcc_get_service_proto_rawDescGZIP(), []int{21}
+	return file_api_proto_agent_master_yagpcc_get_service_proto_rawDescGZIP(), []int{31}
 }
 
 func (x *Extension) GetName() string {
@@ -2506,7 +3162,7 @@ type DatabaseExtensionsInfo struct {
 
 func (x *DatabaseExtensionsInfo) Reset() {
 	*x = DatabaseExtensionsInfo{}
-	mi := &file_api_proto_agent_master_yagpcc_get_service_proto_msgTypes[22]
+	mi := &file_api_proto_agent_master_yagpcc_get_service_proto_msgTypes[32]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2518,7 +3174,7 @@ func (x *DatabaseExtensionsInfo) String() string {
 func (*DatabaseExtensionsInfo) ProtoMessage() {}
 
 func (x *DatabaseExtensionsInfo) ProtoReflect() protoreflect.Message {
-	mi := &file_api_proto_agent_master_yagpcc_get_service_proto_msgTypes[22]
+	mi := &file_api_proto_agent_master_yagpcc_get_service_proto_msgTypes[32]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2531,7 +3187,7 @@ func (x *DatabaseExtensionsInfo) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DatabaseExtensionsInfo.ProtoReflect.Descriptor instead.
 func (*DatabaseExtensionsInfo) Descriptor() ([]byte, []int) {
-	return file_api_proto_agent_master_yagpcc_get_service_proto_rawDescGZIP(), []int{22}
+	return file_api_proto_agent_master_yagpcc_get_service_proto_rawDescGZIP(), []int{32}
 }
 
 func (x *DatabaseExtensionsInfo) GetDatabaseName() string {
@@ -2564,7 +3220,7 @@ type GetGPExtensionsResponse struct {
 
 func (x *GetGPExtensionsResponse) Reset() {
 	*x = GetGPExtensionsResponse{}
-	mi := &file_api_proto_agent_master_yagpcc_get_service_proto_msgTypes[23]
+	mi := &file_api_proto_agent_master_yagpcc_get_service_proto_msgTypes[33]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2576,7 +3232,7 @@ func (x *GetGPExtensionsResponse) String() string {
 func (*GetGPExtensionsResponse) ProtoMessage() {}
 
 func (x *GetGPExtensionsResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_api_proto_agent_master_yagpcc_get_service_proto_msgTypes[23]
+	mi := &file_api_proto_agent_master_yagpcc_get_service_proto_msgTypes[33]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2589,7 +3245,7 @@ func (x *GetGPExtensionsResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetGPExtensionsResponse.ProtoReflect.Descriptor instead.
 func (*GetGPExtensionsResponse) Descriptor() ([]byte, []int) {
-	return file_api_proto_agent_master_yagpcc_get_service_proto_rawDescGZIP(), []int{23}
+	return file_api_proto_agent_master_yagpcc_get_service_proto_rawDescGZIP(), []int{33}
 }
 
 func (x *GetGPExtensionsResponse) GetDatabases() []*DatabaseExtensionsInfo {
@@ -2603,7 +3259,55 @@ var File_api_proto_agent_master_yagpcc_get_service_proto protoreflect.FileDescri
 
 const file_api_proto_agent_master_yagpcc_get_service_proto_rawDesc = "" +
 	"\n" +
-	"/api/proto/agent_master/yagpcc_get_service.proto\x12\x06yagpcc\x1a\x1fgoogle/protobuf/timestamp.proto\x1a%api/proto/common/yagpcc_metrics.proto\x1a%api/proto/common/yagpcc_session.proto\"\x15\n" +
+	"/api/proto/agent_master/yagpcc_get_service.proto\x12\x06yagpcc\x1a\x1fgoogle/protobuf/timestamp.proto\x1a%api/proto/common/yagpcc_metrics.proto\x1a%api/proto/common/yagpcc_session.proto\"{\n" +
+	"\x13GetGpPidProcInfoReq\x12-\n" +
+	"\tquery_key\x18\x01 \x01(\v2\x10.yagpcc.QueryKeyR\bqueryKey\x12\x1a\n" +
+	"\bsegindex\x18\x02 \x01(\x05R\bsegindex\x12\x19\n" +
+	"\bslice_id\x18\x03 \x01(\x03R\asliceId\"L\n" +
+	"\x1bGetGPQueryRunningMatricsReq\x12-\n" +
+	"\tquery_key\x18\x01 \x01(\v2\x10.yagpcc.QueryKeyR\bqueryKey\"\x85\x01\n" +
+	"\vCellMetrics\x12\x19\n" +
+	"\bslice_id\x18\x01 \x01(\x03R\asliceId\x12\x1a\n" +
+	"\bsegindex\x18\x02 \x01(\x05R\bsegindex\x12?\n" +
+	"\x0fruntime_metrics\x18\x03 \x01(\v2\x16.yagpcc.RuntimeMetricsR\x0eruntimeMetrics\"\xeb\x01\n" +
+	" GetGPQueryRunningMatricsResponse\x12\x19\n" +
+	"\bslice_id\x18\x01 \x03(\x03R\asliceId\x12\x1a\n" +
+	"\bsegindex\x18\x02 \x03(\x05R\bsegindex\x126\n" +
+	"\fcell_metrics\x18\x03 \x03(\v2\x13.yagpcc.CellMetricsR\vcellMetrics\x12 \n" +
+	"\x04skew\x18\x04 \x01(\v2\f.yagpcc.SkewR\x04skew\x126\n" +
+	"\fdata_quality\x18\x05 \x01(\v2\x13.yagpcc.DataQualityR\vdataQuality\"\x1d\n" +
+	"\x1bGetGPHostsRunningQueriesReq\"\xf0\x02\n" +
+	"\x0fRunningHostInfo\x12\x1b\n" +
+	"\thost_name\x18\x01 \x01(\tR\bhostName\x12\x1a\n" +
+	"\bsegindex\x18\x02 \x03(\x05R\bsegindex\x12%\n" +
+	"\x0eactive_queries\x18\x03 \x01(\x03R\ractiveQueries\x12#\n" +
+	"\ractive_slices\x18\x04 \x01(\x03R\factiveSlices\x12\x1b\n" +
+	"\tcpu_usage\x18\x05 \x01(\x01R\bcpuUsage\x12!\n" +
+	"\fmemory_usage\x18\x06 \x01(\x03R\vmemoryUsage\x12\x1d\n" +
+	"\n" +
+	"disk_usage\x18\a \x01(\x03R\tdiskUsage\x12\x1f\n" +
+	"\vspill_bytes\x18\b \x01(\x03R\n" +
+	"spillBytes\x12 \n" +
+	"\x04skew\x18\t \x01(\v2\f.yagpcc.SkewR\x04skew\x126\n" +
+	"\fdata_quality\x18\n" +
+	" \x01(\v2\x13.yagpcc.DataQualityR\vdataQuality\"Q\n" +
+	" GetGPHostsRunningQueriesResponse\x12-\n" +
+	"\x05hosts\x18\x01 \x03(\v2\x17.yagpcc.RunningHostInfoR\x05hosts\"9\n" +
+	"\x1aGetGPHostRunningQueriesReq\x12\x1b\n" +
+	"\thost_name\x18\x01 \x01(\tR\bhostName\"\xd7\x01\n" +
+	"\x10RunningQueryInfo\x12-\n" +
+	"\tquery_key\x18\x01 \x01(\v2\x10.yagpcc.QueryKeyR\bqueryKey\x12\x1b\n" +
+	"\tuser_name\x18\x02 \x01(\tR\buserName\x12\x17\n" +
+	"\adb_name\x18\x03 \x01(\tR\x06dbName\x12\x1d\n" +
+	"\n" +
+	"query_text\x18\x04 \x01(\tR\tqueryText\x12?\n" +
+	"\x0fruntime_metrics\x18\x05 \x01(\v2\x16.yagpcc.RuntimeMetricsR\x0eruntimeMetrics\"\xee\x01\n" +
+	"\x1fGetGPHostRunningQueriesResponse\x12\x1b\n" +
+	"\thost_name\x18\x01 \x01(\tR\bhostName\x12\x1a\n" +
+	"\bsegindex\x18\x02 \x03(\x05R\bsegindex\x122\n" +
+	"\aqueries\x18\x03 \x03(\v2\x18.yagpcc.RunningQueryInfoR\aqueries\x126\n" +
+	"\fdata_quality\x18\x04 \x01(\v2\x13.yagpcc.DataQualityR\vdataQuality\x12&\n" +
+	"\x0fnext_page_token\x18\x05 \x01(\tR\rnextPageToken\"\x15\n" +
 	"\x13GetTotalSessionsReq\"\xaf\x01\n" +
 	"\x0fGetGPQueriesReq\x121\n" +
 	"\x05field\x18\x01 \x03(\v2\x1b.yagpcc.SessionFieldWrapperR\x05field\x12-\n" +
@@ -2641,7 +3345,7 @@ const file_api_proto_agent_master_yagpcc_get_service_proto_rawDesc = "" +
 	"\x0eTotalQueryData\x120\n" +
 	"\n" +
 	"query_stat\x18\x01 \x01(\v2\x11.yagpcc.QueryStatR\tqueryStat\x12J\n" +
-	"\x15segment_query_metrics\x18\x02 \x03(\v2\x16.yagpcc.SegmentMetricsR\x13segmentQueryMetricsJ\x04\b\x03\x10\x04\"\xcd\x06\n" +
+	"\x15segment_query_metrics\x18\x02 \x03(\v2\x16.yagpcc.SegmentMetricsR\x13segmentQueryMetricsJ\x04\b\x03\x10\x04\"\xa7\a\n" +
 	"\tQueryStat\x12\x1d\n" +
 	"\n" +
 	"cluster_id\x18\x01 \x01(\tR\tclusterId\x12\x1a\n" +
@@ -2667,7 +3371,9 @@ const file_api_proto_agent_master_yagpcc_get_service_proto_rawDesc = "" +
 	"lockedMode\x12#\n" +
 	"\rsession_state\x18\x11 \x01(\tR\fsessionState\x12\x18\n" +
 	"\amessage\x18\x12 \x01(\tR\amessage\x12\x16\n" +
-	"\x06slices\x18\x13 \x01(\x03R\x06slices\"\xfe\x05\n" +
+	"\x06slices\x18\x13 \x01(\x03R\x06slices\x12 \n" +
+	"\x04skew\x18\x14 \x01(\v2\f.yagpcc.SkewR\x04skew\x126\n" +
+	"\fdata_quality\x18\x15 \x01(\v2\x13.yagpcc.DataQualityR\vdataQuality\"\xfe\x05\n" +
 	"\x0eQueryStatWrite\x12\x1d\n" +
 	"\n" +
 	"cluster_id\x18\x01 \x01(\tR\tclusterId\x12\x1a\n" +
@@ -2693,7 +3399,7 @@ const file_api_proto_agent_master_yagpcc_get_service_proto_rawDesc = "" +
 	"lockedMode\x12#\n" +
 	"\rsession_state\x18\x11 \x01(\tR\fsessionState\x12\x18\n" +
 	"\amessage\x18\x12 \x01(\tR\amessage\x12\x16\n" +
-	"\x06slices\x18\x13 \x01(\x03R\x06slices\"\x92\x04\n" +
+	"\x06slices\x18\x13 \x01(\x03R\x06slices\"\xb4\x04\n" +
 	"\x0eSegmentMetrics\x12\x1d\n" +
 	"\n" +
 	"cluster_id\x18\x01 \x01(\tR\tclusterId\x12\x1a\n" +
@@ -2708,7 +3414,8 @@ const file_api_proto_agent_master_yagpcc_get_service_proto_rawDesc = "" +
 	"\x0fsegment_metrics\x18\t \x01(\v2\x11.yagpcc.GPMetricsR\x0esegmentMetrics\x12-\n" +
 	"\tquery_key\x18\v \x01(\v2\x10.yagpcc.QueryKeyR\bqueryKey\x120\n" +
 	"\n" +
-	"query_info\x18\f \x01(\v2\x11.yagpcc.QueryInfoR\tqueryInfoJ\x04\b\x05\x10\x06J\x04\b\n" +
+	"query_info\x18\f \x01(\v2\x11.yagpcc.QueryInfoR\tqueryInfo\x12 \n" +
+	"\x04skew\x18\r \x01(\v2\f.yagpcc.SkewR\x04skewJ\x04\b\x05\x10\x06J\x04\b\n" +
 	"\x10\v\"\xc3\x03\n" +
 	"\x13SegmentMetricsWrite\x12\x1d\n" +
 	"\n" +
@@ -3009,16 +3716,20 @@ const file_api_proto_agent_master_yagpcc_get_service_proto_rawDesc = "" +
 	"\x14SESSION_FILTER_STATE\x10\x06\x12\x1a\n" +
 	"\x16SESSION_FILTER_RSGNAME\x10\a\x12\x1a\n" +
 	"\x16SESSION_FILTER_SESS_ID\x10\b\x12\x18\n" +
-	"\x14SESSION_FILTER_TM_ID\x10\t2\xa4\x04\n" +
+	"\x14SESSION_FILTER_TM_ID\x10\t2\xb2\a\n" +
 	"\tGetGPInfo\x12J\n" +
-	"\rGetGPSessions\x12\x18.yagpcc.GetGPSessionsReq\x1a\x1d.yagpcc.GetGPSessionsResponse\"\x00\x12A\n" +
+	"\rGetGPSessions\x12\x18.yagpcc.GetGPSessionsReq\x1a\x1d.yagpcc.GetGPSessionsResponse\"\x00\x12G\n" +
+	"\fGetGPSession\x12\x17.yagpcc.GetGPSessionReq\x1a\x1c.yagpcc.GetGPSessionResponse\"\x00\x12A\n" +
 	"\n" +
 	"GetGPQuery\x12\x15.yagpcc.GetGPQueryReq\x1a\x1a.yagpcc.GetGPQueryResponse\"\x00\x12H\n" +
-	"\fGetGPQueries\x12\x17.yagpcc.GetGPQueriesReq\x1a\x1d.yagpcc.GetGPSessionsResponse\"\x00\x12G\n" +
-	"\fGetGPSession\x12\x17.yagpcc.GetGPSessionReq\x1a\x1c.yagpcc.GetGPSessionResponse\"\x00\x12W\n" +
+	"\fGetGPQueries\x12\x17.yagpcc.GetGPQueriesReq\x1a\x1d.yagpcc.GetGPSessionsResponse\"\x00\x12W\n" +
 	"\x14GetTotalSessionsStat\x12\x1b.yagpcc.GetTotalSessionsReq\x1a .yagpcc.GetTotalSessionsResponse\"\x00\x12P\n" +
 	"\x0fGetGPExtensions\x12\x1a.yagpcc.GetGPExtensionsReq\x1a\x1f.yagpcc.GetGPExtensionsResponse\"\x00\x12J\n" +
-	"\rListDatabases\x12\x18.yagpcc.ListDatabasesReq\x1a\x1d.yagpcc.ListDatabasesResponse\"\x00BNB\x0eMasterYAGPCCAGZ<github.com/open-gpdb/yagpcc/api/proto/agent_master;greenplumb\x06proto3"
+	"\rListDatabases\x12\x18.yagpcc.ListDatabasesReq\x1a\x1d.yagpcc.ListDatabasesResponse\"\x00\x12k\n" +
+	"\x18GetGPQueryRunningMatrics\x12#.yagpcc.GetGPQueryRunningMatricsReq\x1a(.yagpcc.GetGPQueryRunningMatricsResponse\"\x00\x12k\n" +
+	"\x18GetGPHostsRunningQueries\x12#.yagpcc.GetGPHostsRunningQueriesReq\x1a(.yagpcc.GetGPHostsRunningQueriesResponse\"\x00\x12h\n" +
+	"\x17GetGPHostRunningQueries\x12\".yagpcc.GetGPHostRunningQueriesReq\x1a'.yagpcc.GetGPHostRunningQueriesResponse\"\x00\x12H\n" +
+	"\x10GetGpPidProcInfo\x12\x1b.yagpcc.GetGpPidProcInfoReq\x1a\x15.yagpcc.GpPidProcInfo\"\x00BNB\x0eMasterYAGPCCAGZ<github.com/open-gpdb/yagpcc/api/proto/agent_master;greenplumb\x06proto3"
 
 var (
 	file_api_proto_agent_master_yagpcc_get_service_proto_rawDescOnce sync.Once
@@ -3033,114 +3744,152 @@ func file_api_proto_agent_master_yagpcc_get_service_proto_rawDescGZIP() []byte {
 }
 
 var file_api_proto_agent_master_yagpcc_get_service_proto_enumTypes = make([]protoimpl.EnumInfo, 5)
-var file_api_proto_agent_master_yagpcc_get_service_proto_msgTypes = make([]protoimpl.MessageInfo, 24)
+var file_api_proto_agent_master_yagpcc_get_service_proto_msgTypes = make([]protoimpl.MessageInfo, 34)
 var file_api_proto_agent_master_yagpcc_get_service_proto_goTypes = []any{
-	(RunningQueryType)(0),            // 0: yagpcc.RunningQueryType
-	(StatKind)(0),                    // 1: yagpcc.StatKind
-	(SortOrder)(0),                   // 2: yagpcc.SortOrder
-	(SessionField)(0),                // 3: yagpcc.SessionField
-	(SessionFilterEnum)(0),           // 4: yagpcc.SessionFilterEnum
-	(*GetTotalSessionsReq)(nil),      // 5: yagpcc.GetTotalSessionsReq
-	(*GetGPQueriesReq)(nil),          // 6: yagpcc.GetGPQueriesReq
-	(*SessionStat)(nil),              // 7: yagpcc.SessionStat
-	(*GetTotalSessionsResponse)(nil), // 8: yagpcc.GetTotalSessionsResponse
-	(*GetGPSessionsReq)(nil),         // 9: yagpcc.GetGPSessionsReq
-	(*GetGPSessionsResponse)(nil),    // 10: yagpcc.GetGPSessionsResponse
-	(*GetGPQueryReq)(nil),            // 11: yagpcc.GetGPQueryReq
-	(*GetGPQueryResponse)(nil),       // 12: yagpcc.GetGPQueryResponse
-	(*GetGPSessionReq)(nil),          // 13: yagpcc.GetGPSessionReq
-	(*GetGPSessionResponse)(nil),     // 14: yagpcc.GetGPSessionResponse
-	(*TotalQueryData)(nil),           // 15: yagpcc.TotalQueryData
-	(*QueryStat)(nil),                // 16: yagpcc.QueryStat
-	(*QueryStatWrite)(nil),           // 17: yagpcc.QueryStatWrite
-	(*SegmentMetrics)(nil),           // 18: yagpcc.SegmentMetrics
-	(*SegmentMetricsWrite)(nil),      // 19: yagpcc.SegmentMetricsWrite
-	(*SessionFieldWrapper)(nil),      // 20: yagpcc.SessionFieldWrapper
-	(*SessionFilter)(nil),            // 21: yagpcc.SessionFilter
-	(*GetGPExtensionsReq)(nil),       // 22: yagpcc.GetGPExtensionsReq
-	(*ListDatabasesReq)(nil),         // 23: yagpcc.ListDatabasesReq
-	(*DatabaseInfo)(nil),             // 24: yagpcc.DatabaseInfo
-	(*ListDatabasesResponse)(nil),    // 25: yagpcc.ListDatabasesResponse
-	(*Extension)(nil),                // 26: yagpcc.Extension
-	(*DatabaseExtensionsInfo)(nil),   // 27: yagpcc.DatabaseExtensionsInfo
-	(*GetGPExtensionsResponse)(nil),  // 28: yagpcc.GetGPExtensionsResponse
-	(*common.SessionState)(nil),      // 29: yagpcc.SessionState
-	(*common.QueryKey)(nil),          // 30: yagpcc.QueryKey
-	(*common.SessionKey)(nil),        // 31: yagpcc.SessionKey
-	(*timestamppb.Timestamp)(nil),    // 32: google.protobuf.Timestamp
-	(*common.QueryInfo)(nil),         // 33: yagpcc.QueryInfo
-	(common.QueryStatus)(0),          // 34: yagpcc.QueryStatus
-	(*common.GPMetrics)(nil),         // 35: yagpcc.GPMetrics
-	(*common.AggregatedMetrics)(nil), // 36: yagpcc.AggregatedMetrics
-	(*common.SegmentKey)(nil),        // 37: yagpcc.SegmentKey
+	(RunningQueryType)(0),                    // 0: yagpcc.RunningQueryType
+	(StatKind)(0),                            // 1: yagpcc.StatKind
+	(SortOrder)(0),                           // 2: yagpcc.SortOrder
+	(SessionField)(0),                        // 3: yagpcc.SessionField
+	(SessionFilterEnum)(0),                   // 4: yagpcc.SessionFilterEnum
+	(*GetGpPidProcInfoReq)(nil),              // 5: yagpcc.GetGpPidProcInfoReq
+	(*GetGPQueryRunningMatricsReq)(nil),      // 6: yagpcc.GetGPQueryRunningMatricsReq
+	(*CellMetrics)(nil),                      // 7: yagpcc.CellMetrics
+	(*GetGPQueryRunningMatricsResponse)(nil), // 8: yagpcc.GetGPQueryRunningMatricsResponse
+	(*GetGPHostsRunningQueriesReq)(nil),      // 9: yagpcc.GetGPHostsRunningQueriesReq
+	(*RunningHostInfo)(nil),                  // 10: yagpcc.RunningHostInfo
+	(*GetGPHostsRunningQueriesResponse)(nil), // 11: yagpcc.GetGPHostsRunningQueriesResponse
+	(*GetGPHostRunningQueriesReq)(nil),       // 12: yagpcc.GetGPHostRunningQueriesReq
+	(*RunningQueryInfo)(nil),                 // 13: yagpcc.RunningQueryInfo
+	(*GetGPHostRunningQueriesResponse)(nil),  // 14: yagpcc.GetGPHostRunningQueriesResponse
+	(*GetTotalSessionsReq)(nil),              // 15: yagpcc.GetTotalSessionsReq
+	(*GetGPQueriesReq)(nil),                  // 16: yagpcc.GetGPQueriesReq
+	(*SessionStat)(nil),                      // 17: yagpcc.SessionStat
+	(*GetTotalSessionsResponse)(nil),         // 18: yagpcc.GetTotalSessionsResponse
+	(*GetGPSessionsReq)(nil),                 // 19: yagpcc.GetGPSessionsReq
+	(*GetGPSessionsResponse)(nil),            // 20: yagpcc.GetGPSessionsResponse
+	(*GetGPQueryReq)(nil),                    // 21: yagpcc.GetGPQueryReq
+	(*GetGPQueryResponse)(nil),               // 22: yagpcc.GetGPQueryResponse
+	(*GetGPSessionReq)(nil),                  // 23: yagpcc.GetGPSessionReq
+	(*GetGPSessionResponse)(nil),             // 24: yagpcc.GetGPSessionResponse
+	(*TotalQueryData)(nil),                   // 25: yagpcc.TotalQueryData
+	(*QueryStat)(nil),                        // 26: yagpcc.QueryStat
+	(*QueryStatWrite)(nil),                   // 27: yagpcc.QueryStatWrite
+	(*SegmentMetrics)(nil),                   // 28: yagpcc.SegmentMetrics
+	(*SegmentMetricsWrite)(nil),              // 29: yagpcc.SegmentMetricsWrite
+	(*SessionFieldWrapper)(nil),              // 30: yagpcc.SessionFieldWrapper
+	(*SessionFilter)(nil),                    // 31: yagpcc.SessionFilter
+	(*GetGPExtensionsReq)(nil),               // 32: yagpcc.GetGPExtensionsReq
+	(*ListDatabasesReq)(nil),                 // 33: yagpcc.ListDatabasesReq
+	(*DatabaseInfo)(nil),                     // 34: yagpcc.DatabaseInfo
+	(*ListDatabasesResponse)(nil),            // 35: yagpcc.ListDatabasesResponse
+	(*Extension)(nil),                        // 36: yagpcc.Extension
+	(*DatabaseExtensionsInfo)(nil),           // 37: yagpcc.DatabaseExtensionsInfo
+	(*GetGPExtensionsResponse)(nil),          // 38: yagpcc.GetGPExtensionsResponse
+	(*common.QueryKey)(nil),                  // 39: yagpcc.QueryKey
+	(*common.RuntimeMetrics)(nil),            // 40: yagpcc.RuntimeMetrics
+	(*common.Skew)(nil),                      // 41: yagpcc.Skew
+	(*common.DataQuality)(nil),               // 42: yagpcc.DataQuality
+	(*common.SessionState)(nil),              // 43: yagpcc.SessionState
+	(*common.SessionKey)(nil),                // 44: yagpcc.SessionKey
+	(*timestamppb.Timestamp)(nil),            // 45: google.protobuf.Timestamp
+	(*common.QueryInfo)(nil),                 // 46: yagpcc.QueryInfo
+	(common.QueryStatus)(0),                  // 47: yagpcc.QueryStatus
+	(*common.GPMetrics)(nil),                 // 48: yagpcc.GPMetrics
+	(*common.AggregatedMetrics)(nil),         // 49: yagpcc.AggregatedMetrics
+	(*common.SegmentKey)(nil),                // 50: yagpcc.SegmentKey
+	(*common.GpPidProcInfo)(nil),             // 51: yagpcc.GpPidProcInfo
 }
 var file_api_proto_agent_master_yagpcc_get_service_proto_depIdxs = []int32{
-	20, // 0: yagpcc.GetGPQueriesReq.field:type_name -> yagpcc.SessionFieldWrapper
-	21, // 1: yagpcc.GetGPQueriesReq.filter:type_name -> yagpcc.SessionFilter
-	7,  // 2: yagpcc.GetTotalSessionsResponse.sessions_stat:type_name -> yagpcc.SessionStat
-	20, // 3: yagpcc.GetGPSessionsReq.field:type_name -> yagpcc.SessionFieldWrapper
-	21, // 4: yagpcc.GetGPSessionsReq.filter:type_name -> yagpcc.SessionFilter
-	0,  // 5: yagpcc.GetGPSessionsReq.show_query_type:type_name -> yagpcc.RunningQueryType
-	29, // 6: yagpcc.GetGPSessionsResponse.sessions_state:type_name -> yagpcc.SessionState
-	30, // 7: yagpcc.GetGPQueryReq.query_key:type_name -> yagpcc.QueryKey
-	15, // 8: yagpcc.GetGPQueryResponse.queries_data:type_name -> yagpcc.TotalQueryData
-	31, // 9: yagpcc.GetGPSessionReq.session_key:type_name -> yagpcc.SessionKey
-	29, // 10: yagpcc.GetGPSessionResponse.sessions_state:type_name -> yagpcc.SessionState
-	16, // 11: yagpcc.TotalQueryData.query_stat:type_name -> yagpcc.QueryStat
-	18, // 12: yagpcc.TotalQueryData.segment_query_metrics:type_name -> yagpcc.SegmentMetrics
-	32, // 13: yagpcc.QueryStat.collect_time:type_name -> google.protobuf.Timestamp
-	30, // 14: yagpcc.QueryStat.query_key:type_name -> yagpcc.QueryKey
-	33, // 15: yagpcc.QueryStat.query_info:type_name -> yagpcc.QueryInfo
-	1,  // 16: yagpcc.QueryStat.stat_kind:type_name -> yagpcc.StatKind
-	34, // 17: yagpcc.QueryStat.query_status:type_name -> yagpcc.QueryStatus
-	32, // 18: yagpcc.QueryStat.start_time:type_name -> google.protobuf.Timestamp
-	32, // 19: yagpcc.QueryStat.end_time:type_name -> google.protobuf.Timestamp
-	35, // 20: yagpcc.QueryStat.total_query_metrics:type_name -> yagpcc.GPMetrics
-	36, // 21: yagpcc.QueryStat.aggregated_metrics:type_name -> yagpcc.AggregatedMetrics
-	30, // 22: yagpcc.QueryStatWrite.query_key:type_name -> yagpcc.QueryKey
-	33, // 23: yagpcc.QueryStatWrite.query_info:type_name -> yagpcc.QueryInfo
-	1,  // 24: yagpcc.QueryStatWrite.stat_kind:type_name -> yagpcc.StatKind
-	34, // 25: yagpcc.QueryStatWrite.query_status:type_name -> yagpcc.QueryStatus
-	35, // 26: yagpcc.QueryStatWrite.total_query_metrics:type_name -> yagpcc.GPMetrics
-	36, // 27: yagpcc.QueryStatWrite.aggregated_metrics:type_name -> yagpcc.AggregatedMetrics
-	32, // 28: yagpcc.SegmentMetrics.collect_time:type_name -> google.protobuf.Timestamp
-	37, // 29: yagpcc.SegmentMetrics.segment_key:type_name -> yagpcc.SegmentKey
-	34, // 30: yagpcc.SegmentMetrics.query_status:type_name -> yagpcc.QueryStatus
-	32, // 31: yagpcc.SegmentMetrics.start_time:type_name -> google.protobuf.Timestamp
-	32, // 32: yagpcc.SegmentMetrics.end_time:type_name -> google.protobuf.Timestamp
-	35, // 33: yagpcc.SegmentMetrics.segment_metrics:type_name -> yagpcc.GPMetrics
-	30, // 34: yagpcc.SegmentMetrics.query_key:type_name -> yagpcc.QueryKey
-	33, // 35: yagpcc.SegmentMetrics.query_info:type_name -> yagpcc.QueryInfo
-	37, // 36: yagpcc.SegmentMetricsWrite.segment_key:type_name -> yagpcc.SegmentKey
-	34, // 37: yagpcc.SegmentMetricsWrite.query_status:type_name -> yagpcc.QueryStatus
-	35, // 38: yagpcc.SegmentMetricsWrite.segment_metrics:type_name -> yagpcc.GPMetrics
-	30, // 39: yagpcc.SegmentMetricsWrite.query_key:type_name -> yagpcc.QueryKey
-	33, // 40: yagpcc.SegmentMetricsWrite.query_info:type_name -> yagpcc.QueryInfo
-	3,  // 41: yagpcc.SessionFieldWrapper.field_name:type_name -> yagpcc.SessionField
-	2,  // 42: yagpcc.SessionFieldWrapper.order:type_name -> yagpcc.SortOrder
-	4,  // 43: yagpcc.SessionFilter.field_name:type_name -> yagpcc.SessionFilterEnum
-	24, // 44: yagpcc.ListDatabasesResponse.databases:type_name -> yagpcc.DatabaseInfo
-	26, // 45: yagpcc.DatabaseExtensionsInfo.extensions:type_name -> yagpcc.Extension
-	27, // 46: yagpcc.GetGPExtensionsResponse.databases:type_name -> yagpcc.DatabaseExtensionsInfo
-	9,  // 47: yagpcc.GetGPInfo.GetGPSessions:input_type -> yagpcc.GetGPSessionsReq
-	11, // 48: yagpcc.GetGPInfo.GetGPQuery:input_type -> yagpcc.GetGPQueryReq
-	6,  // 49: yagpcc.GetGPInfo.GetGPQueries:input_type -> yagpcc.GetGPQueriesReq
-	13, // 50: yagpcc.GetGPInfo.GetGPSession:input_type -> yagpcc.GetGPSessionReq
-	5,  // 51: yagpcc.GetGPInfo.GetTotalSessionsStat:input_type -> yagpcc.GetTotalSessionsReq
-	22, // 52: yagpcc.GetGPInfo.GetGPExtensions:input_type -> yagpcc.GetGPExtensionsReq
-	23, // 53: yagpcc.GetGPInfo.ListDatabases:input_type -> yagpcc.ListDatabasesReq
-	10, // 54: yagpcc.GetGPInfo.GetGPSessions:output_type -> yagpcc.GetGPSessionsResponse
-	12, // 55: yagpcc.GetGPInfo.GetGPQuery:output_type -> yagpcc.GetGPQueryResponse
-	10, // 56: yagpcc.GetGPInfo.GetGPQueries:output_type -> yagpcc.GetGPSessionsResponse
-	14, // 57: yagpcc.GetGPInfo.GetGPSession:output_type -> yagpcc.GetGPSessionResponse
-	8,  // 58: yagpcc.GetGPInfo.GetTotalSessionsStat:output_type -> yagpcc.GetTotalSessionsResponse
-	28, // 59: yagpcc.GetGPInfo.GetGPExtensions:output_type -> yagpcc.GetGPExtensionsResponse
-	25, // 60: yagpcc.GetGPInfo.ListDatabases:output_type -> yagpcc.ListDatabasesResponse
-	54, // [54:61] is the sub-list for method output_type
-	47, // [47:54] is the sub-list for method input_type
-	47, // [47:47] is the sub-list for extension type_name
-	47, // [47:47] is the sub-list for extension extendee
-	0,  // [0:47] is the sub-list for field type_name
+	39, // 0: yagpcc.GetGpPidProcInfoReq.query_key:type_name -> yagpcc.QueryKey
+	39, // 1: yagpcc.GetGPQueryRunningMatricsReq.query_key:type_name -> yagpcc.QueryKey
+	40, // 2: yagpcc.CellMetrics.runtime_metrics:type_name -> yagpcc.RuntimeMetrics
+	7,  // 3: yagpcc.GetGPQueryRunningMatricsResponse.cell_metrics:type_name -> yagpcc.CellMetrics
+	41, // 4: yagpcc.GetGPQueryRunningMatricsResponse.skew:type_name -> yagpcc.Skew
+	42, // 5: yagpcc.GetGPQueryRunningMatricsResponse.data_quality:type_name -> yagpcc.DataQuality
+	41, // 6: yagpcc.RunningHostInfo.skew:type_name -> yagpcc.Skew
+	42, // 7: yagpcc.RunningHostInfo.data_quality:type_name -> yagpcc.DataQuality
+	10, // 8: yagpcc.GetGPHostsRunningQueriesResponse.hosts:type_name -> yagpcc.RunningHostInfo
+	39, // 9: yagpcc.RunningQueryInfo.query_key:type_name -> yagpcc.QueryKey
+	40, // 10: yagpcc.RunningQueryInfo.runtime_metrics:type_name -> yagpcc.RuntimeMetrics
+	13, // 11: yagpcc.GetGPHostRunningQueriesResponse.queries:type_name -> yagpcc.RunningQueryInfo
+	42, // 12: yagpcc.GetGPHostRunningQueriesResponse.data_quality:type_name -> yagpcc.DataQuality
+	30, // 13: yagpcc.GetGPQueriesReq.field:type_name -> yagpcc.SessionFieldWrapper
+	31, // 14: yagpcc.GetGPQueriesReq.filter:type_name -> yagpcc.SessionFilter
+	17, // 15: yagpcc.GetTotalSessionsResponse.sessions_stat:type_name -> yagpcc.SessionStat
+	30, // 16: yagpcc.GetGPSessionsReq.field:type_name -> yagpcc.SessionFieldWrapper
+	31, // 17: yagpcc.GetGPSessionsReq.filter:type_name -> yagpcc.SessionFilter
+	0,  // 18: yagpcc.GetGPSessionsReq.show_query_type:type_name -> yagpcc.RunningQueryType
+	43, // 19: yagpcc.GetGPSessionsResponse.sessions_state:type_name -> yagpcc.SessionState
+	39, // 20: yagpcc.GetGPQueryReq.query_key:type_name -> yagpcc.QueryKey
+	25, // 21: yagpcc.GetGPQueryResponse.queries_data:type_name -> yagpcc.TotalQueryData
+	44, // 22: yagpcc.GetGPSessionReq.session_key:type_name -> yagpcc.SessionKey
+	43, // 23: yagpcc.GetGPSessionResponse.sessions_state:type_name -> yagpcc.SessionState
+	26, // 24: yagpcc.TotalQueryData.query_stat:type_name -> yagpcc.QueryStat
+	28, // 25: yagpcc.TotalQueryData.segment_query_metrics:type_name -> yagpcc.SegmentMetrics
+	45, // 26: yagpcc.QueryStat.collect_time:type_name -> google.protobuf.Timestamp
+	39, // 27: yagpcc.QueryStat.query_key:type_name -> yagpcc.QueryKey
+	46, // 28: yagpcc.QueryStat.query_info:type_name -> yagpcc.QueryInfo
+	1,  // 29: yagpcc.QueryStat.stat_kind:type_name -> yagpcc.StatKind
+	47, // 30: yagpcc.QueryStat.query_status:type_name -> yagpcc.QueryStatus
+	45, // 31: yagpcc.QueryStat.start_time:type_name -> google.protobuf.Timestamp
+	45, // 32: yagpcc.QueryStat.end_time:type_name -> google.protobuf.Timestamp
+	48, // 33: yagpcc.QueryStat.total_query_metrics:type_name -> yagpcc.GPMetrics
+	49, // 34: yagpcc.QueryStat.aggregated_metrics:type_name -> yagpcc.AggregatedMetrics
+	41, // 35: yagpcc.QueryStat.skew:type_name -> yagpcc.Skew
+	42, // 36: yagpcc.QueryStat.data_quality:type_name -> yagpcc.DataQuality
+	39, // 37: yagpcc.QueryStatWrite.query_key:type_name -> yagpcc.QueryKey
+	46, // 38: yagpcc.QueryStatWrite.query_info:type_name -> yagpcc.QueryInfo
+	1,  // 39: yagpcc.QueryStatWrite.stat_kind:type_name -> yagpcc.StatKind
+	47, // 40: yagpcc.QueryStatWrite.query_status:type_name -> yagpcc.QueryStatus
+	48, // 41: yagpcc.QueryStatWrite.total_query_metrics:type_name -> yagpcc.GPMetrics
+	49, // 42: yagpcc.QueryStatWrite.aggregated_metrics:type_name -> yagpcc.AggregatedMetrics
+	45, // 43: yagpcc.SegmentMetrics.collect_time:type_name -> google.protobuf.Timestamp
+	50, // 44: yagpcc.SegmentMetrics.segment_key:type_name -> yagpcc.SegmentKey
+	47, // 45: yagpcc.SegmentMetrics.query_status:type_name -> yagpcc.QueryStatus
+	45, // 46: yagpcc.SegmentMetrics.start_time:type_name -> google.protobuf.Timestamp
+	45, // 47: yagpcc.SegmentMetrics.end_time:type_name -> google.protobuf.Timestamp
+	48, // 48: yagpcc.SegmentMetrics.segment_metrics:type_name -> yagpcc.GPMetrics
+	39, // 49: yagpcc.SegmentMetrics.query_key:type_name -> yagpcc.QueryKey
+	46, // 50: yagpcc.SegmentMetrics.query_info:type_name -> yagpcc.QueryInfo
+	41, // 51: yagpcc.SegmentMetrics.skew:type_name -> yagpcc.Skew
+	50, // 52: yagpcc.SegmentMetricsWrite.segment_key:type_name -> yagpcc.SegmentKey
+	47, // 53: yagpcc.SegmentMetricsWrite.query_status:type_name -> yagpcc.QueryStatus
+	48, // 54: yagpcc.SegmentMetricsWrite.segment_metrics:type_name -> yagpcc.GPMetrics
+	39, // 55: yagpcc.SegmentMetricsWrite.query_key:type_name -> yagpcc.QueryKey
+	46, // 56: yagpcc.SegmentMetricsWrite.query_info:type_name -> yagpcc.QueryInfo
+	3,  // 57: yagpcc.SessionFieldWrapper.field_name:type_name -> yagpcc.SessionField
+	2,  // 58: yagpcc.SessionFieldWrapper.order:type_name -> yagpcc.SortOrder
+	4,  // 59: yagpcc.SessionFilter.field_name:type_name -> yagpcc.SessionFilterEnum
+	34, // 60: yagpcc.ListDatabasesResponse.databases:type_name -> yagpcc.DatabaseInfo
+	36, // 61: yagpcc.DatabaseExtensionsInfo.extensions:type_name -> yagpcc.Extension
+	37, // 62: yagpcc.GetGPExtensionsResponse.databases:type_name -> yagpcc.DatabaseExtensionsInfo
+	19, // 63: yagpcc.GetGPInfo.GetGPSessions:input_type -> yagpcc.GetGPSessionsReq
+	23, // 64: yagpcc.GetGPInfo.GetGPSession:input_type -> yagpcc.GetGPSessionReq
+	21, // 65: yagpcc.GetGPInfo.GetGPQuery:input_type -> yagpcc.GetGPQueryReq
+	16, // 66: yagpcc.GetGPInfo.GetGPQueries:input_type -> yagpcc.GetGPQueriesReq
+	15, // 67: yagpcc.GetGPInfo.GetTotalSessionsStat:input_type -> yagpcc.GetTotalSessionsReq
+	32, // 68: yagpcc.GetGPInfo.GetGPExtensions:input_type -> yagpcc.GetGPExtensionsReq
+	33, // 69: yagpcc.GetGPInfo.ListDatabases:input_type -> yagpcc.ListDatabasesReq
+	6,  // 70: yagpcc.GetGPInfo.GetGPQueryRunningMatrics:input_type -> yagpcc.GetGPQueryRunningMatricsReq
+	9,  // 71: yagpcc.GetGPInfo.GetGPHostsRunningQueries:input_type -> yagpcc.GetGPHostsRunningQueriesReq
+	12, // 72: yagpcc.GetGPInfo.GetGPHostRunningQueries:input_type -> yagpcc.GetGPHostRunningQueriesReq
+	5,  // 73: yagpcc.GetGPInfo.GetGpPidProcInfo:input_type -> yagpcc.GetGpPidProcInfoReq
+	20, // 74: yagpcc.GetGPInfo.GetGPSessions:output_type -> yagpcc.GetGPSessionsResponse
+	24, // 75: yagpcc.GetGPInfo.GetGPSession:output_type -> yagpcc.GetGPSessionResponse
+	22, // 76: yagpcc.GetGPInfo.GetGPQuery:output_type -> yagpcc.GetGPQueryResponse
+	20, // 77: yagpcc.GetGPInfo.GetGPQueries:output_type -> yagpcc.GetGPSessionsResponse
+	18, // 78: yagpcc.GetGPInfo.GetTotalSessionsStat:output_type -> yagpcc.GetTotalSessionsResponse
+	38, // 79: yagpcc.GetGPInfo.GetGPExtensions:output_type -> yagpcc.GetGPExtensionsResponse
+	35, // 80: yagpcc.GetGPInfo.ListDatabases:output_type -> yagpcc.ListDatabasesResponse
+	8,  // 81: yagpcc.GetGPInfo.GetGPQueryRunningMatrics:output_type -> yagpcc.GetGPQueryRunningMatricsResponse
+	11, // 82: yagpcc.GetGPInfo.GetGPHostsRunningQueries:output_type -> yagpcc.GetGPHostsRunningQueriesResponse
+	14, // 83: yagpcc.GetGPInfo.GetGPHostRunningQueries:output_type -> yagpcc.GetGPHostRunningQueriesResponse
+	51, // 84: yagpcc.GetGPInfo.GetGpPidProcInfo:output_type -> yagpcc.GpPidProcInfo
+	74, // [74:85] is the sub-list for method output_type
+	63, // [63:74] is the sub-list for method input_type
+	63, // [63:63] is the sub-list for extension type_name
+	63, // [63:63] is the sub-list for extension extendee
+	0,  // [0:63] is the sub-list for field type_name
 }
 
 func init() { file_api_proto_agent_master_yagpcc_get_service_proto_init() }
@@ -3154,7 +3903,7 @@ func file_api_proto_agent_master_yagpcc_get_service_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_api_proto_agent_master_yagpcc_get_service_proto_rawDesc), len(file_api_proto_agent_master_yagpcc_get_service_proto_rawDesc)),
 			NumEnums:      5,
-			NumMessages:   24,
+			NumMessages:   34,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

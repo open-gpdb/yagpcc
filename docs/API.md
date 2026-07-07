@@ -607,6 +607,7 @@ serialized using `protojson` with camelCase field names and zero-value fields in
 | `GET` | `/api/session/{sess_id}` | Get a single session by session ID |
 | `GET` | `/api/queries` | List queries (query params: `page_size`, `page_token`, `sort`, `filter_*`) |
 | `GET` | `/api/query/{ssid}/{ccnt}` | Get a single query by SSID and CCNT |
+| `GET` | `/api/query/{ssid}/{ccnt}/running-metrics` | Get procfs runtime metrics matrix cells for a query. Returns `cellMetrics[]` with `sliceId`, `segindex`, and `runtimeMetrics` (`utime`, `stime`, `vmPeak`, `vmRss`, `state`, `procIo`, `procSpill`), plus `skew` and `dataQuality`. Idle cells can be rendered separately using `runtimeMetrics.state == "idle"`. |
 | `GET` | `/api/stats/sessions` | Get session state statistics (counts by state) |
 | `GET` | `/api/extensions` | List extensions (optional `database_name` param) |
 | `GET` | `/api/databases` | List available databases |

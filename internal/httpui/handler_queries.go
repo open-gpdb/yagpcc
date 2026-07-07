@@ -318,6 +318,98 @@ func convertSegmentMetrics(sm *pbm.SegmentMetrics) map[string]interface{} {
 	return result
 }
 
+func convertProcIO(io *pbc.ProcIO) map[string]interface{} {
+	if io == nil {
+		return nil
+	}
+	return map[string]interface{}{
+		"rchar":               io.GetRchar(),
+		"wchar":               io.GetWchar(),
+		"syscr":               io.GetSyscr(),
+		"syscw":               io.GetSyscw(),
+		"readBytes":           io.GetReadBytes(),
+		"writeBytes":          io.GetWriteBytes(),
+		"cancelledWriteBytes": io.GetCancelledWriteBytes(),
+	}
+}
+
+func convertProcSpill(spill *pbc.ProcSpill) map[string]interface{} {
+	if spill == nil {
+		return nil
+	}
+	return map[string]interface{}{
+		"size":  spill.GetSize(),
+		"files": spill.GetFiles(),
+	}
+}
+
+func convertRuntimeMetrics(metrics *pbc.RuntimeMetrics) map[string]interface{} {
+	if metrics == nil {
+		return nil
+	}
+	return map[string]interface{}{
+		"utime":     metrics.GetUtime(),
+		"stime":     metrics.GetStime(),
+		"vmPeak":    metrics.GetVmPeak(),
+		"vmRss":     metrics.GetVmRss(),
+		"state":     metrics.GetState(),
+		"procIo":    convertProcIO(metrics.GetProcIo()),
+		"procSpill": convertProcSpill(metrics.GetProcSpill()),
+	}
+}
+
+func convertDataQuality(dq *pbc.DataQuality) map[string]interface{} {
+	if dq == nil {
+		return nil
+	}
+	return map[string]interface{}{
+		"segmentsExpected": dq.GetSegmentsExpected(),
+		"segmentsReceived": dq.GetSegmentsReceived(),
+		"isPartial":        dq.GetIsPartial(),
+		"freshnessMs":      dq.GetFreshnessMs(),
+	}
+}
+
+func convertSkew(skew *pbc.Skew) map[string]interface{} {
+	if skew == nil {
+		return nil
+	}
+	return map[string]interface{}{
+		"skew":     skew.GetSkew(),
+		"segindex": skew.GetSegindex(),
+	}
+}
+
+func (s *Server) handleGetQueryRunningMetrics(w http.ResponseWriter, r *http.Request, ssid int32, ccnt int32) {
+	req := &pbm.GetGPQueryRunningMatricsReq{
+		QueryKey: &pbc.QueryKey{Ssid: ssid, Ccnt: ccnt},
+	}
+	resp, err := s.grpcServer.GetGPQueryRunningMatrics(r.Context(), req)
+	if err != nil {
+		s.logger.Errorf("UI GetGPQueryRunningMatrics error: %v", err)
+		writeJSONError(w, http.StatusInternalServerError, fmt.Sprintf("error: %v", err))
+		return
+	}
+
+	cells := make([]map[string]interface{}, 0, len(resp.GetCellMetrics()))
+	for _, metrics := range resp.GetCellMetrics() {
+		cell := map[string]interface{}{
+			"sliceId":        metrics.GetSliceId(),
+			"segindex":       metrics.GetSegindex(),
+			"runtimeMetrics": convertRuntimeMetrics(metrics.GetRuntimeMetrics()),
+		}
+		cells = append(cells, cell)
+	}
+
+	writeJSON(w, http.StatusOK, map[string]interface{}{
+		"sliceId":        resp.GetSliceId(),
+		"segindex":       resp.GetSegindex(),
+		"runtimeMetrics": cells,
+		"skew":           convertSkew(resp.GetSkew()),
+		"dataQuality":    convertDataQuality(resp.GetDataQuality()),
+	})
+}
+
 // handleGetQuery handles GET /api/query/{ssid}/{ccnt}
 func (s *Server) handleGetQuery(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
@@ -344,6 +436,10 @@ func (s *Server) handleGetQuery(w http.ResponseWriter, r *http.Request) {
 	ccnt, err := strconv.ParseInt(parts[1], 10, 32)
 	if err != nil {
 		writeJSONError(w, http.StatusBadRequest, "invalid ccnt")
+		return
+	}
+	if len(parts) >= 3 && parts[2] == "running-metrics" {
+		s.handleGetQueryRunningMetrics(w, r, int32(ssid), int32(ccnt))
 		return
 	}
 

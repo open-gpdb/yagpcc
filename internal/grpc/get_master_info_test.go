@@ -357,3 +357,45 @@ func TestGetGPSessions_SpillStat(t *testing.T) {
 	assert.Equal(t, int32(4), lastMetrics.Spill.FileCount)
 	assert.Equal(t, int64(8192), lastMetrics.Spill.TotalBytes)
 }
+
+func TestGetGPQueryRunningMatrics(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	sessionMocker := NewMockStatActivityLister(ctrl)
+	clientSet, cleanup := setupGRPCClientSet(t, sessionMocker)
+	defer cleanup()
+
+	queryKey := &pbc.QueryKey{Ssid: 77, Ccnt: 5}
+	base := time.Now().Add(-time.Second)
+	clientSet.procfsStorage.RegisterProcfsStatWithDataQuality(base, []*pbc.GpPidProcInfo{
+		{GpSegmentId: 0, SessId: 77, Pid: 10, Ccnt: 5, SliceId: 1, Cmdline: "postgres: con77 cmd5 SELECT", ProcStat: &pbc.ProcStat{Utime: 0}, ProcStatus: &pbc.ProcStatus{VmPeak: 10, VmRss: 5}, ProcIo: &pbc.ProcIO{ReadBytes: 0}},
+		{GpSegmentId: 1, SessId: 77, Pid: 11, Ccnt: 5, SliceId: 1, Cmdline: "postgres: con77 cmd5 SELECT", ProcStat: &pbc.ProcStat{Utime: 0}, ProcStatus: &pbc.ProcStatus{VmPeak: 10, VmRss: 5}, ProcIo: &pbc.ProcIO{ReadBytes: 0}},
+		{GpSegmentId: 2, SessId: 77, Pid: 12, Ccnt: 6, SliceId: 1, Cmdline: "postgres: con77 cmd6 SELECT", ProcStat: &pbc.ProcStat{Utime: 0}, ProcStatus: &pbc.ProcStatus{VmPeak: 10, VmRss: 5}, ProcIo: &pbc.ProcIO{ReadBytes: 0}},
+	}, 3, 2)
+	clientSet.procfsStorage.RegisterProcfsStatWithDataQuality(base.Add(time.Second), []*pbc.GpPidProcInfo{
+		{GpSegmentId: 0, SessId: 77, Pid: 10, Ccnt: 5, SliceId: 1, Cmdline: "postgres: con77 cmd5 SELECT", ProcStat: &pbc.ProcStat{Utime: 10, Stime: 1}, ProcStatus: &pbc.ProcStatus{VmPeak: 100, VmRss: 50}, ProcIo: &pbc.ProcIO{ReadBytes: 100}, ProcSpill: &pbc.ProcSpill{Size: 1000, Files: 1}},
+		{GpSegmentId: 1, SessId: 77, Pid: 11, Ccnt: 5, SliceId: 1, Cmdline: "postgres: con77 cmd5 SELECT", ProcStat: &pbc.ProcStat{Utime: 40, Stime: 2}, ProcStatus: &pbc.ProcStatus{VmPeak: 200, VmRss: 100}, ProcIo: &pbc.ProcIO{ReadBytes: 400}, ProcSpill: &pbc.ProcSpill{Size: 4000, Files: 4}},
+		{GpSegmentId: 2, SessId: 77, Pid: 12, Ccnt: 6, SliceId: 1, Cmdline: "postgres: con77 cmd6 SELECT", ProcStat: &pbc.ProcStat{Utime: 10000, Stime: 10000}, ProcStatus: &pbc.ProcStatus{VmPeak: 10000, VmRss: 10000}, ProcIo: &pbc.ProcIO{ReadBytes: 10000}},
+	}, 3, 2)
+
+	response, err := clientSet.GetGetGPInfoClient().GetGPQueryRunningMatrics(context.Background(), &pbm.GetGPQueryRunningMatricsReq{QueryKey: queryKey})
+	require.NoError(t, err)
+
+	require.Len(t, response.SliceId, 2)
+	require.Len(t, response.Segindex, 2)
+	require.Len(t, response.CellMetrics, 2)
+	assert.Equal(t, []int64{1, 1}, response.SliceId)
+	assert.Equal(t, []int32{0, 1}, response.Segindex)
+	assert.Equal(t, int64(10), response.CellMetrics[0].RuntimeMetrics.Utime)
+	assert.Equal(t, int64(40), response.CellMetrics[1].RuntimeMetrics.Utime)
+	assert.Equal(t, int64(400), response.CellMetrics[1].RuntimeMetrics.ProcIo.ReadBytes)
+	assert.Equal(t, int64(4000), response.CellMetrics[1].RuntimeMetrics.ProcSpill.Size)
+
+	require.NotNil(t, response.Skew)
+	assert.InDelta(t, 0.369047619, response.Skew.Skew, 0.000001)
+	assert.Equal(t, int32(1), response.Skew.Segindex)
+
+	require.NotNil(t, response.DataQuality)
+	assert.Equal(t, int64(3), response.DataQuality.SegmentsExpected)
+	assert.Equal(t, int64(2), response.DataQuality.SegmentsReceived)
+	assert.True(t, response.DataQuality.IsPartial)
+}

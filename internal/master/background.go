@@ -456,6 +456,13 @@ func forwardGCQueries(ctx context.Context, l *zap.SugaredLogger, rqStorage *stor
 	}
 }
 
+func (bs *BackgroundStorage) GetQueryRunningMetrics(queryKey *pbc.QueryKey) ([]*storage.ProcfsCellMetric, *pbc.Skew, *pbc.DataQuality, error) {
+	if bs.procfsStorage == nil {
+		return nil, nil, nil, fmt.Errorf("procfs storage is nil")
+	}
+	return bs.procfsStorage.GetQueryRunningMetrics(queryKey)
+}
+
 func (bs *BackgroundStorage) TryRefreshSessionsFromGP(
 	ctx context.Context,
 	clearDeletedSessions bool,
@@ -703,7 +710,7 @@ func (bs *BackgroundStorage) RefreshProcfs(ctx context.Context, procfsRefreshInt
 				enrichWithWorkfileUsage(result, usageEntries)
 			}
 
-			bs.procfsStorage.RegisterProcfsStat(currTime, result)
+			bs.procfsStorage.RegisterProcfsStatWithDataQuality(currTime, result, procfsGatherer.LastHostsExpected(), procfsGatherer.LastHostsResponded())
 			// measure only successful latencies
 			if metrics.YagpccMetrics != nil {
 				metrics.YagpccMetrics.HandleLatencies.With(map[string]string{"method": "RefreshProcfs"}).Observe(time.Since(currTime).Seconds())

@@ -95,10 +95,10 @@ message GetPidProcInfoResponse {
 `GpPidProcInfo` (defined in
 [api/proto/common/yagpcc_metrics.proto](../api/proto/common/yagpcc_metrics.proto))
 carries the primary key (`gp_segment_id`, `sess_id`, `pid`), the process
-`cmdline`, and the parsed `ProcStat` (from `/proc/<pid>/stat`),
-`ProcStatus` (from `/proc/<pid>/status`), `ProcIO` (from
-`/proc/<pid>/io`), and `ProcSpill` (from `gp_workfile_usage_per_query`,
-injected on the master — see §1.3):
+`cmdline`, the parsed Greenplum command count (`ccnt`), and the parsed
+`ProcStat` (from `/proc/<pid>/stat`), `ProcStatus` (from
+`/proc/<pid>/status`), `ProcIO` (from `/proc/<pid>/io`), and `ProcSpill`
+(from `gp_workfile_usage_per_query`, injected on the master — see §1.3):
 
 ```
 message GpPidProcInfo {
@@ -106,10 +106,12 @@ message GpPidProcInfo {
     int64       sess_id       = 2;
     int64       pid           = 3;
     string      cmdline       = 4;
-    ProcStat    proc_stat     = 5;
-    ProcStatus  proc_status   = 6;
-    ProcIO      proc_io       = 7;
+    string      state         = 5;
+    ProcStat    proc_stat     = 6;
+    ProcStatus  proc_status   = 7;
+    ProcIO      proc_io       = 8;
     ProcSpill   proc_spill    = 9;   // injected from workfile_usage (master side)
+    int32       ccnt          = 10;  // parsed from cmdline on the segment side
 }
 
 message ProcIO {
@@ -157,7 +159,7 @@ in the ring buffer.
 | Row type | `WorkfileUsageEntry{Pid, SessID, CommandCnt, SegID, Size, NumFiles}` in [internal/gp/workfile_usage/models.go](../internal/gp/workfile_usage/models.go) |
 | Background lister | [`workfile_usage.Lister`](../internal/gp/workfile_usage/lister.go) — started in `InitBG()`, polls every `defaultCollectionInterval` (2 s) |
 | Enrichment function | [`enrichWithWorkfileUsage(procInfos, usageEntries)`](../internal/master/background.go) |
-| Call site | [`RefreshProcfs()`](../internal/master/background.go) — called immediately after `GatherProcfsStat()` and before `RegisterProcfsStat()` |
+| Call site | [`RefreshProcfs()`](../internal/master/background.go) — called immediately after `GatherProcfsStat()` and before `RegisterProcfsStatWithDataQuality()` |
 
 The enrichment step works as follows:
 
@@ -184,7 +186,10 @@ The segment-host yagpcc keeps **no local state** for proc-stats. On every
 2. For each `(gp_segment_id, sess_id, pid)` reads
    `/proc/<pid>/stat`, `/proc/<pid>/status`, `/proc/<pid>/io`,
    `/proc/<pid>/cmdline` via
-   [`GetPidProcInfo()`](../internal/utils/procfs.go).
+   [`GetPidProcInfo()`](../internal/utils/procfs.go). While reading
+   `cmdline`, it parses the `cmd<N>` token once and stores it as
+   `GpPidProcInfo.ccnt`, so later query-level lookups do not repeatedly
+   parse command lines from the in-memory procfs storage.
 3. Skips entries where the process has already exited
    (`ErrProcessNotFound` / `ENOENT`) so that the master can detect
    process disappearance from the missing key alone.
@@ -225,13 +230,16 @@ The flow is driven by two independent ticker goroutines launched in
 3. Calls `enrichWithWorkfileUsage()` to inject `ProcSpill` data from the
    workfile-usage lister into the gathered results (see §1.3).
 4. Calls
-   [`ProcfsStorage.RegisterProcfsStat(time.Now(), result)`](../internal/storage/procfs_storage.go)
+   [`ProcfsStorage.RegisterProcfsStatWithDataQuality(time.Now(), result, expectedHosts, respondedHosts)`](../internal/storage/procfs_storage.go)
    to append the gathered `[]*GpPidProcInfo` as a new timestamped
-   snapshot in the ring buffer.
-5. `RegisterProcfsStat` builds two maps for fast access:
+   snapshot in the ring buffer together with procfs gather quality
+   metadata.
+5. `RegisterProcfsStatWithDataQuality` builds two maps for fast access:
    - `pidProcData` (`ProcMap`): keyed by `ProcKey{GpSegmentId, SessId, Pid}` → `*ProcStat`
    - `pidProcIndex` (`ProcIndexMap`): keyed by `ProcIndexKey{SessId}` → `[]*ProcIndexData{GpSegmentId, Pid}`
-   - Each `ProcStat` now also stores `ProcSpill` from the enrichment step.
+   - each `ProcStat` now also stores `ProcSpill` from the enrichment step
+   - each snapshot stores `hostsExpected` and `hostsResponded`, later used
+     to fill `DataQuality` on procfs-backed query-running-metrics responses.
 6. Calls `TidyUpProcfsStat()` to trim the ring buffer to
    `maximumStoredPoints` (default 30).
 
@@ -321,8 +329,8 @@ sequenceDiagram
     M->>WU: List(ctx) — read cached workfile_usage snapshot
     WU-->>M: []WorkfileUsageEntry{SegID, Pid, Size, NumFiles}
     Note over M: enrichWithWorkfileUsage():<br/>match (SegID, Pid) → set ProcSpill on each GpPidProcInfo
-    M->>PS: RegisterProcfsStat(time.Now(), enriched)
-    Note over PS: append snapshot (includes ProcSpill),<br/>trim ring buffer
+    M->>PS: RegisterProcfsStatWithDataQuality(time.Now(), enriched, expectedHosts, respondedHosts)
+    Note over PS: append snapshot (includes ProcSpill + DataQuality source counters),<br/>trim ring buffer
 
     Note over M: RefreshSessions ticker fires
     M->>SS: TryRefreshSessionsFromGP()
@@ -377,6 +385,7 @@ type ProcIndexData struct {
 type ProcStat struct {
     Cmdline    string
     State      string
+    Ccnt       int32
     ProcStat   *pbc.ProcStat
     ProcStatus *pbc.ProcStatus
     ProcIO     *pbc.ProcIO
@@ -387,9 +396,11 @@ type ProcMap      map[ProcKey]*ProcStat
 type ProcIndexMap map[ProcIndexKey][]*ProcIndexData
 
 type ProcfsStatType struct {
-    statTime     time.Time
-    pidProcData  ProcMap       // primary: (seg, sess, pid) → stats
-    pidProcIndex ProcIndexMap  // secondary: sess → [(seg, pid), ...]
+    statTime       time.Time
+    pidProcData    ProcMap       // primary: (seg, sess, pid) → stats
+    pidProcIndex   ProcIndexMap  // secondary: sess → [(seg, pid), ...]
+    hostsExpected  int64         // number of segment hosts targeted by the procfs gather
+    hostsResponded int64         // number of segment hosts that returned procfs data successfully
 }
 
 type ProcfsStorage struct {
@@ -407,6 +418,9 @@ Each snapshot (`ProcfsStatType`) contains:
 - `pidProcIndex` — a secondary index from `ProcIndexKey{SessId}` to the
   list of `(GpSegmentId, Pid)` pairs belonging to that session, enabling
   efficient per-session lookups.
+- `hostsExpected` / `hostsResponded` — procfs gather quality counters.
+  They record how many segment hosts were targeted and how many responded
+  successfully; query-level procfs APIs use them to fill `DataQuality`.
 
 ### 2.3 Snapshot lookup
 
@@ -463,7 +477,7 @@ merges one process's diff into a session-level accumulator:
 
 - **Ring buffer trimming** —
   [`TidyUpProcfsStat()`](../internal/storage/procfs_storage.go) is called
-  after every `RegisterProcfsStat()`. If the buffer exceeds
+  after every `RegisterProcfsStatWithDataQuality()`. If the buffer exceeds
   `maximumStoredPoints`, the oldest snapshots are discarded.
 - **No per-PID GC** — individual processes are not tracked across ticks.
   If a PID disappears from a snapshot, it simply won't appear in the
@@ -472,10 +486,10 @@ merges one process's diff into a session-level accumulator:
   `clearDeletedSessions` is enabled), and its procfs data naturally
   stops being queried.
 
-### 2.6 Exposure via existing gRPC surface
+### 2.6 Exposure via existing gRPC / HTTP UI surfaces
 
-No new proto messages or RPCs were added. Procfs data is exposed through
-the existing `SessionState.LastMetrics` field:
+Procfs data is exposed through the existing `SessionState.LastMetrics`
+field and through the query runtime matrix API:
 
 1. [`RecalculateProcfsUsage()`](../internal/gp/sessions.go) iterates all
    sessions and calls `GetProcfsSessions()`.
@@ -513,6 +527,16 @@ alongside any hook-collected metrics in `TotalMetrics` and
 `LastMetrics.Spill` will also be populated with the current aggregate
 spill byte count and file count across all its worker PIDs.
 
+`GetGPQueryRunningMatrics` exposes per-cell procfs runtime data for a
+single query. The master filters procfs entries by `(SessId, Ccnt)` using
+the stored `GpPidProcInfo.ccnt`, aggregates PIDs into `CellMetrics`, and
+returns `RuntimeMetrics` for each `(slice_id, segindex)` cell. The
+`RuntimeMetrics.state` field carries the aggregated procfs process state;
+the UI uses it to render idle cells as gray and active cells from green to
+red based on CPU skew within the slice. Query-level `DataQuality` is
+filled from `hostsExpected` / `hostsResponded` stored in the latest procfs
+snapshot.
+
 ### 2.7 Spill-info data flow summary
 
 ```
@@ -525,7 +549,7 @@ WorkfileUsageEntry{SegID, Pid, Size, NumFiles}
         ▼
 GpPidProcInfo.ProcSpill{Size, Files}   ← per-PID snapshot
         │
-        │  RegisterProcfsStat() → stored in ProcStat.ProcSpill
+        │  RegisterProcfsStatWithDataQuality() → stored in ProcStat.ProcSpill and snapshot DataQuality counters
         ▼
 Ring buffer snapshot (ProcfsStatType)
         │
@@ -578,10 +602,6 @@ considered as future enhancements:
   rollup metrics sorted by resource usage.
 - **`ProcAvg` proto message** — a dedicated message for per-session
   rolling averages on `SessionState`.
-- **Per-query attribution** — the current implementation attributes
-  procfs data to **sessions** (via `SessId`). Attributing to specific
-  running queries (via `(SessId, Ccnt)`) would require correlating
-  procfs snapshots with query start/end times.
 - **Configurable diff windows** — currently hardcoded to 5 minutes in
   `GetProcfsSessions()`. Making the window configurable (or exposing
   5 / 15 / 30 min variants) would allow consumers to choose their

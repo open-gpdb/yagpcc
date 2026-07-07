@@ -2437,12 +2437,19 @@ type GpPidProcInfo struct {
 	SessId      int64 `protobuf:"varint,2,opt,name=sess_id,json=sessId,proto3" json:"sess_id,omitempty"`
 	Pid         int64 `protobuf:"varint,3,opt,name=pid,proto3" json:"pid,omitempty"`
 	// actual data
-	Cmdline       string      `protobuf:"bytes,4,opt,name=cmdline,proto3" json:"cmdline,omitempty"`
-	State         string      `protobuf:"bytes,5,opt,name=state,proto3" json:"state,omitempty"`
-	ProcStat      *ProcStat   `protobuf:"bytes,6,opt,name=proc_stat,json=procStat,proto3" json:"proc_stat,omitempty"`
-	ProcStatus    *ProcStatus `protobuf:"bytes,7,opt,name=proc_status,json=procStatus,proto3" json:"proc_status,omitempty"`
-	ProcIo        *ProcIO     `protobuf:"bytes,8,opt,name=proc_io,json=procIo,proto3" json:"proc_io,omitempty"`
-	ProcSpill     *ProcSpill  `protobuf:"bytes,9,opt,name=proc_spill,json=procSpill,proto3" json:"proc_spill,omitempty"`
+	Cmdline    string      `protobuf:"bytes,4,opt,name=cmdline,proto3" json:"cmdline,omitempty"`
+	State      string      `protobuf:"bytes,5,opt,name=state,proto3" json:"state,omitempty"`
+	ProcStat   *ProcStat   `protobuf:"bytes,6,opt,name=proc_stat,json=procStat,proto3" json:"proc_stat,omitempty"`
+	ProcStatus *ProcStatus `protobuf:"bytes,7,opt,name=proc_status,json=procStatus,proto3" json:"proc_status,omitempty"`
+	ProcIo     *ProcIO     `protobuf:"bytes,8,opt,name=proc_io,json=procIo,proto3" json:"proc_io,omitempty"`
+	ProcSpill  *ProcSpill  `protobuf:"bytes,9,opt,name=proc_spill,json=procSpill,proto3" json:"proc_spill,omitempty"`
+	// Greenplum command count parsed from cmdline while collecting procfs data.
+	// Set to -1 when the backend cmdline does not contain command count information.
+	Ccnt int32 `protobuf:"varint,10,opt,name=ccnt,proto3" json:"ccnt,omitempty"`
+	// Greenplum slice identifier parsed from cmdline while collecting procfs data.
+	// Set to -1 when the backend cmdline does not contain slice information
+	// (for example, an idle session that is not attached to a running query).
+	SliceId       int64 `protobuf:"varint,11,opt,name=slice_id,json=sliceId,proto3" json:"slice_id,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -2540,6 +2547,243 @@ func (x *GpPidProcInfo) GetProcSpill() *ProcSpill {
 	return nil
 }
 
+func (x *GpPidProcInfo) GetCcnt() int32 {
+	if x != nil {
+		return x.Ccnt
+	}
+	return 0
+}
+
+func (x *GpPidProcInfo) GetSliceId() int64 {
+	if x != nil {
+		return x.SliceId
+	}
+	return 0
+}
+
+type RuntimeMetrics struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// Amount of time that this process has been scheduled in user mode,
+	// measured in clock ticks.
+	Utime int64 `protobuf:"varint,1,opt,name=utime,proto3" json:"utime,omitempty"`
+	// Amount of time that this process has been scheduled in kernel mode,
+	// measured in clock ticks.
+	Stime int64 `protobuf:"varint,2,opt,name=stime,proto3" json:"stime,omitempty"`
+	// Peak virtual memory size.
+	VmPeak int64 `protobuf:"varint,3,opt,name=vm_peak,json=vmPeak,proto3" json:"vm_peak,omitempty"`
+	// Resident set size (sum of RssAnon RssFile and RssShmem).
+	VmRss     int64      `protobuf:"varint,4,opt,name=vm_rss,json=vmRss,proto3" json:"vm_rss,omitempty"`
+	ProcIo    *ProcIO    `protobuf:"bytes,5,opt,name=proc_io,json=procIo,proto3" json:"proc_io,omitempty"`
+	ProcSpill *ProcSpill `protobuf:"bytes,6,opt,name=proc_spill,json=procSpill,proto3" json:"proc_spill,omitempty"`
+	// Aggregated process state for this runtime cell.
+	State         string `protobuf:"bytes,7,opt,name=state,proto3" json:"state,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *RuntimeMetrics) Reset() {
+	*x = RuntimeMetrics{}
+	mi := &file_api_proto_common_yagpcc_metrics_proto_msgTypes[16]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *RuntimeMetrics) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*RuntimeMetrics) ProtoMessage() {}
+
+func (x *RuntimeMetrics) ProtoReflect() protoreflect.Message {
+	mi := &file_api_proto_common_yagpcc_metrics_proto_msgTypes[16]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use RuntimeMetrics.ProtoReflect.Descriptor instead.
+func (*RuntimeMetrics) Descriptor() ([]byte, []int) {
+	return file_api_proto_common_yagpcc_metrics_proto_rawDescGZIP(), []int{16}
+}
+
+func (x *RuntimeMetrics) GetUtime() int64 {
+	if x != nil {
+		return x.Utime
+	}
+	return 0
+}
+
+func (x *RuntimeMetrics) GetStime() int64 {
+	if x != nil {
+		return x.Stime
+	}
+	return 0
+}
+
+func (x *RuntimeMetrics) GetVmPeak() int64 {
+	if x != nil {
+		return x.VmPeak
+	}
+	return 0
+}
+
+func (x *RuntimeMetrics) GetVmRss() int64 {
+	if x != nil {
+		return x.VmRss
+	}
+	return 0
+}
+
+func (x *RuntimeMetrics) GetProcIo() *ProcIO {
+	if x != nil {
+		return x.ProcIo
+	}
+	return nil
+}
+
+func (x *RuntimeMetrics) GetProcSpill() *ProcSpill {
+	if x != nil {
+		return x.ProcSpill
+	}
+	return nil
+}
+
+func (x *RuntimeMetrics) GetState() string {
+	if x != nil {
+		return x.State
+	}
+	return ""
+}
+
+type DataQuality struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// how many segments should sent data
+	SegmentsExpected int64 `protobuf:"varint,1,opt,name=segments_expected,json=segmentsExpected,proto3" json:"segments_expected,omitempty"`
+	// how many segments actually sent data
+	SegmentsReceived int64 `protobuf:"varint,2,opt,name=segments_received,json=segmentsReceived,proto3" json:"segments_received,omitempty"`
+	// data is incomplete
+	IsPartial bool `protobuf:"varint,3,opt,name=is_partial,json=isPartial,proto3" json:"is_partial,omitempty"`
+	// how many ms has passed since receiving the data
+	FreshnessMs   int64 `protobuf:"varint,4,opt,name=freshness_ms,json=freshnessMs,proto3" json:"freshness_ms,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *DataQuality) Reset() {
+	*x = DataQuality{}
+	mi := &file_api_proto_common_yagpcc_metrics_proto_msgTypes[17]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *DataQuality) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*DataQuality) ProtoMessage() {}
+
+func (x *DataQuality) ProtoReflect() protoreflect.Message {
+	mi := &file_api_proto_common_yagpcc_metrics_proto_msgTypes[17]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use DataQuality.ProtoReflect.Descriptor instead.
+func (*DataQuality) Descriptor() ([]byte, []int) {
+	return file_api_proto_common_yagpcc_metrics_proto_rawDescGZIP(), []int{17}
+}
+
+func (x *DataQuality) GetSegmentsExpected() int64 {
+	if x != nil {
+		return x.SegmentsExpected
+	}
+	return 0
+}
+
+func (x *DataQuality) GetSegmentsReceived() int64 {
+	if x != nil {
+		return x.SegmentsReceived
+	}
+	return 0
+}
+
+func (x *DataQuality) GetIsPartial() bool {
+	if x != nil {
+		return x.IsPartial
+	}
+	return false
+}
+
+func (x *DataQuality) GetFreshnessMs() int64 {
+	if x != nil {
+		return x.FreshnessMs
+	}
+	return 0
+}
+
+type Skew struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Skew          float64                `protobuf:"fixed64,1,opt,name=skew,proto3" json:"skew,omitempty"`
+	Segindex      int32                  `protobuf:"varint,2,opt,name=segindex,proto3" json:"segindex,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *Skew) Reset() {
+	*x = Skew{}
+	mi := &file_api_proto_common_yagpcc_metrics_proto_msgTypes[18]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *Skew) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*Skew) ProtoMessage() {}
+
+func (x *Skew) ProtoReflect() protoreflect.Message {
+	mi := &file_api_proto_common_yagpcc_metrics_proto_msgTypes[18]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use Skew.ProtoReflect.Descriptor instead.
+func (*Skew) Descriptor() ([]byte, []int) {
+	return file_api_proto_common_yagpcc_metrics_proto_rawDescGZIP(), []int{18}
+}
+
+func (x *Skew) GetSkew() float64 {
+	if x != nil {
+		return x.Skew
+	}
+	return 0
+}
+
+func (x *Skew) GetSegindex() int32 {
+	if x != nil {
+		return x.Segindex
+	}
+	return 0
+}
+
 type AggregatedMetrics struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Calls         int64                  `protobuf:"varint,1,opt,name=calls,proto3" json:"calls,omitempty"`
@@ -2554,7 +2798,7 @@ type AggregatedMetrics struct {
 
 func (x *AggregatedMetrics) Reset() {
 	*x = AggregatedMetrics{}
-	mi := &file_api_proto_common_yagpcc_metrics_proto_msgTypes[16]
+	mi := &file_api_proto_common_yagpcc_metrics_proto_msgTypes[19]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2566,7 +2810,7 @@ func (x *AggregatedMetrics) String() string {
 func (*AggregatedMetrics) ProtoMessage() {}
 
 func (x *AggregatedMetrics) ProtoReflect() protoreflect.Message {
-	mi := &file_api_proto_common_yagpcc_metrics_proto_msgTypes[16]
+	mi := &file_api_proto_common_yagpcc_metrics_proto_msgTypes[19]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2579,7 +2823,7 @@ func (x *AggregatedMetrics) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use AggregatedMetrics.ProtoReflect.Descriptor instead.
 func (*AggregatedMetrics) Descriptor() ([]byte, []int) {
-	return file_api_proto_common_yagpcc_metrics_proto_rawDescGZIP(), []int{16}
+	return file_api_proto_common_yagpcc_metrics_proto_rawDescGZIP(), []int{19}
 }
 
 func (x *AggregatedMetrics) GetCalls() int64 {
@@ -2837,7 +3081,7 @@ const file_api_proto_common_yagpcc_metrics_proto_rawDesc = "" +
 	"\x15cancelled_write_bytes\x18\a \x01(\x03R\x13cancelledWriteBytes\"5\n" +
 	"\tProcSpill\x12\x12\n" +
 	"\x04size\x18\x01 \x01(\x03R\x04size\x12\x14\n" +
-	"\x05files\x18\x02 \x01(\x03R\x05files\"\xcd\x02\n" +
+	"\x05files\x18\x02 \x01(\x03R\x05files\"\xfc\x02\n" +
 	"\rGpPidProcInfo\x12\"\n" +
 	"\rgp_segment_id\x18\x01 \x01(\x03R\vgpSegmentId\x12\x17\n" +
 	"\asess_id\x18\x02 \x01(\x03R\x06sessId\x12\x10\n" +
@@ -2849,7 +3093,28 @@ const file_api_proto_common_yagpcc_metrics_proto_rawDesc = "" +
 	"procStatus\x12'\n" +
 	"\aproc_io\x18\b \x01(\v2\x0e.yagpcc.ProcIOR\x06procIo\x120\n" +
 	"\n" +
-	"proc_spill\x18\t \x01(\v2\x11.yagpcc.ProcSpillR\tprocSpill\"\xbc\x01\n" +
+	"proc_spill\x18\t \x01(\v2\x11.yagpcc.ProcSpillR\tprocSpill\x12\x12\n" +
+	"\x04ccnt\x18\n" +
+	" \x01(\x05R\x04ccnt\x12\x19\n" +
+	"\bslice_id\x18\v \x01(\x03R\asliceId\"\xdd\x01\n" +
+	"\x0eRuntimeMetrics\x12\x14\n" +
+	"\x05utime\x18\x01 \x01(\x03R\x05utime\x12\x14\n" +
+	"\x05stime\x18\x02 \x01(\x03R\x05stime\x12\x17\n" +
+	"\avm_peak\x18\x03 \x01(\x03R\x06vmPeak\x12\x15\n" +
+	"\x06vm_rss\x18\x04 \x01(\x03R\x05vmRss\x12'\n" +
+	"\aproc_io\x18\x05 \x01(\v2\x0e.yagpcc.ProcIOR\x06procIo\x120\n" +
+	"\n" +
+	"proc_spill\x18\x06 \x01(\v2\x11.yagpcc.ProcSpillR\tprocSpill\x12\x14\n" +
+	"\x05state\x18\a \x01(\tR\x05state\"\xa9\x01\n" +
+	"\vDataQuality\x12+\n" +
+	"\x11segments_expected\x18\x01 \x01(\x03R\x10segmentsExpected\x12+\n" +
+	"\x11segments_received\x18\x02 \x01(\x03R\x10segmentsReceived\x12\x1d\n" +
+	"\n" +
+	"is_partial\x18\x03 \x01(\bR\tisPartial\x12!\n" +
+	"\ffreshness_ms\x18\x04 \x01(\x03R\vfreshnessMs\"6\n" +
+	"\x04Skew\x12\x12\n" +
+	"\x04skew\x18\x01 \x01(\x01R\x04skew\x12\x1a\n" +
+	"\bsegindex\x18\x02 \x01(\x05R\bsegindex\"\xbc\x01\n" +
 	"\x11AggregatedMetrics\x12\x14\n" +
 	"\x05calls\x18\x01 \x01(\x03R\x05calls\x12\x19\n" +
 	"\bmin_time\x18\x02 \x01(\x01R\aminTime\x12\x19\n" +
@@ -2887,7 +3152,7 @@ func file_api_proto_common_yagpcc_metrics_proto_rawDescGZIP() []byte {
 }
 
 var file_api_proto_common_yagpcc_metrics_proto_enumTypes = make([]protoimpl.EnumInfo, 2)
-var file_api_proto_common_yagpcc_metrics_proto_msgTypes = make([]protoimpl.MessageInfo, 17)
+var file_api_proto_common_yagpcc_metrics_proto_msgTypes = make([]protoimpl.MessageInfo, 20)
 var file_api_proto_common_yagpcc_metrics_proto_goTypes = []any{
 	(QueryStatus)(0),              // 0: yagpcc.QueryStatus
 	(PlanGenerator)(0),            // 1: yagpcc.PlanGenerator
@@ -2907,14 +3172,17 @@ var file_api_proto_common_yagpcc_metrics_proto_goTypes = []any{
 	(*ProcIO)(nil),                // 15: yagpcc.ProcIO
 	(*ProcSpill)(nil),             // 16: yagpcc.ProcSpill
 	(*GpPidProcInfo)(nil),         // 17: yagpcc.GpPidProcInfo
-	(*AggregatedMetrics)(nil),     // 18: yagpcc.AggregatedMetrics
-	(*timestamppb.Timestamp)(nil), // 19: google.protobuf.Timestamp
+	(*RuntimeMetrics)(nil),        // 18: yagpcc.RuntimeMetrics
+	(*DataQuality)(nil),           // 19: yagpcc.DataQuality
+	(*Skew)(nil),                  // 20: yagpcc.Skew
+	(*AggregatedMetrics)(nil),     // 21: yagpcc.AggregatedMetrics
+	(*timestamppb.Timestamp)(nil), // 22: google.protobuf.Timestamp
 }
 var file_api_proto_common_yagpcc_metrics_proto_depIdxs = []int32{
 	1,  // 0: yagpcc.QueryInfo.generator:type_name -> yagpcc.PlanGenerator
-	19, // 1: yagpcc.QueryInfo.submit_time:type_name -> google.protobuf.Timestamp
-	19, // 2: yagpcc.QueryInfo.start_time:type_name -> google.protobuf.Timestamp
-	19, // 3: yagpcc.QueryInfo.end_time:type_name -> google.protobuf.Timestamp
+	22, // 1: yagpcc.QueryInfo.submit_time:type_name -> google.protobuf.Timestamp
+	22, // 2: yagpcc.QueryInfo.start_time:type_name -> google.protobuf.Timestamp
+	22, // 3: yagpcc.QueryInfo.end_time:type_name -> google.protobuf.Timestamp
 	8,  // 4: yagpcc.GPMetrics.systemStat:type_name -> yagpcc.SystemStat
 	11, // 5: yagpcc.GPMetrics.instrumentation:type_name -> yagpcc.MetricInstrumentation
 	12, // 6: yagpcc.GPMetrics.spill:type_name -> yagpcc.SpillInfo
@@ -2925,11 +3193,13 @@ var file_api_proto_common_yagpcc_metrics_proto_depIdxs = []int32{
 	14, // 11: yagpcc.GpPidProcInfo.proc_status:type_name -> yagpcc.ProcStatus
 	15, // 12: yagpcc.GpPidProcInfo.proc_io:type_name -> yagpcc.ProcIO
 	16, // 13: yagpcc.GpPidProcInfo.proc_spill:type_name -> yagpcc.ProcSpill
-	14, // [14:14] is the sub-list for method output_type
-	14, // [14:14] is the sub-list for method input_type
-	14, // [14:14] is the sub-list for extension type_name
-	14, // [14:14] is the sub-list for extension extendee
-	0,  // [0:14] is the sub-list for field type_name
+	15, // 14: yagpcc.RuntimeMetrics.proc_io:type_name -> yagpcc.ProcIO
+	16, // 15: yagpcc.RuntimeMetrics.proc_spill:type_name -> yagpcc.ProcSpill
+	16, // [16:16] is the sub-list for method output_type
+	16, // [16:16] is the sub-list for method input_type
+	16, // [16:16] is the sub-list for extension type_name
+	16, // [16:16] is the sub-list for extension extendee
+	0,  // [0:16] is the sub-list for field type_name
 }
 
 func init() { file_api_proto_common_yagpcc_metrics_proto_init() }
@@ -2943,7 +3213,7 @@ func file_api_proto_common_yagpcc_metrics_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_api_proto_common_yagpcc_metrics_proto_rawDesc), len(file_api_proto_common_yagpcc_metrics_proto_rawDesc)),
 			NumEnums:      2,
-			NumMessages:   17,
+			NumMessages:   20,
 			NumExtensions: 0,
 			NumServices:   0,
 		},

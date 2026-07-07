@@ -107,6 +107,8 @@ func (s *dataProcStatServer) GetPidProcStat(_ context.Context, req *pb.GetPidPro
 			Pid:         sp.Pid,
 			Cmdline:     fmt.Sprintf("cmd-%d", sp.Pid),
 			State:       "S",
+			Ccnt:        int32(sp.Pid / 10),
+			SliceId:     sp.GpSegmentId + 1,
 		}
 		resp.PidProcData = append(resp.PidProcData, info)
 		s.allData = append(s.allData, info)
@@ -322,9 +324,13 @@ func TestProcessProcfsRequests_SavesData(t *testing.T) {
 	assert.Equal(t, int64(1), result[0].GpSegmentId)
 	assert.Equal(t, int64(100), result[0].Pid)
 	assert.Equal(t, "cmd-100", result[0].Cmdline)
+	assert.Equal(t, int32(10), result[0].Ccnt)
+	assert.Equal(t, int64(2), result[0].SliceId)
 	assert.Equal(t, int64(2), result[1].GpSegmentId)
 	assert.Equal(t, int64(200), result[1].Pid)
 	assert.Equal(t, "cmd-200", result[1].Cmdline)
+	assert.Equal(t, int32(20), result[1].Ccnt)
+	assert.Equal(t, int64(3), result[1].SliceId)
 }
 
 func TestProcessProcfsRequests_SavesDataWithBatching(t *testing.T) {
@@ -456,6 +462,8 @@ func TestGatherProcfsStat_WithSessions_SavesData(t *testing.T) {
 	}
 	assert.True(t, pids[100])
 	assert.True(t, pids[200])
+	assert.Equal(t, int64(1), ps.LastHostsExpected())
+	assert.Equal(t, int64(1), ps.LastHostsResponded())
 }
 
 func TestGatherProcfsStat_ContextCancelled(t *testing.T) {
@@ -530,6 +538,8 @@ func TestGatherProcfsStat_PartialFailure_ReturnsSuccessfulResults(t *testing.T) 
 	}
 	assert.True(t, pids[100], "expected pid 100 from successful host")
 	assert.True(t, pids[200], "expected pid 200 from successful host")
+	assert.Equal(t, int64(2), ps.LastHostsExpected())
+	assert.Equal(t, int64(1), ps.LastHostsResponded())
 }
 
 func TestGatherProcfsStat_AllHostsFail_MultipleHosts(t *testing.T) {

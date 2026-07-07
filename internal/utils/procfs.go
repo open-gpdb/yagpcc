@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"math"
 	"os"
+	"strconv"
 	"strings"
 	"syscall"
 
@@ -35,6 +36,39 @@ import (
 // Callers should check for this error with errors.Is and handle it
 // accordingly (e.g. skip the PID, log at debug level, increment a counter).
 var ErrProcessNotFound = errors.New("process not found")
+
+const (
+	UnsetCmdLineCommandCount = int32(-1)
+	UnsetCmdLineSliceID      = int64(-1)
+)
+
+func parseCmdLineIntAfterToken[T ~int32 | ~int64](cmdline string, token string, bitSize int) (T, bool) {
+	idx := strings.LastIndex(cmdline, token)
+	if idx == -1 {
+		return 0, false
+	}
+	afterToken := cmdline[idx+len(token):]
+	end := 0
+	for end < len(afterToken) && afterToken[end] >= '0' && afterToken[end] <= '9' {
+		end++
+	}
+	if end == 0 {
+		return 0, false
+	}
+	value, err := strconv.ParseInt(afterToken[:end], 10, bitSize)
+	if err != nil {
+		return 0, false
+	}
+	return T(value), true
+}
+
+func ParseCmdLineCommandCount(cmdline string) (int32, bool) {
+	return parseCmdLineIntAfterToken[int32](cmdline, " cmd", 32)
+}
+
+func ParseCmdLineSliceID(cmdline string) (int64, bool) {
+	return parseCmdLineIntAfterToken[int64](cmdline, " slice", 64)
+}
 
 // ParseCmdLineSessionStatus extracts the session status from a
 // PostgreSQL/Greenplum backend process cmdline string (as seen in `ps` output
@@ -70,6 +104,15 @@ func ParseCmdLineSessionStatus(cmdline string) string {
 	}
 
 	status := strings.TrimSpace(afterCmd[spaceIdx+1:])
+	if strings.HasPrefix(status, "slice") {
+		sliceEnd := len("slice")
+		for sliceEnd < len(status) && status[sliceEnd] >= '0' && status[sliceEnd] <= '9' {
+			sliceEnd++
+		}
+		if sliceEnd > len("slice") && sliceEnd < len(status) && status[sliceEnd] == ' ' {
+			status = strings.TrimSpace(status[sliceEnd+1:])
+		}
+	}
 	return status
 }
 
@@ -112,12 +155,20 @@ func getProcInfo(logger *zap.SugaredLogger, proc procfs.Proc, pid, gpSegmentID, 
 		GpSegmentId: gpSegmentID,
 		SessId:      sessID,
 		Pid:         pid,
+		Ccnt:        UnsetCmdLineCommandCount,
+		SliceId:     UnsetCmdLineSliceID,
 	}
 
 	// /proc/<pid>/cmdline
 	if cmdline, err := proc.CmdLine(); err == nil {
 		info.Cmdline = strings.Join(cmdline, " ")
 		info.State = ParseCmdLineSessionStatus(info.Cmdline)
+		if ccnt, ok := ParseCmdLineCommandCount(info.Cmdline); ok {
+			info.Ccnt = ccnt
+		}
+		if sliceID, ok := ParseCmdLineSliceID(info.Cmdline); ok {
+			info.SliceId = sliceID
+		}
 	} else if !isProcessGone(err) {
 		return nil, err
 	}

@@ -127,8 +127,8 @@ func TestGetProcInfo_AllFiles(t *testing.T) {
 	fake := newFakeProcDir(t, pid)
 	logger := zap.NewNop().Sugar()
 
-	// Session backend cmdline with "idle" status.
-	cmdline := "postgres:  5432, gpadmin postgres localhost(33326) con21 cmd237786 idle"
+	// Session backend cmdline with active query status and slice id.
+	cmdline := "postgres:  5432, gpadmin postgres localhost(33326) con21 cmd237786 slice3 SELECT"
 	fake.writeFile(t, "cmdline", cmdline)
 	fake.writeFile(t, "stat", sampleStat(pid))
 	fake.writeFile(t, "status", sampleStatus(pid))
@@ -145,9 +145,11 @@ func TestGetProcInfo_AllFiles(t *testing.T) {
 	assert.Equal(t, int64(100), info.SessId)
 	assert.Equal(t, int64(pid), info.Pid)
 
-	// Cmdline and state extraction.
+	// Cmdline, state, command count, and slice id extraction.
 	assert.Equal(t, cmdline, info.Cmdline)
-	assert.Equal(t, "idle", info.State)
+	assert.Equal(t, "SELECT", info.State)
+	assert.Equal(t, int32(237786), info.Ccnt)
+	assert.Equal(t, int64(3), info.SliceId)
 
 	// ProcStat populated.
 	require.NotNil(t, info.ProcStat)
@@ -199,26 +201,43 @@ func TestGetProcInfo_SessionStateExtraction(t *testing.T) {
 		name          string
 		cmdline       string
 		expectedState string
+		expectedCcnt  int32
+		expectedSlice int64
 	}{
 		{
 			name:          "idle session",
 			cmdline:       "postgres:  5432, gpadmin postgres localhost(33326) con21 cmd237786 idle",
 			expectedState: "idle",
+			expectedCcnt:  237786,
+			expectedSlice: UnsetCmdLineSliceID,
 		},
 		{
 			name:          "SELECT query",
 			cmdline:       "postgres:  5432, monitor postgres localhost(22122) con38 cmd1006767 SELECT",
 			expectedState: "SELECT",
+			expectedCcnt:  1006767,
+			expectedSlice: UnsetCmdLineSliceID,
+		},
+		{
+			name:          "SELECT query with slice",
+			cmdline:       "postgres:  5432, monitor postgres localhost(22122) con38 cmd1006767 slice2 SELECT",
+			expectedState: "SELECT",
+			expectedCcnt:  1006767,
+			expectedSlice: 2,
 		},
 		{
 			name:          "background process has no state",
 			cmdline:       "postgres:  5432, checkpointer process",
 			expectedState: "",
+			expectedCcnt:  UnsetCmdLineCommandCount,
+			expectedSlice: UnsetCmdLineSliceID,
 		},
 		{
 			name:          "empty cmdline",
 			cmdline:       "",
 			expectedState: "",
+			expectedCcnt:  UnsetCmdLineCommandCount,
+			expectedSlice: UnsetCmdLineSliceID,
 		},
 	}
 
@@ -237,6 +256,8 @@ func TestGetProcInfo_SessionStateExtraction(t *testing.T) {
 			require.NoError(t, err)
 			require.NotNil(t, info)
 			assert.Equal(t, tt.expectedState, info.State)
+			assert.Equal(t, tt.expectedCcnt, info.Ccnt)
+			assert.Equal(t, tt.expectedSlice, info.SliceId)
 		})
 	}
 }
@@ -256,9 +277,11 @@ func TestGetProcInfo_MissingCmdline(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, info)
 
-	// Cmdline and state should be empty when file is missing.
+	// Cmdline, state, ccnt, and slice id should be unset when file is missing.
 	assert.Empty(t, info.Cmdline)
 	assert.Empty(t, info.State)
+	assert.Equal(t, UnsetCmdLineCommandCount, info.Ccnt)
+	assert.Equal(t, UnsetCmdLineSliceID, info.SliceId)
 
 	// Other fields should still be populated.
 	require.NotNil(t, info.ProcStat)

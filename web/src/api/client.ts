@@ -98,6 +98,10 @@ export function getQuery(ssid: number, ccnt: number) {
   return get<QueryResponse>(`/api/query/${ssid}/${ccnt}`);
 }
 
+export function getQueryRunningMetrics(ssid: number, ccnt: number) {
+  return get<QueryRunningMetricsResponse>(`/api/query/${ssid}/${ccnt}/running-metrics`);
+}
+
 export function getSessionStats() {
   return get<SessionStatsResponse>("/api/stats/sessions");
 }
@@ -387,6 +391,57 @@ export interface AggregatedMetrics {
   meanTime: number;
   stddevTime: number;
   totalTime: number;
+}
+
+export interface ProcIO {
+  rchar: number;
+  wchar: number;
+  syscr: number;
+  syscw: number;
+  readBytes: number;
+  writeBytes: number;
+  cancelledWriteBytes: number;
+}
+
+export interface ProcSpill {
+  size: number;
+  files: number;
+}
+
+export interface RuntimeMetrics {
+  utime: number;
+  stime: number;
+  vmPeak: number;
+  vmRss: number;
+  state: string;
+  procIo: ProcIO | null;
+  procSpill: ProcSpill | null;
+}
+
+export interface SkewInfo {
+  skew: number;
+  segindex: number;
+}
+
+export interface DataQuality {
+  segmentsExpected: number;
+  segmentsReceived: number;
+  isPartial: boolean;
+  freshnessMs: number;
+}
+
+export interface RuntimeMetricsCell {
+  sliceId: number;
+  segindex: number;
+  runtimeMetrics: RuntimeMetrics | null;
+}
+
+export interface QueryRunningMetricsResponse {
+  sliceId: number[];
+  segindex: number[];
+  runtimeMetrics: RuntimeMetricsCell[];
+  skew: SkewInfo | null;
+  dataQuality: DataQuality | null;
 }
 
 export interface SegmentKey {
