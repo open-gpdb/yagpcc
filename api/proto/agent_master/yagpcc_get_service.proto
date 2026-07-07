@@ -27,12 +27,26 @@ option go_package = "github.com/open-gpdb/yagpcc/api/proto/agent_master;greenplu
 
 service GetGPInfo {
     rpc GetGPSessions (GetGPSessionsReq) returns (GetGPSessionsResponse) {}
-    rpc GetGPQuery    (GetGPQueryReq) returns (GetGPQueryResponse) {}
-    rpc GetGPQueries (GetGPQueriesReq) returns (GetGPSessionsResponse) {}
     rpc GetGPSession  (GetGPSessionReq) returns (GetGPSessionResponse) {}
+    rpc GetGPQuery    (GetGPQueryReq) returns (GetGPQueryResponse) {}
+    rpc GetGPQueries (GetGPQueriesReq) returns (GetGPSessionsResponse) {}   
     rpc GetTotalSessionsStat (GetTotalSessionsReq) returns (GetTotalSessionsResponse) {}
     rpc GetGPExtensions (GetGPExtensionsReq) returns (GetGPExtensionsResponse) {}
     rpc ListDatabases (ListDatabasesReq) returns (ListDatabasesResponse) {}
+    rpc GetGPQueryRunningMatrics (GetGPQueryRunningMatricsReq) returns (GetGPQueryRunningMatricsResponse) {}
+    rpc GetGPHostsRunningQueries (GetGPHostsRunningQueriesReq) returns (GetGPHostsRunningQueriesResponse) {}
+    rpc GetGPHostRunningQueries (GetGPHostRunningQueriesReq) returns (GetGPHostRunningQueriesResponse) {}
+}
+
+message GetGPQueryRunningMatricsReq {
+    QueryKey query_key  = 1;
+}
+
+message GetGPHostsRunningQueriesReq {
+}
+
+message GetGPHostRunningQueriesReq {
+    string host_name = 1;
 }
 
 message GetTotalSessionsReq {
