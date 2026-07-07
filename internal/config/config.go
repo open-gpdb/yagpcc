@@ -129,6 +129,7 @@ type Config struct {
 	MaxMessageSize             int64              `config:"max_message_size" yaml:"max_message_size"`
 	MaxOuterMessageSize        int64              `config:"max_outer_message_size" yaml:"max_outer_message_size"`
 	MaximumStoredQueries       uint32             `config:"maximum_stored_queries" yaml:"maximum_stored_queries"`
+	Clickhouse                 ClickhouseConfig   `json:"clickhouse" yaml:"clickhouse"`
 }
 
 var _ AppConfig = &Config{}
@@ -269,6 +270,7 @@ func DefaultConfig() (*Config, error) {
 		MaxMessageSize:             12 * 1024 * 1024,
 		MaxOuterMessageSize:        4 * 1024 * 1024,
 		MaximumStoredQueries:       50 * 1000,
+		Clickhouse:                 DefaultClickhouseConfig(),
 	}
 	config.normalizeWriters()
 	return &config, nil
@@ -340,6 +342,11 @@ func (cfg *Config) Validate() error {
 	}
 	if fileTarget.MaxFileSize <= 0 {
 		return fmt.Errorf("writers.targets[0].max_file_size must be > 0, got %v", fileTarget.MaxFileSize)
+	}
+	if cfg.Role == "master" {
+		if err := cfg.Clickhouse.Validate(); err != nil {
+			return err
+		}
 	}
 	return nil
 }
