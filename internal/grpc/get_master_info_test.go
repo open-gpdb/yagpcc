@@ -399,3 +399,22 @@ func TestGetGPQueryRunningMatrics(t *testing.T) {
 	assert.Equal(t, int64(2), response.DataQuality.SegmentsReceived)
 	assert.True(t, response.DataQuality.IsPartial)
 }
+
+func TestGetGPQueryRunningMatricsReturnsEmptyOnNoProcfsData(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	sessionMocker := NewMockStatActivityLister(ctrl)
+	clientSet, cleanup := setupGRPCClientSet(t, sessionMocker)
+	defer cleanup()
+
+	response, err := clientSet.GetGetGPInfoClient().GetGPQueryRunningMatrics(context.Background(), &pbm.GetGPQueryRunningMatricsReq{
+		QueryKey: &pbc.QueryKey{Ssid: 77, Ccnt: 5},
+	})
+
+	require.NoError(t, err)
+	require.NotNil(t, response)
+	assert.Empty(t, response.SliceId)
+	assert.Empty(t, response.Segindex)
+	assert.Empty(t, response.CellMetrics)
+	assert.Nil(t, response.Skew)
+	assert.Nil(t, response.DataQuality)
+}

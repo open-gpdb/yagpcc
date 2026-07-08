@@ -387,7 +387,13 @@ func (s *Server) handleGetQueryRunningMetrics(w http.ResponseWriter, r *http.Req
 	resp, err := s.grpcServer.GetGPQueryRunningMatrics(r.Context(), req)
 	if err != nil {
 		s.logger.Errorf("UI GetGPQueryRunningMatrics error: %v", err)
-		writeJSONError(w, http.StatusInternalServerError, fmt.Sprintf("error: %v", err))
+		writeJSON(w, http.StatusOK, map[string]interface{}{
+			"sliceId":        []int64{},
+			"segindex":       []int32{},
+			"runtimeMetrics": []map[string]interface{}{},
+			"skew":           nil,
+			"dataQuality":    nil,
+		})
 		return
 	}
 

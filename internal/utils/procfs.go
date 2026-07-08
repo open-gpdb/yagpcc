@@ -38,8 +38,9 @@ import (
 var ErrProcessNotFound = errors.New("process not found")
 
 const (
-	UnsetCmdLineCommandCount = int32(-1)
-	UnsetCmdLineSliceID      = int64(-1)
+	UnsetCmdLineCommandCount  = int32(-1)
+	UnsetCmdLineSliceID       = int64(-1)
+	ProcfsQuerySegmentSliceID = int64(1)
 )
 
 func parseCmdLineIntAfterToken[T ~int32 | ~int64](cmdline string, token string, bitSize int) (T, bool) {
@@ -165,6 +166,7 @@ func getProcInfo(logger *zap.SugaredLogger, proc procfs.Proc, pid, gpSegmentID, 
 		info.State = ParseCmdLineSessionStatus(info.Cmdline)
 		if ccnt, ok := ParseCmdLineCommandCount(info.Cmdline); ok {
 			info.Ccnt = ccnt
+			info.SliceId = ProcfsQuerySegmentSliceID
 		}
 		if sliceID, ok := ParseCmdLineSliceID(info.Cmdline); ok {
 			info.SliceId = sliceID

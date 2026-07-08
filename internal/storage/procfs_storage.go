@@ -25,6 +25,7 @@ import (
 	"time"
 
 	pbc "github.com/open-gpdb/yagpcc/api/proto/common"
+	"github.com/open-gpdb/yagpcc/internal/utils"
 )
 
 type (
@@ -107,7 +108,7 @@ type ProcfsOption = func(*ProcfsStorage)
 const (
 	defaultStoredPoints       = 30
 	procfsQueryMasterSliceID  = int64(0)
-	procfsQuerySegmentSliceID = int64(1)
+	procfsQuerySegmentSliceID = utils.ProcfsQuerySegmentSliceID
 )
 
 func NewProcfsStorage(opts ...ProcfsOption) *ProcfsStorage {
@@ -449,9 +450,6 @@ func procfsMatchesQuery(procData *ProcStat, ccnt int32) bool {
 func procfsCellForProc(segindex int32, sliceID int64) QueryCellKey {
 	if sliceID != UnsetSliceId {
 		return QueryCellKey{SliceID: sliceID, Segindex: segindex}
-	}
-	if segindex < 0 {
-		return QueryCellKey{SliceID: procfsQueryMasterSliceID, Segindex: segindex}
 	}
 	return QueryCellKey{SliceID: procfsQuerySegmentSliceID, Segindex: segindex}
 }

@@ -209,14 +209,14 @@ func TestGetProcInfo_SessionStateExtraction(t *testing.T) {
 			cmdline:       "postgres:  5432, gpadmin postgres localhost(33326) con21 cmd237786 idle",
 			expectedState: "idle",
 			expectedCcnt:  237786,
-			expectedSlice: UnsetCmdLineSliceID,
+			expectedSlice: ProcfsQuerySegmentSliceID,
 		},
 		{
 			name:          "SELECT query",
 			cmdline:       "postgres:  5432, monitor postgres localhost(22122) con38 cmd1006767 SELECT",
 			expectedState: "SELECT",
 			expectedCcnt:  1006767,
-			expectedSlice: UnsetCmdLineSliceID,
+			expectedSlice: ProcfsQuerySegmentSliceID,
 		},
 		{
 			name:          "SELECT query with slice",

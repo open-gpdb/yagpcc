@@ -134,7 +134,7 @@ func TestProcfsMatchesQuerySkipsIdleBackendWithoutSlice(t *testing.T) {
 func TestProcfsCellForProcUsesParsedSliceID(t *testing.T) {
 	assert.Equal(t, QueryCellKey{SliceID: 2, Segindex: 1}, procfsCellForProc(1, 2))
 	assert.Equal(t, QueryCellKey{SliceID: procfsQuerySegmentSliceID, Segindex: 1}, procfsCellForProc(1, UnsetSliceId))
-	assert.Equal(t, QueryCellKey{SliceID: procfsQueryMasterSliceID, Segindex: -1}, procfsCellForProc(-1, UnsetSliceId))
+	assert.Equal(t, QueryCellKey{SliceID: procfsQuerySegmentSliceID, Segindex: -1}, procfsCellForProc(-1, UnsetSliceId))
 }
 
 func TestAddProcIO(t *testing.T) {

@@ -254,7 +254,7 @@ func (s *GetMasterInfoServer) GetGPSession(ctx context.Context, in *pbm.GetGPSes
 		sessionState, err := s.backgroundStorage.SessionStorage.GetSessionDesc(
 			sKey,
 			sesI,
-			false,
+			true,
 			pbm.RunningQueryType_RQT_LAST,
 			-1)
 		if err != nil {
@@ -401,19 +401,26 @@ func (s *GetMasterInfoServer) GetGPQueryRunningMatrics(ctx context.Context, in *
 		return nil, fmt.Errorf("invalid input - query key cannot be nil")
 	}
 	start := time.Now()
+	response := &pbm.GetGPQueryRunningMatricsResponse{
+		SliceId:     make([]int64, 0),
+		Segindex:    make([]int32, 0),
+		CellMetrics: make([]*pbm.CellMetrics, 0),
+	}
 
 	cellMetrics, skew, dataQuality, err := s.backgroundStorage.GetQueryRunningMetrics(in.QueryKey)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get query running metrics: %w", err)
+		s.logger.Errorf("failed to get query running metrics: %v", err)
+		if metrics.YagpccMetrics != nil {
+			metrics.YagpccMetrics.HandleLatencies.With(map[string]string{"method": "GetGPQueryRunningMatrics"}).Observe(time.Since(start).Seconds())
+		}
+		return response, nil
 	}
 
-	response := &pbm.GetGPQueryRunningMatricsResponse{
-		SliceId:     make([]int64, 0, len(cellMetrics)),
-		Segindex:    make([]int32, 0, len(cellMetrics)),
-		CellMetrics: make([]*pbm.CellMetrics, 0, len(cellMetrics)),
-		Skew:        skew,
-		DataQuality: dataQuality,
-	}
+	response.SliceId = make([]int64, 0, len(cellMetrics))
+	response.Segindex = make([]int32, 0, len(cellMetrics))
+	response.CellMetrics = make([]*pbm.CellMetrics, 0, len(cellMetrics))
+	response.Skew = skew
+	response.DataQuality = dataQuality
 	for _, cell := range cellMetrics {
 		response.SliceId = append(response.SliceId, cell.SliceID)
 		response.Segindex = append(response.Segindex, cell.Segindex)
