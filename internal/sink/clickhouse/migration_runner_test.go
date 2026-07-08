@@ -217,20 +217,23 @@ func TestApplyMigrations_FreshDatabase(t *testing.T) {
 		t.Error("missing meta table bootstrap")
 	}
 
-	// Each of the four core tables must be created.
+	// Each of the three core tables must be created.
 	for _, table := range []string{
-		"yagpcc.query_events",
-		"yagpcc.aggregated_metrics",
-		"yagpcc.session_snapshots",
+		"yagpcc.sessions_part",
+		"yagpcc.statements_part",
+		"yagpcc.segments_part",
 	} {
 		if countExec(conn.execLog, "CREATE TABLE IF NOT EXISTS "+table) == 0 {
 			t.Errorf("missing CREATE TABLE for %s", table)
 		}
 	}
 
-	// The retention placeholder must be rendered.
-	if findExec(conn.execLog, "INTERVAL 30 DAY") < 0 {
-		t.Error("retention_days placeholder was not rendered")
+	// The standalone engine variant must be rendered, not the clustered one.
+	if findExec(conn.execLog, "ENGINE = ReplacingMergeTree") < 0 {
+		t.Error("standalone ReplacingMergeTree engine was not rendered")
+	}
+	if findExec(conn.execLog, "ReplicatedReplacingMergeTree") >= 0 {
+		t.Error("ApplyMigrations must not emit the clustered engine variant")
 	}
 	if findExec(conn.execLog, "{{") >= 0 {
 		t.Error("rendered DDL still contains template syntax")
@@ -272,8 +275,8 @@ func TestApplyMigrations_AlreadyAtExpectedVersion(t *testing.T) {
 	if findExec(conn.execLog, "INSERT INTO yagpcc._yagpcc_meta") >= 0 {
 		t.Error("unexpected INSERT into _yagpcc_meta when already current")
 	}
-	if findExec(conn.execLog, "yagpcc.query_events") >= 0 {
-		t.Error("unexpected CREATE TABLE for query_events when already current")
+	if findExec(conn.execLog, "yagpcc.sessions_part") >= 0 {
+		t.Error("unexpected CREATE TABLE for sessions_part when already current")
 	}
 }
 
@@ -347,8 +350,8 @@ func TestApplyMigrations_DefaultsYagpccVersion(t *testing.T) {
 	if v, ok := conn.execLog[idx].args[1].(string); !ok || v != "unknown" {
 		t.Errorf("yagpcc_version arg = %v, want unknown", conn.execLog[idx].args[1])
 	}
-	if !strings.Contains(strings.Join(execQueries(conn.execLog), "\n"), "INTERVAL 14 DAY") {
-		t.Error("retention_days=14 not rendered into DDL")
+	if !strings.Contains(strings.Join(execQueries(conn.execLog), "\n"), "toIntervalDay(60)") {
+		t.Error("sessions_part TTL was not rendered into DDL")
 	}
 }
 

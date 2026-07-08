@@ -21,6 +21,8 @@
 //
 //   - --dump-schema           print cumulative DDL, never connects to CH
 //   - --dump-migration        print SQL for from→to transition, never connects
+//   - --replicated            modifier for the dump commands: emit the
+//     clustered DDL variant instead of standalone
 //   - --migrate-only          load config, connect, ApplyMigrations, exit
 //   - --verify-schema         load config, connect, VerifySchema, exit
 //
@@ -58,6 +60,7 @@ const (
 	flagNameVerifySchema  = "verify-schema"
 	flagNameFrom          = "from"
 	flagNameTo            = "to"
+	flagNameReplicated    = "replicated"
 )
 
 // schemaFlags captures the parsed CLI flags relevant to schema management.
@@ -68,6 +71,7 @@ type schemaFlags struct {
 	dumpMigration bool
 	migrateOnly   bool
 	verifySchema  bool
+	replicated    bool
 	from          int
 	to            int
 	configPath    string
@@ -86,6 +90,9 @@ func registerSchemaCLIFlags(set *pflag.FlagSet, f *schemaFlags) {
 		"load config, connect to ClickHouse, verify schema version and exit")
 	set.IntVar(&f.from, flagNameFrom, -1, "source schema version for --dump-migration")
 	set.IntVar(&f.to, flagNameTo, -1, "target schema version for --dump-migration")
+	set.BoolVar(&f.replicated, flagNameReplicated, false,
+		"with --dump-schema/--dump-migration, print the clustered variant "+
+			"(ReplicatedReplacingMergeTree + ON CLUSTER + Distributed) instead of standalone")
 }
 
 // schemaCommandRequested reports whether any of the schema-management CLI
@@ -173,7 +180,7 @@ func retentionDaysFor(f schemaFlags, deps schemaCLIDeps) int {
 }
 
 func runDumpSchema(f schemaFlags, deps schemaCLIDeps) int {
-	opts := clickhouse.DumpOptions{RetentionDays: retentionDaysFor(f, deps)}
+	opts := clickhouse.DumpOptions{RetentionDays: retentionDaysFor(f, deps), Replicated: f.replicated}
 	out, err := clickhouse.DumpSchema(opts)
 	if err != nil {
 		_, _ = fmt.Fprintf(deps.stderr, "dump-schema: %v\n", err)
@@ -194,7 +201,7 @@ func runDumpMigration(f schemaFlags, deps schemaCLIDeps) int {
 		)
 		return schemaCLIExitFail
 	}
-	opts := clickhouse.DumpOptions{RetentionDays: retentionDaysFor(f, deps)}
+	opts := clickhouse.DumpOptions{RetentionDays: retentionDaysFor(f, deps), Replicated: f.replicated}
 	out, err := clickhouse.DumpMigration(f.from, f.to, opts)
 	if err != nil {
 		_, _ = fmt.Fprintf(deps.stderr, "dump-migration: %v\n", err)

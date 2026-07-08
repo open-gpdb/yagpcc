@@ -95,7 +95,7 @@ func TestSchemaCLI_DumpSchema_NoConfig(t *testing.T) {
 	}
 }
 
-func TestSchemaCLI_DumpSchema_UsesConfigRetentionDays(t *testing.T) {
+func TestSchemaCLI_DumpSchema_LoadsConfig(t *testing.T) {
 	cfg := enabledConfig()
 	cfg.Clickhouse.RetentionDays = 7
 	deps, stdout, _ := newCapturingDeps(cfg)
@@ -103,8 +103,35 @@ func TestSchemaCLI_DumpSchema_UsesConfigRetentionDays(t *testing.T) {
 	if rc != schemaCLIExitOK {
 		t.Fatalf("rc=%d", rc)
 	}
-	if !strings.Contains(stdout.String(), "INTERVAL 7 DAY DELETE") {
-		t.Fatalf("expected retention=7 in DDL, got %q", stdout.String())
+	// The production schema carries fixed per-table TTLs, so the dump renders
+	// them regardless of the config's retention_days value.
+	if !strings.Contains(stdout.String(), "toIntervalDay(60)") {
+		t.Fatalf("expected sessions TTL in DDL, got %q", stdout.String())
+	}
+}
+
+func TestSchemaCLI_DumpSchema_ReplicatedFlag(t *testing.T) {
+	deps, stdout, stderr := newCapturingDeps(nil)
+	rc := runSchemaCLI(context.Background(), schemaFlags{dumpSchema: true, replicated: true}, deps)
+	if rc != schemaCLIExitOK {
+		t.Fatalf("rc=%d stderr=%q", rc, stderr.String())
+	}
+	out := stdout.String()
+	for _, want := range []string{"ReplicatedReplacingMergeTree", "ON CLUSTER '{cluster}'", "Distributed("} {
+		if !strings.Contains(out, want) {
+			t.Fatalf("expected %q in replicated dump, got %q", want, out)
+		}
+	}
+}
+
+func TestSchemaCLI_DumpSchema_StandaloneByDefault(t *testing.T) {
+	deps, stdout, _ := newCapturingDeps(nil)
+	rc := runSchemaCLI(context.Background(), schemaFlags{dumpSchema: true}, deps)
+	if rc != schemaCLIExitOK {
+		t.Fatalf("rc=%d", rc)
+	}
+	if strings.Contains(stdout.String(), "ReplicatedReplacingMergeTree") {
+		t.Fatalf("standalone dump must not contain clustered engine, got %q", stdout.String())
 	}
 }
 
@@ -322,8 +349,8 @@ func TestMaybeRunDumpOnlyFromConfig_PrintsAndExits(t *testing.T) {
 	if rc != schemaCLIExitOK {
 		t.Fatalf("rc=%d", rc)
 	}
-	if !strings.Contains(stdout.String(), "INTERVAL 14 DAY DELETE") {
-		t.Fatalf("expected retention=14 in DDL, got %q", stdout.String())
+	if !strings.Contains(stdout.String(), "toIntervalDay(60)") {
+		t.Fatalf("expected sessions TTL in DDL, got %q", stdout.String())
 	}
 }
 

@@ -19,6 +19,7 @@ package clickhouse
 import (
 	"context"
 	"errors"
+	"reflect"
 	"strings"
 	"testing"
 )
@@ -114,10 +115,11 @@ func TestDumpSchema_RendersAllUpFiles(t *testing.T) {
 	for _, want := range []string{
 		"CREATE DATABASE IF NOT EXISTS yagpcc",
 		"yagpcc._yagpcc_meta",
-		"yagpcc.query_events",
-		"yagpcc.aggregated_metrics",
-		"yagpcc.session_snapshots",
-		"INTERVAL 30 DAY",
+		"yagpcc.sessions_part",
+		"yagpcc.statements_part",
+		"yagpcc.segments_part",
+		"ENGINE = ReplacingMergeTree",
+		"toIntervalDay(60)",
 		"-- migration 1 (init) up",
 	} {
 		if !strings.Contains(out, want) {
@@ -127,6 +129,90 @@ func TestDumpSchema_RendersAllUpFiles(t *testing.T) {
 	if strings.Contains(out, "{{") {
 		t.Error("DumpSchema output still contains template syntax")
 	}
+}
+
+func TestDumpSchema_Replicated(t *testing.T) {
+	std, err := DumpSchema(DumpOptions{RetentionDays: 30})
+	if err != nil {
+		t.Fatalf("DumpSchema standalone: %v", err)
+	}
+	repl, err := DumpSchema(DumpOptions{RetentionDays: 30, Replicated: true})
+	if err != nil {
+		t.Fatalf("DumpSchema replicated: %v", err)
+	}
+
+	// Standalone must not carry any clustered constructs.
+	for _, absent := range []string{"ReplicatedReplacingMergeTree", "ON CLUSTER", "Distributed("} {
+		if strings.Contains(std, absent) {
+			t.Errorf("standalone dump should not contain %q", absent)
+		}
+	}
+	// Replicated must carry all of them, including the Distributed fan-out tables.
+	for _, want := range []string{
+		"ReplicatedReplacingMergeTree",
+		"ON CLUSTER '{cluster}'",
+		"Distributed('{cluster}', yagpcc, sessions_part",
+		"Distributed('{cluster}', yagpcc, statements_part",
+		"Distributed('{cluster}', yagpcc, segments_part",
+	} {
+		if !strings.Contains(repl, want) {
+			t.Errorf("replicated dump missing %q", want)
+		}
+	}
+	if strings.Contains(repl, "{{") {
+		t.Error("replicated dump still contains template syntax")
+	}
+
+	// Both variants must declare the same set of columns for every table.
+	for _, table := range []string{"sessions_part", "statements_part", "segments_part"} {
+		stdCols := extractColumns(t, std, table)
+		replCols := extractColumns(t, repl, table)
+		if len(stdCols) == 0 {
+			t.Fatalf("no columns parsed for %s", table)
+		}
+		if !reflect.DeepEqual(stdCols, replCols) {
+			t.Errorf("column set differs for %s:\n standalone=%v\n replicated=%v",
+				table, stdCols, replCols)
+		}
+	}
+}
+
+// extractColumns pulls the "`name` Type" column declarations out of the
+// CREATE TABLE ... for yagpcc.<table>_part block, returning "name Type" pairs
+// in declaration order. INDEX lines are ignored so only real columns compare.
+func extractColumns(t *testing.T, ddl, table string) []string {
+	t.Helper()
+	marker := "yagpcc." + table
+	start := strings.Index(ddl, marker)
+	if start < 0 {
+		t.Fatalf("table %s not found in DDL", table)
+	}
+	open := strings.Index(ddl[start:], "(")
+	if open < 0 {
+		t.Fatalf("no column block for %s", table)
+	}
+	rest := ddl[start+open+1:]
+	end := strings.Index(rest, "\n)")
+	if end < 0 {
+		t.Fatalf("no closing paren for %s", table)
+	}
+	body := rest[:end]
+
+	var cols []string
+	for _, line := range strings.Split(body, "\n") {
+		line = strings.TrimSpace(strings.TrimSuffix(strings.TrimSpace(line), ","))
+		if !strings.HasPrefix(line, "`") {
+			continue // skip INDEX lines and blanks
+		}
+		closeIdx := strings.Index(line[1:], "`")
+		if closeIdx < 0 {
+			continue
+		}
+		name := line[1 : closeIdx+1]
+		typ := strings.TrimSpace(line[closeIdx+2:])
+		cols = append(cols, name+" "+typ)
+	}
+	return cols
 }
 
 func TestDumpSchema_InvalidRetention(t *testing.T) {
@@ -143,11 +229,11 @@ func TestDumpMigration_Up(t *testing.T) {
 	if err != nil {
 		t.Fatalf("DumpMigration: %v", err)
 	}
-	if !strings.Contains(out, "CREATE TABLE IF NOT EXISTS yagpcc.query_events") {
-		t.Error("expected up SQL for query_events")
+	if !strings.Contains(out, "CREATE TABLE IF NOT EXISTS yagpcc.sessions_part") {
+		t.Error("expected up SQL for sessions_part")
 	}
-	if !strings.Contains(out, "INTERVAL 7 DAY") {
-		t.Errorf("retention should render to INTERVAL 7 DAY; got %s", out)
+	if !strings.Contains(out, "toIntervalDay(60)") {
+		t.Errorf("sessions_part TTL should render; got %s", out)
 	}
 	if strings.Contains(out, "DROP TABLE") {
 		t.Error("up dump should not contain DROP TABLE")
@@ -160,9 +246,9 @@ func TestDumpMigration_Down(t *testing.T) {
 		t.Fatalf("DumpMigration: %v", err)
 	}
 	for _, want := range []string{
-		"DROP TABLE IF EXISTS yagpcc.session_snapshots",
-		"DROP TABLE IF EXISTS yagpcc.aggregated_metrics",
-		"DROP TABLE IF EXISTS yagpcc.query_events",
+		"DROP TABLE IF EXISTS yagpcc.segments_part",
+		"DROP TABLE IF EXISTS yagpcc.statements_part",
+		"DROP TABLE IF EXISTS yagpcc.sessions_part",
 		"DROP TABLE IF EXISTS yagpcc._yagpcc_meta",
 		"-- migration 1 (init) down",
 	} {

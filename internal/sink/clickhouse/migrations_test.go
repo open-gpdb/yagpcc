@@ -42,8 +42,8 @@ func TestParseMigrationsEmbedded(t *testing.T) {
 	if !strings.Contains(migs[0].Down, "DROP TABLE") {
 		t.Error("down file should contain DROP TABLE")
 	}
-	if !strings.Contains(migs[0].Up, "{{.RetentionDays}}") {
-		t.Error("up file should contain {{.RetentionDays}} placeholder")
+	if !strings.Contains(migs[0].Up, "{{if .Replicated}}") {
+		t.Error("up file should contain the {{if .Replicated}} variant switch")
 	}
 
 	// Highest applied version equals ExpectedSchemaVersion.
@@ -230,6 +230,7 @@ func TestRenderEmbeddedUpMigration(t *testing.T) {
 	}
 	rendered, err := RenderTemplate(migs[0].Up, map[string]any{
 		"RetentionDays": 30,
+		"Replicated":    false,
 	})
 	if err != nil {
 		t.Fatalf("RenderTemplate: %v", err)
@@ -237,13 +238,25 @@ func TestRenderEmbeddedUpMigration(t *testing.T) {
 	for _, want := range []string{
 		"CREATE DATABASE IF NOT EXISTS yagpcc",
 		"yagpcc._yagpcc_meta",
-		"yagpcc.query_events",
-		"yagpcc.aggregated_metrics",
-		"yagpcc.session_snapshots",
-		"INTERVAL 30 DAY",
+		"yagpcc.sessions_part",
+		"yagpcc.statements_part",
+		"yagpcc.segments_part",
+		"ReplacingMergeTree",
+		"toIntervalDay(60)",
+		"toIntervalDay(180)",
 	} {
 		if !strings.Contains(rendered, want) {
 			t.Errorf("rendered up migration missing %q", want)
+		}
+	}
+	// The standalone variant must not emit clustered engine or Distributed tables.
+	for _, absent := range []string{
+		"ReplicatedReplacingMergeTree",
+		"ON CLUSTER",
+		"Distributed(",
+	} {
+		if strings.Contains(rendered, absent) {
+			t.Errorf("standalone up migration should not contain %q", absent)
 		}
 	}
 	if strings.Contains(rendered, "{{") {

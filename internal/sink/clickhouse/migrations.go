@@ -308,8 +308,12 @@ func ApplyMigrations(ctx context.Context, conn MigrationConn, opts MigrateOption
 		return fmt.Errorf("parse migrations: %w", err)
 	}
 
+	// ApplyMigrations always renders the standalone variant. The clustered
+	// (Replicated/Distributed) DDL is bootstrapped out of band, so Replicated
+	// is fixed to false here; schema_cli --replicated prints it for that path.
 	params := map[string]any{
 		"RetentionDays": opts.RetentionDays,
+		"Replicated":    false,
 	}
 	yagpccVersion := opts.YagpccVersion
 	if yagpccVersion == "" {

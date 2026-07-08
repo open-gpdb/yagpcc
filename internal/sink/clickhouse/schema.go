@@ -78,8 +78,11 @@ func VerifySchema(ctx context.Context, conn MigrationConn) error {
 
 // DumpOptions parameterises DumpSchema and DumpMigration. RetentionDays is
 // rendered into `{{.RetentionDays}}` placeholders inside the embedded files.
+// Replicated selects the clustered DDL variant (ReplicatedReplacingMergeTree +
+// ON CLUSTER + Distributed) instead of the standalone default.
 type DumpOptions struct {
 	RetentionDays int
+	Replicated    bool
 }
 
 // DumpSchema returns the cumulative DDL needed to bring an empty database to
@@ -136,7 +139,10 @@ func DumpMigration(from, to int, opts DumpOptions) (string, error) {
 		)
 	}
 
-	params := map[string]any{"RetentionDays": opts.RetentionDays}
+	params := map[string]any{
+		"RetentionDays": opts.RetentionDays,
+		"Replicated":    opts.Replicated,
+	}
 	var out strings.Builder
 
 	render := func(version int, direction string) error {
