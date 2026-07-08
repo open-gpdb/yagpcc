@@ -127,6 +127,7 @@ func ProcfsDiff(first, last *pbc.GpPidProcInfo) (*pbc.GpPidProcInfo, error) {
 		ProcStatus:  last.ProcStatus,
 		ProcStat:    diffProcStat(first.ProcStat, last.ProcStat),
 		ProcIo:      diffProcIO(first.ProcIo, last.ProcIo),
+		ProcSpill:   last.ProcSpill,
 	}, nil
 }
 
@@ -195,6 +196,15 @@ func GroupProcfsMetrics(dest *pbc.GpPidProcInfo, source *pbc.GpPidProcInfo, aggK
 			dest.ProcIo.ReadBytes += source.ProcIo.ReadBytes
 			dest.ProcIo.WriteBytes += source.ProcIo.WriteBytes
 			dest.ProcIo.CancelledWriteBytes += source.ProcIo.CancelledWriteBytes
+		}
+	}
+
+	if source.ProcSpill != nil {
+		if dest.ProcSpill == nil {
+			dest.ProcSpill = proto.Clone(source.ProcSpill).(*pbc.ProcSpill)
+		} else {
+			dest.ProcSpill.Size += source.ProcSpill.Size
+			dest.ProcSpill.Files += source.ProcSpill.Files
 		}
 	}
 

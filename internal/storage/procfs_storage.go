@@ -47,6 +47,7 @@ type (
 		ProcStat   *pbc.ProcStat
 		ProcStatus *pbc.ProcStatus
 		ProcIO     *pbc.ProcIO
+		ProcSpill  *pbc.ProcSpill
 	}
 )
 
@@ -61,6 +62,7 @@ func (ps *ProcStat) ToGpPidProcInfo(key ProcKey) *pbc.GpPidProcInfo {
 		ProcStat:    ps.ProcStat,
 		ProcStatus:  ps.ProcStatus,
 		ProcIo:      ps.ProcIO,
+		ProcSpill:   ps.ProcSpill,
 	}
 }
 
@@ -135,6 +137,7 @@ func (p *ProcfsStorage) RegisterProcfsStat(statTime time.Time, procfsStat []*pbc
 			ProcStat:   proc.ProcStat,
 			ProcStatus: proc.ProcStatus,
 			ProcIO:     proc.ProcIo,
+			ProcSpill:  proc.ProcSpill,
 		}
 		key := ProcIndexKey{
 			SessId: proc.SessId,

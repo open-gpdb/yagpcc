@@ -58,8 +58,28 @@ func TestLister_Start_Negative(t *testing.T) {
 	t.Run("error initializing locks cache", func(t *testing.T) {
 		ctrl := gomock.NewController(t)
 
+		sessionsCollectionStopped := make(chan struct{})
+		locksCollectionStopped := make(chan struct{})
+		allSessionsCollectionStopped := make(chan struct{})
+
 		logMock := NewMockLog(ctrl)
 		logMock.EXPECT().Infof("initializing cache")
+		logMock.EXPECT().Infof("background collection for %s started", "stat_activity.Session")
+		logMock.EXPECT().Infof("background collection for %s started", "stat_activity.SessionLock")
+		logMock.EXPECT().Infof("background collection for %s started", "stat_activity.SessionPid")
+		logMock.EXPECT().Warnf("error initializing locks cache, continuing without lock data: %s", "error executing query: test error")
+		logMock.
+			EXPECT().
+			Infof("background collection for %s stopped", "stat_activity.Session").
+			Do(func(string, ...any) { close(sessionsCollectionStopped) })
+		logMock.
+			EXPECT().
+			Infof("background collection for %s stopped", "stat_activity.SessionLock").
+			Do(func(string, ...any) { close(locksCollectionStopped) })
+		logMock.
+			EXPECT().
+			Infof("background collection for %s stopped", "stat_activity.SessionPid").
+			Do(func(string, ...any) { close(allSessionsCollectionStopped) })
 
 		dbMock := NewMockDB(ctrl)
 		dbMock.
@@ -70,6 +90,10 @@ func TestLister_Start_Negative(t *testing.T) {
 			EXPECT().
 			ExecQuery(gomock.Any(), gomock.AssignableToTypeOf(""), gomock.AssignableToTypeOf(&[]stat_activity.SessionLock{})).
 			Return(fmt.Errorf("test error"))
+		dbMock.
+			EXPECT().
+			ExecQuery(gomock.Any(), gomock.AssignableToTypeOf(""), gomock.AssignableToTypeOf(&[]stat_activity.SessionPid{})).
+			Return(nil)
 
 		sut := stat_activity.NewLister(
 			logMock,
@@ -80,7 +104,12 @@ func TestLister_Start_Negative(t *testing.T) {
 		)
 
 		err := sut.Start(context.Background())
-		assert.EqualError(t, err, "error initializing locks cache: error executing query: test error")
+		assert.NoError(t, err)
+
+		sut.Stop()
+		assertBackgroundOperationCompleted(t, sessionsCollectionStopped, 10*time.Second, "sessions collection stop timed out")
+		assertBackgroundOperationCompleted(t, locksCollectionStopped, 10*time.Second, "locks collection stop timed out")
+		assertBackgroundOperationCompleted(t, allSessionsCollectionStopped, 10*time.Second, "all sessions collection stop timed out")
 	})
 }
 

@@ -14,29 +14,17 @@
 // implied. See the License for the specific language governing
 // permissions and limitations under the License.
 
-package master
+package lister
 
-import (
-	"context"
+import "context"
 
-	"github.com/open-gpdb/yagpcc/internal/gp"
-	"github.com/open-gpdb/yagpcc/internal/gp/stat_activity"
-	"github.com/open-gpdb/yagpcc/internal/gp/workfile_usage"
-)
-
-type statActivityLister interface {
-	Start(ctx context.Context) error
-	Stop()
-	List(ctx context.Context) ([]*gp.GpStatActivity, error)
-	ListAllSessions(ctx context.Context) ([]stat_activity.SessionPid, error)
+// Log is the logging interface required by background collectors.
+type Log interface {
+	Infof(format string, args ...any)
+	Warnf(format string, args ...any)
 }
 
-type workFileLister interface {
-	Start(ctx context.Context) error
-	Stop()
-	List(ctx context.Context) ([]workfile_usage.WorkfileUsageEntry, error)
-}
-
-type masterSentinel interface {
-	RunUntilIsMaster(ctx context.Context) error
+// DB is the database interface required by background collectors.
+type DB interface {
+	ExecQuery(ctx context.Context, query string, dest any) error
 }

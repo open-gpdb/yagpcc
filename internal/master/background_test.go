@@ -21,9 +21,11 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"go.uber.org/zap"
 
 	pbc "github.com/open-gpdb/yagpcc/api/proto/common"
+	"github.com/open-gpdb/yagpcc/internal/gp/workfile_usage"
 	"github.com/open-gpdb/yagpcc/internal/storage"
 )
 
@@ -326,4 +328,127 @@ func TestQueryCompleted_InterruptedWaitingForSegments(t *testing.T) {
 
 	assert.Equal(t, 0, decision, "an interrupted query with stale segment data must wait")
 	assert.Equal(t, reasonNone, reason)
+}
+
+// --- enrichWithWorkfileUsage ---
+
+func TestEnrichWithWorkfileUsage_EmptyProcInfos(t *testing.T) {
+	// Should not panic with an empty proc slice.
+	entries := []workfile_usage.WorkfileUsageEntry{
+		{SegID: 0, Pid: 100, Size: 1024, NumFiles: 2},
+	}
+	enrichWithWorkfileUsage(nil, entries)
+	enrichWithWorkfileUsage([]*pbc.GpPidProcInfo{}, entries)
+}
+
+func TestEnrichWithWorkfileUsage_EmptyUsageEntries(t *testing.T) {
+	// No usage data → ProcSpill must remain nil on all entries.
+	infos := []*pbc.GpPidProcInfo{
+		{GpSegmentId: 0, Pid: 42},
+		{GpSegmentId: 1, Pid: 99},
+	}
+	enrichWithWorkfileUsage(infos, nil)
+	enrichWithWorkfileUsage(infos, []workfile_usage.WorkfileUsageEntry{})
+	for _, info := range infos {
+		assert.Nil(t, info.ProcSpill, "ProcSpill must stay nil when there is no workfile usage data")
+	}
+}
+
+func TestEnrichWithWorkfileUsage_ExactMatch(t *testing.T) {
+	infos := []*pbc.GpPidProcInfo{
+		{GpSegmentId: 1, Pid: 42},
+	}
+	entries := []workfile_usage.WorkfileUsageEntry{
+		{SegID: 1, Pid: 42, Size: 5_000_000, NumFiles: 10},
+	}
+	enrichWithWorkfileUsage(infos, entries)
+
+	require.NotNil(t, infos[0].ProcSpill, "ProcSpill must be populated on an exact (SegID, Pid) match")
+	assert.Equal(t, int64(5_000_000), infos[0].ProcSpill.Size)
+	assert.Equal(t, int64(10), infos[0].ProcSpill.Files)
+}
+
+func TestEnrichWithWorkfileUsage_NoMatchingEntry(t *testing.T) {
+	// The workfile entry is for a different (SegID, Pid) pair.
+	infos := []*pbc.GpPidProcInfo{
+		{GpSegmentId: 0, Pid: 10},
+	}
+	entries := []workfile_usage.WorkfileUsageEntry{
+		{SegID: 1, Pid: 99, Size: 1000, NumFiles: 3},
+	}
+	enrichWithWorkfileUsage(infos, entries)
+	assert.Nil(t, infos[0].ProcSpill, "ProcSpill must stay nil when no workfile entry matches")
+}
+
+func TestEnrichWithWorkfileUsage_PartialMatch(t *testing.T) {
+	// Two proc infos; only one has a matching workfile entry.
+	infos := []*pbc.GpPidProcInfo{
+		{GpSegmentId: 0, Pid: 10},
+		{GpSegmentId: 1, Pid: 20},
+	}
+	entries := []workfile_usage.WorkfileUsageEntry{
+		{SegID: 1, Pid: 20, Size: 2048, NumFiles: 4},
+	}
+	enrichWithWorkfileUsage(infos, entries)
+
+	assert.Nil(t, infos[0].ProcSpill, "unmatched entry must keep nil ProcSpill")
+	require.NotNil(t, infos[1].ProcSpill)
+	assert.Equal(t, int64(2048), infos[1].ProcSpill.Size)
+	assert.Equal(t, int64(4), infos[1].ProcSpill.Files)
+}
+
+func TestEnrichWithWorkfileUsage_MultipleEntriesSameKey(t *testing.T) {
+	// Two workfile rows with the same (SegID, Pid) — sizes and file counts
+	// must be summed defensively.
+	infos := []*pbc.GpPidProcInfo{
+		{GpSegmentId: 2, Pid: 77},
+	}
+	entries := []workfile_usage.WorkfileUsageEntry{
+		{SegID: 2, Pid: 77, Size: 1_000_000, NumFiles: 5},
+		{SegID: 2, Pid: 77, Size: 500_000, NumFiles: 3},
+	}
+	enrichWithWorkfileUsage(infos, entries)
+
+	require.NotNil(t, infos[0].ProcSpill)
+	assert.Equal(t, int64(1_500_000), infos[0].ProcSpill.Size)
+	assert.Equal(t, int64(8), infos[0].ProcSpill.Files)
+}
+
+func TestEnrichWithWorkfileUsage_MultipleProcsMultipleEntries(t *testing.T) {
+	infos := []*pbc.GpPidProcInfo{
+		{GpSegmentId: 0, Pid: 1},
+		{GpSegmentId: 0, Pid: 2},
+		{GpSegmentId: 1, Pid: 1},
+	}
+	entries := []workfile_usage.WorkfileUsageEntry{
+		{SegID: 0, Pid: 1, Size: 100, NumFiles: 1},
+		{SegID: 0, Pid: 2, Size: 200, NumFiles: 2},
+		// No entry for (1, 1)
+	}
+	enrichWithWorkfileUsage(infos, entries)
+
+	require.NotNil(t, infos[0].ProcSpill)
+	assert.Equal(t, int64(100), infos[0].ProcSpill.Size)
+	assert.Equal(t, int64(1), infos[0].ProcSpill.Files)
+
+	require.NotNil(t, infos[1].ProcSpill)
+	assert.Equal(t, int64(200), infos[1].ProcSpill.Size)
+	assert.Equal(t, int64(2), infos[1].ProcSpill.Files)
+
+	assert.Nil(t, infos[2].ProcSpill, "(1,1) has no workfile entry — ProcSpill must remain nil")
+}
+
+func TestEnrichWithWorkfileUsage_ZeroValues(t *testing.T) {
+	// A workfile entry with Size=0 and NumFiles=0 (e.g. query just started spilling)
+	// should still populate ProcSpill (with zero values) so callers know the entry exists.
+	infos := []*pbc.GpPidProcInfo{
+		{GpSegmentId: 3, Pid: 55},
+	}
+	entries := []workfile_usage.WorkfileUsageEntry{
+		{SegID: 3, Pid: 55, Size: 0, NumFiles: 0},
+	}
+	enrichWithWorkfileUsage(infos, entries)
+	require.NotNil(t, infos[0].ProcSpill)
+	assert.Equal(t, int64(0), infos[0].ProcSpill.Size)
+	assert.Equal(t, int64(0), infos[0].ProcSpill.Files)
 }

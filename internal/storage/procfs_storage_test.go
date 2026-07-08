@@ -326,6 +326,69 @@ func TestRegisterProcfsStat_NilSubFields(t *testing.T) {
 	assert.Nil(t, stat.ProcStat)
 	assert.Nil(t, stat.ProcStatus)
 	assert.Nil(t, stat.ProcIO)
+	assert.Nil(t, stat.ProcSpill)
+}
+
+func TestRegisterProcfsStat_ProcSpillStoredAndReturned(t *testing.T) {
+	ps := NewProcfsStorage()
+	now := time.Now()
+	procs := []*pbc.GpPidProcInfo{{
+		GpSegmentId: 2, SessId: 50, Pid: 99,
+		Cmdline: "spilly", State: "R",
+		ProcIo:    &pbc.ProcIO{ReadBytes: 1024},
+		ProcSpill: &pbc.ProcSpill{Size: 5_000_000, Files: 12},
+	}}
+	ps.RegisterProcfsStat(now, procs)
+
+	ps.mx.RLock()
+	defer ps.mx.RUnlock()
+	key := ProcKey{GpSegmentId: 2, SessId: 50, Pid: 99}
+	stat, ok := ps.procfsStat[0].pidProcData[key]
+	require.True(t, ok)
+	require.NotNil(t, stat.ProcSpill, "ProcSpill should be stored in the internal ProcStat")
+	assert.Equal(t, int64(5_000_000), stat.ProcSpill.Size)
+	assert.Equal(t, int64(12), stat.ProcSpill.Files)
+}
+
+func TestToGpPidProcInfo_ProcSpillRoundTrip(t *testing.T) {
+	spill := &pbc.ProcSpill{Size: 8_000_000, Files: 7}
+	ps := &ProcStat{
+		Cmdline:    "cmd",
+		State:      "R",
+		ProcStat:   &pbc.ProcStat{Utime: 42},
+		ProcStatus: &pbc.ProcStatus{VmRss: 256},
+		ProcIO:     &pbc.ProcIO{WriteBytes: 512},
+		ProcSpill:  spill,
+	}
+	key := ProcKey{GpSegmentId: 3, SessId: 7, Pid: 111}
+	info := ps.ToGpPidProcInfo(key)
+
+	require.NotNil(t, info.ProcSpill, "ToGpPidProcInfo must carry ProcSpill into the proto message")
+	assert.Equal(t, int64(8_000_000), info.ProcSpill.Size)
+	assert.Equal(t, int64(7), info.ProcSpill.Files)
+}
+
+func TestToGpPidProcInfo_NilProcSpillPreserved(t *testing.T) {
+	ps := &ProcStat{Cmdline: "cmd", State: "S", ProcSpill: nil}
+	info := ps.ToGpPidProcInfo(ProcKey{GpSegmentId: 0, SessId: 1, Pid: 2})
+	assert.Nil(t, info.ProcSpill, "nil ProcSpill must remain nil after conversion")
+}
+
+func TestRegisterProcfsStat_ProcSpillNilWhenAbsent(t *testing.T) {
+	ps := NewProcfsStorage()
+	now := time.Now()
+	// No ProcSpill field set — it should be nil in storage.
+	procs := []*pbc.GpPidProcInfo{{
+		GpSegmentId: 1, SessId: 10, Pid: 20,
+		ProcIo: &pbc.ProcIO{ReadBytes: 100},
+	}}
+	ps.RegisterProcfsStat(now, procs)
+
+	ps.mx.RLock()
+	defer ps.mx.RUnlock()
+	stat := ps.procfsStat[0].pidProcData[ProcKey{GpSegmentId: 1, SessId: 10, Pid: 20}]
+	require.NotNil(t, stat)
+	assert.Nil(t, stat.ProcSpill)
 }
 
 // --- TidyUpProcfsStat ---

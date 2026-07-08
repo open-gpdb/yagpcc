@@ -135,6 +135,7 @@ type grpcClientSet struct {
 	getGPInfoClient    pbm.GetGPInfoClient
 	getSessionMocker   *MockStatActivityLister
 	backgroundStorage  *master.BackgroundStorage
+	procfsStorage      *storage.ProcfsStorage
 }
 
 func setupGRPCClientSet(t *testing.T, sessionMocker *MockStatActivityLister) (*grpcClientSet, func()) {
@@ -155,7 +156,7 @@ func setupGRPCClientSet(t *testing.T, sessionMocker *MockStatActivityLister) (*g
 	aggStorage := storage.NewAggregatedStorage(zLogger)
 	procfsStorage := storage.NewProcfsStorage()
 	sessStorage := gp.NewSessionsStorage(zLogger, rqStorage, procfsStorage)
-	backgroundStorage := master.NewBackgroundStorage(zLogger, sessStorage, rqStorage, aggStorage, procfsStorage, sessionMocker)
+	backgroundStorage := master.NewBackgroundStorage(zLogger, sessStorage, rqStorage, aggStorage, procfsStorage, sessionMocker, nil)
 
 	conn, err := gogrpc.NewClient(
 		"localhost",
@@ -181,5 +182,6 @@ func setupGRPCClientSet(t *testing.T, sessionMocker *MockStatActivityLister) (*g
 		getGPInfoClient:    pbm.NewGetGPInfoClient(conn),
 		getSessionMocker:   sessionMocker,
 		backgroundStorage:  backgroundStorage,
+		procfsStorage:      procfsStorage,
 	}, cleanup
 }
