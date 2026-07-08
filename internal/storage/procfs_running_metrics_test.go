@@ -320,6 +320,175 @@ func TestGetProcfsQueryRuntimeMetrics_UsesParsedSliceAndSkipsIdleWithoutSlice(t 
 	assert.Equal(t, int64(40), metrics[2].RuntimeMetrics.Utime)
 }
 
+func TestGetHostsRunningQueries(t *testing.T) {
+	SegmentConfigLock.Lock()
+	oldMap := SegmentMap
+	SegmentMap = make(map[SegmentKey]*SegmentConfig)
+	SegmentConfigLock.Unlock()
+	defer func() {
+		SegmentConfigLock.Lock()
+		SegmentMap = oldMap
+		SegmentConfigLock.Unlock()
+	}()
+	SetHostnameForSegindex(0, "host-a")
+	SetHostnameForSegindex(1, "host-a")
+	SetHostnameForSegindex(2, "host-b")
+
+	ps := NewProcfsStorage()
+	base := time.Now().Add(-time.Second)
+	ps.RegisterProcfsStatWithHostStat(base, []*pbc.GpPidProcInfo{
+		{GpSegmentId: 0, SessId: 100, Pid: 10, Ccnt: 7, SliceId: 1, State: "SELECT", ProcStat: &pbc.ProcStat{Utime: 0, Stime: 0}, ProcStatus: &pbc.ProcStatus{VmRss: 10}, ProcIo: &pbc.ProcIO{ReadBytes: 0, WriteBytes: 0}},
+		{GpSegmentId: 1, SessId: 100, Pid: 11, Ccnt: 7, SliceId: 1, State: "SELECT", ProcStat: &pbc.ProcStat{Utime: 0, Stime: 0}, ProcStatus: &pbc.ProcStatus{VmRss: 20}, ProcIo: &pbc.ProcIO{ReadBytes: 0, WriteBytes: 0}},
+		{GpSegmentId: 1, SessId: 101, Pid: 12, Ccnt: 8, SliceId: 1, State: "idle", ProcStat: &pbc.ProcStat{Utime: 0, Stime: 0}, ProcStatus: &pbc.ProcStatus{VmRss: 5}, ProcIo: &pbc.ProcIO{ReadBytes: 0, WriteBytes: 0}},
+	}, HostStatMap{"host-a": {LoadAvg: &HostLoadAvg{Avg5: 4.4}, CPUUsage: 0.4}}, 2, 1)
+	ps.RegisterProcfsStatWithHostStat(base.Add(time.Second), []*pbc.GpPidProcInfo{
+		{GpSegmentId: 0, SessId: 100, Pid: 10, Ccnt: 7, SliceId: 1, State: "SELECT", ProcStat: &pbc.ProcStat{Utime: 10, Stime: 0}, ProcStatus: &pbc.ProcStatus{VmRss: 100}, ProcIo: &pbc.ProcIO{ReadBytes: 100, WriteBytes: 10}, ProcSpill: &pbc.ProcSpill{Size: 1000}},
+		{GpSegmentId: 1, SessId: 100, Pid: 11, Ccnt: 7, SliceId: 1, State: "SELECT", ProcStat: &pbc.ProcStat{Utime: 40, Stime: 0}, ProcStatus: &pbc.ProcStatus{VmRss: 200}, ProcIo: &pbc.ProcIO{ReadBytes: 400, WriteBytes: 40}, ProcSpill: &pbc.ProcSpill{Size: 4000}},
+		{GpSegmentId: 1, SessId: 101, Pid: 12, Ccnt: 8, SliceId: 1, State: "idle", ProcStat: &pbc.ProcStat{Utime: 2, Stime: 0}, ProcStatus: &pbc.ProcStatus{VmRss: 50}, ProcIo: &pbc.ProcIO{ReadBytes: 10, WriteBytes: 1}},
+	}, HostStatMap{"host-a": {LoadAvg: &HostLoadAvg{Avg5: 5.5}, CPUUsage: 0.9}}, 2, 1)
+
+	hosts, err := ps.GetHostsRunningQueries()
+	require.NoError(t, err)
+	require.Len(t, hosts, 2)
+	hostA := hosts[0]
+	require.Equal(t, "host-a", hostA.HostName)
+	assert.Equal(t, []int32{0, 1}, hostA.Segindex)
+	assert.Equal(t, int64(1), hostA.ActiveQueries)
+	assert.Equal(t, int64(2), hostA.ActiveSlices)
+	assert.Equal(t, 0.9, hostA.CPUUsage)
+	assert.Equal(t, 5.5, hostA.Avg5)
+	assert.Equal(t, int64(350), hostA.MemoryUsage)
+	assert.Equal(t, int64(510), hostA.DiskReads)
+	assert.Equal(t, int64(51), hostA.DiskWrites)
+	assert.Equal(t, int64(561), hostA.DiskUsage)
+	assert.Equal(t, int64(5000), hostA.SpillBytes)
+	require.NotNil(t, hostA.Skew)
+	assert.InDelta(t, 0.375, hostA.Skew.Skew, 0.000001)
+	assert.Equal(t, int32(1), hostA.Skew.Segindex)
+	require.NotNil(t, hostA.DataQuality)
+	assert.False(t, hostA.DataQuality.IsPartial)
+
+	hostB := hosts[1]
+	assert.Equal(t, "host-b", hostB.HostName)
+	assert.Equal(t, []int32{2}, hostB.Segindex)
+	require.NotNil(t, hostB.DataQuality)
+	assert.True(t, hostB.DataQuality.IsPartial)
+}
+
+func TestHostRunningAccumulatorCornerCases(t *testing.T) {
+	acc := newHostRunningAccumulator("host-x", []int32{3, 4}, &pbc.DataQuality{})
+	acc.addProc(3, nil, nil, true)
+	acc.addProc(3,
+		&ProcStat{Ccnt: 5, SliceId: 1, State: "idle", ProcStatus: &pbc.ProcStatus{VmRss: 10}},
+		&pbc.GpPidProcInfo{ProcIo: &pbc.ProcIO{ReadBytes: 1, WriteBytes: 2}},
+		false,
+	)
+	acc.addProc(4,
+		&ProcStat{Ccnt: 6, SliceId: UnsetSliceId, State: "SELECT", ProcStatus: &pbc.ProcStatus{VmRss: 20}, ProcSpill: &pbc.ProcSpill{Size: 30}},
+		&pbc.GpPidProcInfo{ProcStat: &pbc.ProcStat{Utime: 10}, ProcIo: &pbc.ProcIO{ReadBytes: 3, WriteBytes: 4}},
+		true,
+	)
+	acc.addProc(4,
+		&ProcStat{Ccnt: 6, SliceId: UnsetSliceId, State: "SELECT", ProcStatus: &pbc.ProcStatus{VmRss: 40}},
+		&pbc.GpPidProcInfo{ProcStat: &pbc.ProcStat{Utime: 20}, ProcIo: &pbc.ProcIO{ReadBytes: 5, WriteBytes: 6}},
+		true,
+	)
+
+	result := acc.result()
+	assert.Equal(t, "host-x", result.HostName)
+	assert.Equal(t, []int32{3, 4}, result.Segindex)
+	assert.Equal(t, int64(1), result.ActiveQueries)
+	assert.Equal(t, int64(1), result.ActiveSlices)
+	assert.Equal(t, int64(70), result.MemoryUsage)
+	assert.Equal(t, int64(9), result.DiskReads)
+	assert.Equal(t, int64(12), result.DiskWrites)
+	assert.Equal(t, int64(21), result.DiskUsage)
+	assert.Equal(t, int64(30), result.SpillBytes)
+	require.NotNil(t, result.Skew)
+	assert.Equal(t, 0.0, result.Skew.Skew)
+}
+
+func TestGetHostsRunningQueriesRichMultiHost(t *testing.T) {
+	SegmentConfigLock.Lock()
+	oldMap := SegmentMap
+	SegmentMap = make(map[SegmentKey]*SegmentConfig)
+	SegmentConfigLock.Unlock()
+	defer func() {
+		SegmentConfigLock.Lock()
+		SegmentMap = oldMap
+		SegmentConfigLock.Unlock()
+	}()
+	SetHostnameForSegindex(0, "host-a")
+	SetHostnameForSegindex(1, "host-a")
+	SetHostnameForSegindex(2, "host-b")
+	SetHostnameForSegindex(3, "host-c")
+
+	ps := NewProcfsStorage()
+	base := time.Now().Add(-time.Second)
+	ps.RegisterProcfsStatWithHostStat(base, []*pbc.GpPidProcInfo{
+		{GpSegmentId: 0, SessId: 1, Pid: 10, Ccnt: 1, SliceId: 1, State: "SELECT", ProcStat: &pbc.ProcStat{Utime: 0}, ProcStatus: &pbc.ProcStatus{VmRss: 1}, ProcIo: &pbc.ProcIO{}},
+		{GpSegmentId: 1, SessId: 1, Pid: 11, Ccnt: 1, SliceId: 1, State: "SELECT", ProcStat: &pbc.ProcStat{Utime: 0}, ProcStatus: &pbc.ProcStatus{VmRss: 1}, ProcIo: &pbc.ProcIO{}},
+		{GpSegmentId: 1, SessId: 2, Pid: 12, Ccnt: 2, SliceId: 2, State: "SELECT", ProcStat: &pbc.ProcStat{Utime: 0}, ProcStatus: &pbc.ProcStatus{VmRss: 1}, ProcIo: &pbc.ProcIO{}},
+		{GpSegmentId: 2, SessId: 3, Pid: 20, Ccnt: 3, SliceId: 1, State: "idle", ProcStat: &pbc.ProcStat{Utime: 0}, ProcStatus: &pbc.ProcStatus{VmRss: 1}, ProcIo: &pbc.ProcIO{}},
+		{GpSegmentId: 4, SessId: 4, Pid: 40, Ccnt: 4, SliceId: 1, State: "SELECT", ProcStat: &pbc.ProcStat{Utime: 0}, ProcStatus: &pbc.ProcStatus{VmRss: 1}, ProcIo: &pbc.ProcIO{}},
+	}, HostStatMap{
+		"host-a": {LoadAvg: &HostLoadAvg{Avg5: 1.1}, CPUUsage: 0.11},
+		"host-b": {LoadAvg: &HostLoadAvg{Avg5: 2.2}, CPUUsage: 0.22},
+		"host-c": {LoadAvg: &HostLoadAvg{Avg5: 3.3}, CPUUsage: 0.33},
+	}, 4, 3)
+	ps.RegisterProcfsStatWithHostStat(base.Add(time.Second), []*pbc.GpPidProcInfo{
+		{GpSegmentId: 0, SessId: 1, Pid: 10, Ccnt: 1, SliceId: 1, State: "SELECT", ProcStat: &pbc.ProcStat{Utime: 10}, ProcStatus: &pbc.ProcStatus{VmRss: 10}, ProcIo: &pbc.ProcIO{ReadBytes: 10, WriteBytes: 1}},
+		{GpSegmentId: 1, SessId: 1, Pid: 11, Ccnt: 1, SliceId: 1, State: "SELECT", ProcStat: &pbc.ProcStat{Utime: 30}, ProcStatus: &pbc.ProcStatus{VmRss: 20}, ProcIo: &pbc.ProcIO{ReadBytes: 30, WriteBytes: 3}, ProcSpill: &pbc.ProcSpill{Size: 300}},
+		{GpSegmentId: 1, SessId: 2, Pid: 12, Ccnt: 2, SliceId: 2, State: "SELECT", ProcStat: &pbc.ProcStat{Utime: 60}, ProcStatus: &pbc.ProcStatus{VmRss: 40}, ProcIo: &pbc.ProcIO{ReadBytes: 60, WriteBytes: 6}, ProcSpill: &pbc.ProcSpill{Size: 600}},
+		{GpSegmentId: 2, SessId: 3, Pid: 20, Ccnt: 3, SliceId: 1, State: "idle", ProcStat: &pbc.ProcStat{Utime: 100}, ProcStatus: &pbc.ProcStatus{VmRss: 200}, ProcIo: &pbc.ProcIO{ReadBytes: 20, WriteBytes: 2}},
+		{GpSegmentId: 4, SessId: 4, Pid: 40, Ccnt: 4, SliceId: 1, State: "SELECT", ProcStat: &pbc.ProcStat{Utime: 40}, ProcStatus: &pbc.ProcStatus{VmRss: 400}, ProcIo: &pbc.ProcIO{ReadBytes: 40, WriteBytes: 4}},
+	}, HostStatMap{
+		"host-a": {LoadAvg: &HostLoadAvg{Avg5: 4.4}, CPUUsage: 0.44},
+		"host-b": {LoadAvg: &HostLoadAvg{Avg5: 5.5}, CPUUsage: 0.55},
+		"host-c": {LoadAvg: &HostLoadAvg{Avg5: 6.6}, CPUUsage: 0.66},
+	}, 4, 3)
+
+	hosts, err := ps.GetHostsRunningQueries()
+	require.NoError(t, err)
+	byHost := make(map[string]*HostRunningQueriesInfo, len(hosts))
+	for _, host := range hosts {
+		byHost[host.HostName] = host
+	}
+	require.Contains(t, byHost, "host-a")
+	require.Contains(t, byHost, "host-b")
+	require.Contains(t, byHost, "host-c")
+	require.Contains(t, byHost, "4")
+
+	hostA := byHost["host-a"]
+	assert.Equal(t, []int32{0, 1}, hostA.Segindex)
+	assert.Equal(t, int64(2), hostA.ActiveQueries)
+	assert.Equal(t, int64(3), hostA.ActiveSlices)
+	assert.Equal(t, int64(70), hostA.MemoryUsage)
+	assert.Equal(t, int64(100), hostA.DiskReads)
+	assert.Equal(t, int64(10), hostA.DiskWrites)
+	assert.Equal(t, int64(900), hostA.SpillBytes)
+	assert.InDelta(t, 0.333333, hostA.Skew.Skew, 0.000001)
+	assert.Equal(t, int32(1), hostA.Skew.Segindex)
+
+	hostB := byHost["host-b"]
+	assert.Equal(t, int64(0), hostB.ActiveQueries)
+	assert.Equal(t, int64(0), hostB.ActiveSlices)
+	assert.Equal(t, int64(200), hostB.MemoryUsage)
+	assert.False(t, hostB.DataQuality.IsPartial)
+
+	hostC := byHost["host-c"]
+	assert.Equal(t, []int32{3}, hostC.Segindex)
+	assert.Equal(t, int64(0), hostC.ActiveQueries)
+	assert.Equal(t, 0.66, hostC.CPUUsage)
+	assert.Equal(t, 6.6, hostC.Avg5)
+	assert.False(t, hostC.DataQuality.IsPartial)
+
+	fallbackHost := byHost["4"]
+	assert.Equal(t, []int32{4}, fallbackHost.Segindex)
+	assert.Equal(t, int64(1), fallbackHost.ActiveQueries)
+	assert.True(t, fallbackHost.DataQuality.IsPartial)
+}
+
 func TestGetProcfsQueryRuntimeMetricsNilAndMissingQuery(t *testing.T) {
 	ps := NewProcfsStorage()
 	base := time.Now().Add(-time.Second)

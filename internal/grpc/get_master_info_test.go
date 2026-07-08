@@ -400,6 +400,40 @@ func TestGetGPQueryRunningMatrics(t *testing.T) {
 	assert.True(t, response.DataQuality.IsPartial)
 }
 
+func TestGetGPHostsRunningQueries(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	sessionMocker := NewMockStatActivityLister(ctrl)
+	clientSet, cleanup := setupGRPCClientSet(t, sessionMocker)
+	defer cleanup()
+
+	storage.SetHostnameForSegindex(0, "grpc-host")
+	base := time.Now().Add(-time.Second)
+	clientSet.procfsStorage.RegisterProcfsStatWithHostStat(base, []*pbc.GpPidProcInfo{
+		{GpSegmentId: 0, SessId: 88, Pid: 10, Ccnt: 9, SliceId: 1, State: "SELECT", ProcStat: &pbc.ProcStat{Utime: 0}, ProcStatus: &pbc.ProcStatus{VmRss: 10}, ProcIo: &pbc.ProcIO{ReadBytes: 0}},
+	}, storage.HostStatMap{"grpc-host": {LoadAvg: &storage.HostLoadAvg{Avg5: 1.5}, CPUUsage: 0.1}}, 1, 1)
+	clientSet.procfsStorage.RegisterProcfsStatWithHostStat(base.Add(time.Second), []*pbc.GpPidProcInfo{
+		{GpSegmentId: 0, SessId: 88, Pid: 10, Ccnt: 9, SliceId: 1, State: "SELECT", ProcStat: &pbc.ProcStat{Utime: 20}, ProcStatus: &pbc.ProcStatus{VmRss: 100}, ProcIo: &pbc.ProcIO{ReadBytes: 200, WriteBytes: 20}, ProcSpill: &pbc.ProcSpill{Size: 300}},
+	}, storage.HostStatMap{"grpc-host": {LoadAvg: &storage.HostLoadAvg{Avg5: 2.5}, CPUUsage: 0.6}}, 1, 1)
+
+	response, err := clientSet.GetGetGPInfoClient().GetGPHostsRunningQueries(context.Background(), &pbm.GetGPHostsRunningQueriesReq{})
+	require.NoError(t, err)
+	require.Len(t, response.Hosts, 1)
+	host := response.Hosts[0]
+	assert.Equal(t, "grpc-host", host.HostName)
+	assert.Equal(t, []int32{0}, host.Segindex)
+	assert.Equal(t, int64(1), host.ActiveQueries)
+	assert.Equal(t, int64(1), host.ActiveSlices)
+	assert.Equal(t, 0.6, host.CpuUsage)
+	assert.Equal(t, 2.5, host.Avg5)
+	assert.Equal(t, int64(100), host.MemoryUsage)
+	assert.Equal(t, int64(200), host.DiskReads)
+	assert.Equal(t, int64(20), host.DiskWrites)
+	assert.Equal(t, int64(220), host.DiskUsage)
+	assert.Equal(t, int64(300), host.SpillBytes)
+	require.NotNil(t, host.DataQuality)
+	assert.False(t, host.DataQuality.IsPartial)
+}
+
 func TestGetGPQueryRunningMatricsReturnsEmptyOnNoProcfsData(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	sessionMocker := NewMockStatActivityLister(ctrl)

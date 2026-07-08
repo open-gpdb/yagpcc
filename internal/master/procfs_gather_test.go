@@ -120,6 +120,13 @@ func (s *dataProcStatServer) GetMetricQueries(context.Context, *pb.GetQueriesInf
 	return &pb.GetQueriesInfoResponse{}, nil
 }
 
+func (s *dataProcStatServer) GetHostStat(context.Context, *pb.GetHostStatReq) (*pb.GetHostStatResponse, error) {
+	return &pb.GetHostStatResponse{
+		LoadAvg:  &pb.LoadAvg{Avg1: 1.0, Avg5: 5.0, Avg15: 15.0},
+		CpuUsage: &pb.CpuUsage{CpuUsage: 0.42},
+	}, nil
+}
+
 func (s *dataProcStatServer) getCalls() int {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -404,6 +411,34 @@ func TestProcessProcfsRequests_EmptyRequests(t *testing.T) {
 	called, _ := fakeSrv.snapshot()
 	assert.False(t, called, "GetPidProcStat should not be called with empty segment list")
 	assert.Empty(t, result)
+}
+
+func TestProcessHostStatRequest_Success(t *testing.T) {
+	dataSrv := &dataProcStatServer{}
+	lis := setupBufconnServer(t, dataSrv)
+	hostname := injectBufconn(t, lis)
+
+	ps := newTestProcfsGatherStorage(nil)
+	result, err := ps.processHostStatRequest(context.Background(), hostname, 0, 5*time.Second, 4*1024*1024)
+	require.NoError(t, err)
+	require.NotNil(t, result)
+	require.NotNil(t, result.LoadAvg)
+	assert.Equal(t, 1.0, result.LoadAvg.Avg1)
+	assert.Equal(t, 5.0, result.LoadAvg.Avg5)
+	assert.Equal(t, 15.0, result.LoadAvg.Avg15)
+	assert.Equal(t, 0.42, result.CPUUsage)
+}
+
+func TestGatherHostStatForHosts(t *testing.T) {
+	dataSrv := &dataProcStatServer{}
+	lis := setupBufconnServer(t, dataSrv)
+	hostname := injectBufconn(t, lis)
+
+	ps := newTestProcfsGatherStorage(nil)
+	result := ps.GatherHostStatForHosts(context.Background(), 2, 0, 5*time.Second, 4*1024*1024, []string{hostname, "missing-host"})
+	require.Contains(t, result, hostname)
+	assert.Equal(t, 0.42, result[hostname].CPUUsage)
+	assert.NotContains(t, result, "missing-host")
 }
 
 // ============================================================

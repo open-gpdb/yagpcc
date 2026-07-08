@@ -37,6 +37,7 @@ const _ = grpc.SupportPackageIsVersion9
 const (
 	GetQueryInfo_GetMetricQueries_FullMethodName = "/yagpcc.GetQueryInfo/GetMetricQueries"
 	GetQueryInfo_GetPidProcStat_FullMethodName   = "/yagpcc.GetQueryInfo/GetPidProcStat"
+	GetQueryInfo_GetHostStat_FullMethodName      = "/yagpcc.GetQueryInfo/GetHostStat"
 )
 
 // GetQueryInfoClient is the client API for GetQueryInfo service.
@@ -45,6 +46,7 @@ const (
 type GetQueryInfoClient interface {
 	GetMetricQueries(ctx context.Context, in *GetQueriesInfoReq, opts ...grpc.CallOption) (*GetQueriesInfoResponse, error)
 	GetPidProcStat(ctx context.Context, in *GetPidProcInfoReq, opts ...grpc.CallOption) (*GetPidProcInfoResponse, error)
+	GetHostStat(ctx context.Context, in *GetHostStatReq, opts ...grpc.CallOption) (*GetHostStatResponse, error)
 }
 
 type getQueryInfoClient struct {
@@ -75,12 +77,23 @@ func (c *getQueryInfoClient) GetPidProcStat(ctx context.Context, in *GetPidProcI
 	return out, nil
 }
 
+func (c *getQueryInfoClient) GetHostStat(ctx context.Context, in *GetHostStatReq, opts ...grpc.CallOption) (*GetHostStatResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(GetHostStatResponse)
+	err := c.cc.Invoke(ctx, GetQueryInfo_GetHostStat_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // GetQueryInfoServer is the server API for GetQueryInfo service.
 // All implementations must embed UnimplementedGetQueryInfoServer
 // for forward compatibility.
 type GetQueryInfoServer interface {
 	GetMetricQueries(context.Context, *GetQueriesInfoReq) (*GetQueriesInfoResponse, error)
 	GetPidProcStat(context.Context, *GetPidProcInfoReq) (*GetPidProcInfoResponse, error)
+	GetHostStat(context.Context, *GetHostStatReq) (*GetHostStatResponse, error)
 	mustEmbedUnimplementedGetQueryInfoServer()
 }
 
@@ -96,6 +109,9 @@ func (UnimplementedGetQueryInfoServer) GetMetricQueries(context.Context, *GetQue
 }
 func (UnimplementedGetQueryInfoServer) GetPidProcStat(context.Context, *GetPidProcInfoReq) (*GetPidProcInfoResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method GetPidProcStat not implemented")
+}
+func (UnimplementedGetQueryInfoServer) GetHostStat(context.Context, *GetHostStatReq) (*GetHostStatResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method GetHostStat not implemented")
 }
 func (UnimplementedGetQueryInfoServer) mustEmbedUnimplementedGetQueryInfoServer() {}
 func (UnimplementedGetQueryInfoServer) testEmbeddedByValue()                      {}
@@ -154,6 +170,24 @@ func _GetQueryInfo_GetPidProcStat_Handler(srv interface{}, ctx context.Context, 
 	return interceptor(ctx, in, info, handler)
 }
 
+func _GetQueryInfo_GetHostStat_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetHostStatReq)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(GetQueryInfoServer).GetHostStat(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: GetQueryInfo_GetHostStat_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(GetQueryInfoServer).GetHostStat(ctx, req.(*GetHostStatReq))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // GetQueryInfo_ServiceDesc is the grpc.ServiceDesc for GetQueryInfo service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -168,6 +202,10 @@ var GetQueryInfo_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "GetPidProcStat",
 			Handler:    _GetQueryInfo_GetPidProcStat_Handler,
+		},
+		{
+			MethodName: "GetHostStat",
+			Handler:    _GetQueryInfo_GetHostStat_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

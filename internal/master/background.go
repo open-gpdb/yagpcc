@@ -463,6 +463,13 @@ func (bs *BackgroundStorage) GetQueryRunningMetrics(queryKey *pbc.QueryKey) ([]*
 	return bs.procfsStorage.GetQueryRunningMetrics(queryKey)
 }
 
+func (bs *BackgroundStorage) GetHostsRunningQueries() ([]*storage.HostRunningQueriesInfo, error) {
+	if bs.procfsStorage == nil {
+		return nil, fmt.Errorf("procfs storage is nil")
+	}
+	return bs.procfsStorage.GetHostsRunningQueries()
+}
+
 func (bs *BackgroundStorage) TryRefreshSessionsFromGP(
 	ctx context.Context,
 	clearDeletedSessions bool,
@@ -694,7 +701,12 @@ func (bs *BackgroundStorage) RefreshProcfs(ctx context.Context, procfsRefreshInt
 		case <-ticker.C:
 			currTime := time.Now()
 			bs.l.Debugf("Refresh procfs stat %v", currTime)
+			hostStatsCh := make(chan storage.HostStatMap, 1)
+			go func() {
+				hostStatsCh <- procfsGatherer.GatherHostStatForHosts(ctx, nPullers, portn, procfsRefreshInterval, msgSize, storage.GetConfiguredHostnames())
+			}()
 			result, err := procfsGatherer.GatherProcfsStat(ctx, nPullers, portn, procfsRefreshInterval, msgSize)
+			hostStats := <-hostStatsCh
 			if err != nil {
 				// just log error, do not fail the whole service
 				bs.l.Errorf("fail to get procfs data %v", err)
@@ -710,7 +722,7 @@ func (bs *BackgroundStorage) RefreshProcfs(ctx context.Context, procfsRefreshInt
 				enrichWithWorkfileUsage(result, usageEntries)
 			}
 
-			bs.procfsStorage.RegisterProcfsStatWithDataQuality(currTime, result, procfsGatherer.LastHostsExpected(), procfsGatherer.LastHostsResponded())
+			bs.procfsStorage.RegisterProcfsStatWithHostStat(currTime, result, hostStats, procfsGatherer.LastHostsExpected(), procfsGatherer.LastHostsResponded())
 			// measure only successful latencies
 			if metrics.YagpccMetrics != nil {
 				metrics.YagpccMetrics.HandleLatencies.With(map[string]string{"method": "RefreshProcfs"}).Observe(time.Since(currTime).Seconds())

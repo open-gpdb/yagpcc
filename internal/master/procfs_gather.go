@@ -137,6 +137,59 @@ func (ps *ProcfsGatherStorage) processProcfsRequests(ctx context.Context, hostna
 	return result, nil
 }
 
+func (ps *ProcfsGatherStorage) processHostStatRequest(ctx context.Context, hostname string, portn uint32, gatherTimeout time.Duration, maxMsgSize int) (*storage.HostStat, error) {
+	grpcConn, err := getGrpcClientConnection(ctx, hostname, portn, gatherTimeout.Seconds())
+	if err != nil {
+		return nil, fmt.Errorf("grpc client connection error: %w", err)
+	}
+	cGet := pb.NewGetQueryInfoClient(grpcConn)
+	ctxTimeout, ctxCancel := context.WithTimeout(ctx, gatherTimeout)
+	defer ctxCancel()
+	response, err := cGet.GetHostStat(ctxTimeout, &pb.GetHostStatReq{}, grpc.MaxCallRecvMsgSize(maxMsgSize))
+	if err != nil {
+		return nil, fmt.Errorf("grpc get host stat error: hostname %v port %v error %w", hostname, portn, err)
+	}
+	result := &storage.HostStat{}
+	if loadAvg := response.GetLoadAvg(); loadAvg != nil {
+		result.LoadAvg = &storage.HostLoadAvg{Avg1: loadAvg.GetAvg1(), Avg5: loadAvg.GetAvg5(), Avg15: loadAvg.GetAvg15()}
+	}
+	if cpuUsage := response.GetCpuUsage(); cpuUsage != nil {
+		result.CPUUsage = cpuUsage.GetCpuUsage()
+	}
+	return result, nil
+}
+
+func (ps *ProcfsGatherStorage) GatherHostStatForHosts(ctx context.Context, nPullers int, portn uint32, gatherTimeout time.Duration, maxMsgSize int, hostnames []string) storage.HostStatMap {
+	if nPullers <= 0 || len(hostnames) == 0 {
+		return storage.HostStatMap{}
+	}
+	ctxT, ctxTC := context.WithTimeout(ctx, gatherTimeout)
+	defer ctxTC()
+
+	var mu sync.Mutex
+	result := make(storage.HostStatMap, len(hostnames))
+	sem := make(chan struct{}, nPullers)
+	var wg sync.WaitGroup
+	for _, hostname := range hostnames {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			sem <- struct{}{}
+			defer func() { <-sem }()
+			hostStat, err := ps.processHostStatRequest(ctxT, hostname, portn, gatherTimeout, maxMsgSize)
+			if err != nil {
+				ps.l.Warnf("failed to gather host stat from host %s: %v", hostname, err)
+				return
+			}
+			mu.Lock()
+			result[hostname] = hostStat
+			mu.Unlock()
+		}()
+	}
+	wg.Wait()
+	return result
+}
+
 func (ps *ProcfsGatherStorage) GatherProcfsStat(ctx context.Context, nPullers int, portn uint32, gatherTimeout time.Duration, maxMsgSize int) ([]*pbc.GpPidProcInfo, error) {
 	if nPullers <= 0 {
 		return nil, fmt.Errorf("nPullers must be greater than 0, got %d", nPullers)

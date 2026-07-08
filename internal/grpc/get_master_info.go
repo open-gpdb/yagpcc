@@ -438,6 +438,40 @@ func (s *GetMasterInfoServer) GetGPQueryRunningMatrics(ctx context.Context, in *
 	return response, nil
 }
 
+func (s *GetMasterInfoServer) GetGPHostsRunningQueries(ctx context.Context, in *pbm.GetGPHostsRunningQueriesReq) (*pbm.GetGPHostsRunningQueriesResponse, error) {
+	s.logger.Debugf("got get hosts running queries request %v", in)
+	start := time.Now()
+	hosts, err := s.backgroundStorage.GetHostsRunningQueries()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get hosts running queries: %w", err)
+	}
+	response := &pbm.GetGPHostsRunningQueriesResponse{Hosts: make([]*pbm.RunningHostInfo, 0, len(hosts))}
+	for _, host := range hosts {
+		if host == nil {
+			continue
+		}
+		response.Hosts = append(response.Hosts, &pbm.RunningHostInfo{
+			HostName:      host.HostName,
+			Segindex:      host.Segindex,
+			ActiveQueries: host.ActiveQueries,
+			ActiveSlices:  host.ActiveSlices,
+			CpuUsage:      host.CPUUsage,
+			MemoryUsage:   host.MemoryUsage,
+			DiskUsage:     host.DiskUsage,
+			SpillBytes:    host.SpillBytes,
+			Skew:          host.Skew,
+			DataQuality:   host.DataQuality,
+			Avg5:          host.Avg5,
+			DiskReads:     host.DiskReads,
+			DiskWrites:    host.DiskWrites,
+		})
+	}
+	if metrics.YagpccMetrics != nil {
+		metrics.YagpccMetrics.HandleLatencies.With(map[string]string{"method": "GetGPHostsRunningQueries"}).Observe(time.Since(start).Seconds())
+	}
+	return response, nil
+}
+
 func (s *GetMasterInfoServer) GetGPExtensions(ctx context.Context, in *pbm.GetGPExtensionsReq) (*pbm.GetGPExtensionsResponse, error) {
 	s.logger.Debugf("got get extensions request")
 	start := time.Now()
