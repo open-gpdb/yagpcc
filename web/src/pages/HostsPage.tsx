@@ -139,18 +139,19 @@ export default function HostsPage() {
     {
       title: "Data Quality",
       dataIndex: "dataQuality",
-      width: 140,
-      render: (dq: { segmentsExpected: number; segmentsReceived: number } | null) => {
+      width: 160,
+      render: (dq: { segmentsExpected: number; segmentsReceived: number; freshnessMs: number } | null) => {
         if (!dq) return "—";
-        const { segmentsReceived, segmentsExpected } = dq;
+        const { segmentsReceived, segmentsExpected, freshnessMs } = dq;
         const pct =
           segmentsExpected > 0
             ? Math.round((segmentsReceived / segmentsExpected) * 100)
             : 100;
         const color = pct === 100 ? "green" : pct > 50 ? "orange" : "red";
+        const ageSec = Math.round(freshnessMs / 1000);
         return (
-          <Tag color={color}>
-            {segmentsReceived}/{segmentsExpected} ({pct}%)
+          <Tag color={color} title={`${ageSec}s ago`}>
+            {segmentsReceived}/{segmentsExpected} ({pct}%, {ageSec}s)
           </Tag>
         );
       },
