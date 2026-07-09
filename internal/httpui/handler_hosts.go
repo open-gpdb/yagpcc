@@ -24,7 +24,7 @@ import (
 
 // handleGetHostsRunningQueries handles GET /api/hosts/running-queries
 //
-// Returns a JSON array of RunningHostInfo objects describing per-host
+// Returns a JSON object shaped like {"hosts": [...]} describing per-host
 // running-query statistics collected from procfs snapshots.
 func (s *Server) handleGetHostsRunningQueries(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
