@@ -22,7 +22,7 @@ function formatBytes(value?: number | null): string {
 function CpuUsageBadge({ value }: { value: number }) {
   const { mode } = useTheme();
   const c = getColors(mode);
-  const pct = Math.min(Math.round(value), 100);
+  const pct = Math.max(0, Math.min(Math.round(value * 100), 100));
   let color = c.green;
   if (pct > 80) color = c.red;
   else if (pct > 50) color = c.yellow;
