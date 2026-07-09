@@ -33,6 +33,11 @@ Service for querying Greenplum sessions, queries, and aggregate statistics.
 | **GetGPSession** | `GetGPSessionReq` | `GetGPSessionResponse` | Get a single session by session key. |
 | **GetTotalSessionsStat** | `GetTotalSessionsReq` | `GetTotalSessionsResponse` | Get aggregate session count by state. |
 | **GetGPExtensions** | `GetGPExtensionsReq` | `GetGPExtensionsResponse` | Get installed extensions for all databases. |
+| **ListDatabases** | `ListDatabasesReq` | `ListDatabasesResponse` | List available databases. |
+| **GetGPQueryRunningMatrics** | `GetGPQueryRunningMatricsReq` | `GetGPQueryRunningMatricsResponse` | Get procfs runtime metrics matrix (slice × segment) for a running query. |
+| **GetGPHostsRunningQueries** | `GetGPHostsRunningQueriesReq` | `GetGPHostsRunningQueriesResponse` | Get aggregated host-level statistics for all hosts with running queries. |
+| **GetGPHostRunningQueries** | `GetGPHostRunningQueriesReq` | `GetGPHostRunningQueriesResponse` | Get per-query details for a single host. |
+| **GetGpPidProcInfo** | `GetGpPidProcInfoReq` | `GpPidProcInfo` | Get procfs process info for a specific segment/slice of a query. |
 
 ### Request/response types
 
@@ -79,8 +84,80 @@ Service for querying Greenplum sessions, queries, and aggregate statistics.
 
 #### GetGPExtensionsReq / GetGPExtensionsResponse
 
-- **GetGPExtensionsReq**: empty.
+- **GetGPExtensionsReq**: optional `database_name` (empty = all databases).
 - **GetGPExtensionsResponse**: `databases` — `repeated DatabaseExtensionsInfo`.
+
+#### ListDatabasesReq / ListDatabasesResponse
+
+- **ListDatabasesReq**: empty.
+- **ListDatabasesResponse**: `databases` — `repeated DatabaseInfo` (each has `name` string).
+
+#### GetGPQueryRunningMatricsReq / GetGPQueryRunningMatricsResponse
+
+- **GetGPQueryRunningMatricsReq**: `query_key` (`QueryKey`).
+- **GetGPQueryRunningMatricsResponse**:
+  - `slice_id` (`repeated int64`) — all slice IDs observed.
+  - `segindex` (`repeated int32`) — all segment indices observed.
+  - `cell_metrics` (`repeated CellMetrics`) — one entry per (slice, segment) cell.
+  - `skew` (`Skew`) — CPU-time skew across segments.
+  - `data_quality` (`DataQuality`) — completeness/freshness metadata.
+
+**CellMetrics**:
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `slice_id` | `int64` | Slice ID. |
+| `segindex` | `int32` | Segment index. |
+| `runtime_metrics` | `RuntimeMetrics` | Process-level runtime metrics for this cell. |
+
+#### GetGPHostsRunningQueriesReq / GetGPHostsRunningQueriesResponse
+
+- **GetGPHostsRunningQueriesReq**: empty.
+- **GetGPHostsRunningQueriesResponse**: `hosts` — `repeated RunningHostInfo`.
+
+**RunningHostInfo**:
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `host_name` | `string` | Hostname. |
+| `segindex` | `repeated int32` | Segment indices on this host. |
+| `active_queries` | `int64` | Number of unique active (ssid, ccnt) pairs. |
+| `active_slices` | `int64` | Number of unique active slices. |
+| `cpu_usage` | `double` | Sum of CPU time (utime + stime) across all query processes, in clock ticks. |
+| `memory_usage` | `int64` | Sum of RSS (resident set size) across all query processes, in bytes. |
+| `disk_usage` | `int64` | Sum of disk I/O (read_bytes + write_bytes) across all query processes, in bytes. |
+| `spill_bytes` | `int64` | Sum of spill bytes across all query processes. |
+| `skew` | `Skew` | CPU-time skew across segments on this host. |
+| `data_quality` | `DataQuality` | Completeness/freshness of the data. |
+| `avg5` | `double` | 5-minute system load average (from `/proc/loadavg`). |
+| `disk_reads` | `int64` | Completed disk read operations (from `/proc/stat`). |
+| `disk_writes` | `int64` | Completed disk write operations (from `/proc/stat`). |
+| `total_sessions` | `int64` | Number of unique sessions (ssid values) on this host, including idle ones. For master processes (segindex == -1), the local hostname is used. |
+
+#### GetGPHostRunningQueriesReq / GetGPHostRunningQueriesResponse
+
+- **GetGPHostRunningQueriesReq**: `host_name` (string).
+- **GetGPHostRunningQueriesResponse**:
+  - `host_name` (`string`) — hostname.
+  - `segindex` (`repeated int32`) — segment indices on this host.
+  - `queries` (`repeated RunningQueryInfo`) — per-query details.
+  - `data_quality` (`DataQuality`).
+  - `next_page_token` (`string`) — pagination token.
+
+**RunningQueryInfo**:
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `query_key` | `QueryKey` | Query identifier. |
+| `user_name` | `string` | Database user. |
+| `db_name` | `string` | Database name. |
+| `query_text` | `string` | Query text. |
+| `runtime_metrics` | `RuntimeMetrics` | Process-level runtime metrics. |
+
+#### GetGpPidProcInfoReq / GpPidProcInfo
+
+- **GetGpPidProcInfoReq**: `query_key` (`QueryKey`), `segindex` (`int32`), `slice_id` (`int64`).
+- **GpPidProcInfo** (see "Common types" section below for full field list).
 
 ### Enums used by GetGPInfo
 
@@ -334,6 +411,58 @@ Container for system and Greenplum statistics (session or query).
 | `systemStat` | `SystemStat` | Procfs-based system stats. |
 | `instrumentation` | `MetricInstrumentation` | Plan node / buffer / interconnect stats. |
 | `spill` | `SpillInfo` | Spill file stats. |
+
+### GpPidProcInfo
+
+Process-level information collected from `/proc` filesystem for each Greenplum backend process.
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `gp_segment_id` | `int64` | Segment ID. |
+| `sess_id` | `int64` | Session ID. |
+| `pid` | `int64` | Process ID. |
+| `cmdline` | `string` | Full command line. |
+| `state` | `string` | Process state (e.g. "running", "idle"). |
+| `proc_stat` | `ProcStat` | Contents of `/proc/pid/stat`. |
+| `proc_status` | `ProcStatus` | Contents of `/proc/pid/status`. |
+| `proc_io` | `ProcIO` | Contents of `/proc/pid/io`. |
+| `proc_spill` | `ProcSpill` | Spill file information. |
+| `ccnt` | `int32` | Greenplum command count parsed from cmdline (-1 if not available). |
+| `slice_id` | `int64` | Greenplum slice ID parsed from cmdline (-1 if not available). |
+
+### RuntimeMetrics
+
+Aggregated runtime metrics for a single process or cell in the running-metrics matrix.
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `utime` | `int64` | User-mode CPU time in clock ticks. |
+| `stime` | `int64` | Kernel-mode CPU time in clock ticks. |
+| `vm_peak` | `int64` | Peak virtual memory size. |
+| `vm_rss` | `int64` | Resident set size (RssAnon + RssFile + RssShmem). |
+| `proc_io` | `ProcIO` | I/O statistics from `/proc/pid/io`. |
+| `proc_spill` | `ProcSpill` | Spill file statistics. |
+| `state` | `string` | Aggregated process state for this cell. |
+
+### DataQuality
+
+Metadata about completeness and freshness of collected data.
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `segments_expected` | `int64` | Number of segments expected to send data. |
+| `segments_received` | `int64` | Number of segments that actually sent data. |
+| `is_partial` | `bool` | True when data is incomplete. |
+| `freshness_ms` | `int64` | Milliseconds since data was received. |
+
+### Skew
+
+CPU-time skew information across segments.
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `skew` | `double` | Skew ratio (max / mean CPU time). |
+| `segindex` | `int32` | Segment index with the highest CPU time. |
 
 ---
 
@@ -608,6 +737,7 @@ serialized using `protojson` with camelCase field names and zero-value fields in
 | `GET` | `/api/queries` | List queries (query params: `page_size`, `page_token`, `sort`, `filter_*`) |
 | `GET` | `/api/query/{ssid}/{ccnt}` | Get a single query by SSID and CCNT |
 | `GET` | `/api/query/{ssid}/{ccnt}/running-metrics` | Get procfs runtime metrics matrix cells for a query. Returns `cellMetrics[]` with `sliceId`, `segindex`, and `runtimeMetrics` (`utime`, `stime`, `vmPeak`, `vmRss`, `state`, `procIo`, `procSpill`), plus `skew` and `dataQuality`. Idle cells can be rendered separately using `runtimeMetrics.state == "idle"`. |
+| `GET` | `/api/hosts/running-queries` | Get aggregated host-level statistics for all hosts with running queries. Returns `hosts[]` with `hostName`, `segindex[]`, `activeQueries`, `activeSlices`, `cpuUsage`, `memoryUsage`, `diskUsage`, `spillBytes`, `skew`, `dataQuality`, `avg5`, `diskReads`, `diskWrites`, `totalSessions`. |
 | `GET` | `/api/stats/sessions` | Get session state statistics (counts by state) |
 | `GET` | `/api/extensions` | List extensions (optional `database_name` param) |
 | `GET` | `/api/databases` | List available databases |
@@ -653,7 +783,7 @@ api/proto/
 │   ├── yagpcc_get_service.proto   # GetGPInfo
 │   └── yagpcc_action_service.proto # ActionService
 └── common/
-    ├── yagpcc_metrics.proto       # GPMetrics, QueryKey, SegmentKey, QueryInfo, etc.
+    ├── yagpcc_metrics.proto       # GPMetrics, QueryKey, SegmentKey, QueryInfo, GpPidProcInfo, RuntimeMetrics, DataQuality, Skew
     └── yagpcc_session.proto      # SessionKey, SessionInfo, SessionState, QueryDesc
 ```
 
