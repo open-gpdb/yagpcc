@@ -246,6 +246,11 @@ func TestParseCmdLineSessionStatus(t *testing.T) {
 			expected: "SELECT",
 		},
 		{
+			name:     "SELECT query with slice",
+			cmdline:  "postgres:  5432, monitor postgres localhost(22122) con38 cmd1006767 slice2 SELECT",
+			expected: "SELECT",
+		},
+		{
 			name:     "idle session with different user",
 			cmdline:  "postgres:  5432, monitor postgres localhost(31260) con3185445 cmd2631 idle",
 			expected: "idle",
@@ -341,6 +346,31 @@ func TestParseCmdLineSessionStatus(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			result := ParseCmdLineSessionStatus(tt.cmdline)
 			assert.Equal(t, tt.expected, result)
+		})
+	}
+}
+
+func TestParseCmdLineSliceID(t *testing.T) {
+	tests := []struct {
+		name    string
+		cmdline string
+		want    int64
+		wantOK  bool
+	}{
+		{name: "active query with slice", cmdline: "postgres: con100 cmd7 slice2 SELECT", want: 2, wantOK: true},
+		{name: "QE writer with two digits slice", cmdline: "postgres:  5432, gpadmin postgres localhost(33326) con21 cmd237786 slice12 INSERT", want: 12, wantOK: true},
+		{name: "last slice token wins", cmdline: "prefix slice1 middle slice42 SELECT", want: 42, wantOK: true},
+		{name: "idle session has no slice", cmdline: "postgres: con100 cmd7 idle", wantOK: false},
+		{name: "slice without digits", cmdline: "postgres: con100 cmd7 slice SELECT", wantOK: false},
+		{name: "slice overflow", cmdline: "postgres: con100 cmd7 slice999999999999999999999999 SELECT", wantOK: false},
+		{name: "background process", cmdline: "postgres: checkpointer process", wantOK: false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, ok := ParseCmdLineSliceID(tt.cmdline)
+			assert.Equal(t, tt.wantOK, ok)
+			assert.Equal(t, tt.want, got)
 		})
 	}
 }

@@ -24,6 +24,7 @@ package greenplum
 
 import (
 	context "context"
+	common "github.com/open-gpdb/yagpcc/api/proto/common"
 	grpc "google.golang.org/grpc"
 	codes "google.golang.org/grpc/codes"
 	status "google.golang.org/grpc/status"
@@ -35,13 +36,17 @@ import (
 const _ = grpc.SupportPackageIsVersion9
 
 const (
-	GetGPInfo_GetGPSessions_FullMethodName        = "/yagpcc.GetGPInfo/GetGPSessions"
-	GetGPInfo_GetGPQuery_FullMethodName           = "/yagpcc.GetGPInfo/GetGPQuery"
-	GetGPInfo_GetGPQueries_FullMethodName         = "/yagpcc.GetGPInfo/GetGPQueries"
-	GetGPInfo_GetGPSession_FullMethodName         = "/yagpcc.GetGPInfo/GetGPSession"
-	GetGPInfo_GetTotalSessionsStat_FullMethodName = "/yagpcc.GetGPInfo/GetTotalSessionsStat"
-	GetGPInfo_GetGPExtensions_FullMethodName      = "/yagpcc.GetGPInfo/GetGPExtensions"
-	GetGPInfo_ListDatabases_FullMethodName        = "/yagpcc.GetGPInfo/ListDatabases"
+	GetGPInfo_GetGPSessions_FullMethodName            = "/yagpcc.GetGPInfo/GetGPSessions"
+	GetGPInfo_GetGPSession_FullMethodName             = "/yagpcc.GetGPInfo/GetGPSession"
+	GetGPInfo_GetGPQuery_FullMethodName               = "/yagpcc.GetGPInfo/GetGPQuery"
+	GetGPInfo_GetGPQueries_FullMethodName             = "/yagpcc.GetGPInfo/GetGPQueries"
+	GetGPInfo_GetTotalSessionsStat_FullMethodName     = "/yagpcc.GetGPInfo/GetTotalSessionsStat"
+	GetGPInfo_GetGPExtensions_FullMethodName          = "/yagpcc.GetGPInfo/GetGPExtensions"
+	GetGPInfo_ListDatabases_FullMethodName            = "/yagpcc.GetGPInfo/ListDatabases"
+	GetGPInfo_GetGPQueryRunningMatrics_FullMethodName = "/yagpcc.GetGPInfo/GetGPQueryRunningMatrics"
+	GetGPInfo_GetGPHostsRunningQueries_FullMethodName = "/yagpcc.GetGPInfo/GetGPHostsRunningQueries"
+	GetGPInfo_GetGPHostRunningQueries_FullMethodName  = "/yagpcc.GetGPInfo/GetGPHostRunningQueries"
+	GetGPInfo_GetGpPidProcInfo_FullMethodName         = "/yagpcc.GetGPInfo/GetGpPidProcInfo"
 )
 
 // GetGPInfoClient is the client API for GetGPInfo service.
@@ -49,12 +54,16 @@ const (
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
 type GetGPInfoClient interface {
 	GetGPSessions(ctx context.Context, in *GetGPSessionsReq, opts ...grpc.CallOption) (*GetGPSessionsResponse, error)
+	GetGPSession(ctx context.Context, in *GetGPSessionReq, opts ...grpc.CallOption) (*GetGPSessionResponse, error)
 	GetGPQuery(ctx context.Context, in *GetGPQueryReq, opts ...grpc.CallOption) (*GetGPQueryResponse, error)
 	GetGPQueries(ctx context.Context, in *GetGPQueriesReq, opts ...grpc.CallOption) (*GetGPSessionsResponse, error)
-	GetGPSession(ctx context.Context, in *GetGPSessionReq, opts ...grpc.CallOption) (*GetGPSessionResponse, error)
 	GetTotalSessionsStat(ctx context.Context, in *GetTotalSessionsReq, opts ...grpc.CallOption) (*GetTotalSessionsResponse, error)
 	GetGPExtensions(ctx context.Context, in *GetGPExtensionsReq, opts ...grpc.CallOption) (*GetGPExtensionsResponse, error)
 	ListDatabases(ctx context.Context, in *ListDatabasesReq, opts ...grpc.CallOption) (*ListDatabasesResponse, error)
+	GetGPQueryRunningMatrics(ctx context.Context, in *GetGPQueryRunningMatricsReq, opts ...grpc.CallOption) (*GetGPQueryRunningMatricsResponse, error)
+	GetGPHostsRunningQueries(ctx context.Context, in *GetGPHostsRunningQueriesReq, opts ...grpc.CallOption) (*GetGPHostsRunningQueriesResponse, error)
+	GetGPHostRunningQueries(ctx context.Context, in *GetGPHostRunningQueriesReq, opts ...grpc.CallOption) (*GetGPHostRunningQueriesResponse, error)
+	GetGpPidProcInfo(ctx context.Context, in *GetGpPidProcInfoReq, opts ...grpc.CallOption) (*common.GpPidProcInfo, error)
 }
 
 type getGPInfoClient struct {
@@ -75,6 +84,16 @@ func (c *getGPInfoClient) GetGPSessions(ctx context.Context, in *GetGPSessionsRe
 	return out, nil
 }
 
+func (c *getGPInfoClient) GetGPSession(ctx context.Context, in *GetGPSessionReq, opts ...grpc.CallOption) (*GetGPSessionResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(GetGPSessionResponse)
+	err := c.cc.Invoke(ctx, GetGPInfo_GetGPSession_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 func (c *getGPInfoClient) GetGPQuery(ctx context.Context, in *GetGPQueryReq, opts ...grpc.CallOption) (*GetGPQueryResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(GetGPQueryResponse)
@@ -89,16 +108,6 @@ func (c *getGPInfoClient) GetGPQueries(ctx context.Context, in *GetGPQueriesReq,
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(GetGPSessionsResponse)
 	err := c.cc.Invoke(ctx, GetGPInfo_GetGPQueries_FullMethodName, in, out, cOpts...)
-	if err != nil {
-		return nil, err
-	}
-	return out, nil
-}
-
-func (c *getGPInfoClient) GetGPSession(ctx context.Context, in *GetGPSessionReq, opts ...grpc.CallOption) (*GetGPSessionResponse, error) {
-	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(GetGPSessionResponse)
-	err := c.cc.Invoke(ctx, GetGPInfo_GetGPSession_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -135,17 +144,61 @@ func (c *getGPInfoClient) ListDatabases(ctx context.Context, in *ListDatabasesRe
 	return out, nil
 }
 
+func (c *getGPInfoClient) GetGPQueryRunningMatrics(ctx context.Context, in *GetGPQueryRunningMatricsReq, opts ...grpc.CallOption) (*GetGPQueryRunningMatricsResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(GetGPQueryRunningMatricsResponse)
+	err := c.cc.Invoke(ctx, GetGPInfo_GetGPQueryRunningMatrics_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *getGPInfoClient) GetGPHostsRunningQueries(ctx context.Context, in *GetGPHostsRunningQueriesReq, opts ...grpc.CallOption) (*GetGPHostsRunningQueriesResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(GetGPHostsRunningQueriesResponse)
+	err := c.cc.Invoke(ctx, GetGPInfo_GetGPHostsRunningQueries_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *getGPInfoClient) GetGPHostRunningQueries(ctx context.Context, in *GetGPHostRunningQueriesReq, opts ...grpc.CallOption) (*GetGPHostRunningQueriesResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(GetGPHostRunningQueriesResponse)
+	err := c.cc.Invoke(ctx, GetGPInfo_GetGPHostRunningQueries_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *getGPInfoClient) GetGpPidProcInfo(ctx context.Context, in *GetGpPidProcInfoReq, opts ...grpc.CallOption) (*common.GpPidProcInfo, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(common.GpPidProcInfo)
+	err := c.cc.Invoke(ctx, GetGPInfo_GetGpPidProcInfo_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // GetGPInfoServer is the server API for GetGPInfo service.
 // All implementations must embed UnimplementedGetGPInfoServer
 // for forward compatibility.
 type GetGPInfoServer interface {
 	GetGPSessions(context.Context, *GetGPSessionsReq) (*GetGPSessionsResponse, error)
+	GetGPSession(context.Context, *GetGPSessionReq) (*GetGPSessionResponse, error)
 	GetGPQuery(context.Context, *GetGPQueryReq) (*GetGPQueryResponse, error)
 	GetGPQueries(context.Context, *GetGPQueriesReq) (*GetGPSessionsResponse, error)
-	GetGPSession(context.Context, *GetGPSessionReq) (*GetGPSessionResponse, error)
 	GetTotalSessionsStat(context.Context, *GetTotalSessionsReq) (*GetTotalSessionsResponse, error)
 	GetGPExtensions(context.Context, *GetGPExtensionsReq) (*GetGPExtensionsResponse, error)
 	ListDatabases(context.Context, *ListDatabasesReq) (*ListDatabasesResponse, error)
+	GetGPQueryRunningMatrics(context.Context, *GetGPQueryRunningMatricsReq) (*GetGPQueryRunningMatricsResponse, error)
+	GetGPHostsRunningQueries(context.Context, *GetGPHostsRunningQueriesReq) (*GetGPHostsRunningQueriesResponse, error)
+	GetGPHostRunningQueries(context.Context, *GetGPHostRunningQueriesReq) (*GetGPHostRunningQueriesResponse, error)
+	GetGpPidProcInfo(context.Context, *GetGpPidProcInfoReq) (*common.GpPidProcInfo, error)
 	mustEmbedUnimplementedGetGPInfoServer()
 }
 
@@ -159,14 +212,14 @@ type UnimplementedGetGPInfoServer struct{}
 func (UnimplementedGetGPInfoServer) GetGPSessions(context.Context, *GetGPSessionsReq) (*GetGPSessionsResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method GetGPSessions not implemented")
 }
+func (UnimplementedGetGPInfoServer) GetGPSession(context.Context, *GetGPSessionReq) (*GetGPSessionResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method GetGPSession not implemented")
+}
 func (UnimplementedGetGPInfoServer) GetGPQuery(context.Context, *GetGPQueryReq) (*GetGPQueryResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method GetGPQuery not implemented")
 }
 func (UnimplementedGetGPInfoServer) GetGPQueries(context.Context, *GetGPQueriesReq) (*GetGPSessionsResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method GetGPQueries not implemented")
-}
-func (UnimplementedGetGPInfoServer) GetGPSession(context.Context, *GetGPSessionReq) (*GetGPSessionResponse, error) {
-	return nil, status.Error(codes.Unimplemented, "method GetGPSession not implemented")
 }
 func (UnimplementedGetGPInfoServer) GetTotalSessionsStat(context.Context, *GetTotalSessionsReq) (*GetTotalSessionsResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method GetTotalSessionsStat not implemented")
@@ -176,6 +229,18 @@ func (UnimplementedGetGPInfoServer) GetGPExtensions(context.Context, *GetGPExten
 }
 func (UnimplementedGetGPInfoServer) ListDatabases(context.Context, *ListDatabasesReq) (*ListDatabasesResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method ListDatabases not implemented")
+}
+func (UnimplementedGetGPInfoServer) GetGPQueryRunningMatrics(context.Context, *GetGPQueryRunningMatricsReq) (*GetGPQueryRunningMatricsResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method GetGPQueryRunningMatrics not implemented")
+}
+func (UnimplementedGetGPInfoServer) GetGPHostsRunningQueries(context.Context, *GetGPHostsRunningQueriesReq) (*GetGPHostsRunningQueriesResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method GetGPHostsRunningQueries not implemented")
+}
+func (UnimplementedGetGPInfoServer) GetGPHostRunningQueries(context.Context, *GetGPHostRunningQueriesReq) (*GetGPHostRunningQueriesResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method GetGPHostRunningQueries not implemented")
+}
+func (UnimplementedGetGPInfoServer) GetGpPidProcInfo(context.Context, *GetGpPidProcInfoReq) (*common.GpPidProcInfo, error) {
+	return nil, status.Error(codes.Unimplemented, "method GetGpPidProcInfo not implemented")
 }
 func (UnimplementedGetGPInfoServer) mustEmbedUnimplementedGetGPInfoServer() {}
 func (UnimplementedGetGPInfoServer) testEmbeddedByValue()                   {}
@@ -216,6 +281,24 @@ func _GetGPInfo_GetGPSessions_Handler(srv interface{}, ctx context.Context, dec 
 	return interceptor(ctx, in, info, handler)
 }
 
+func _GetGPInfo_GetGPSession_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetGPSessionReq)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(GetGPInfoServer).GetGPSession(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: GetGPInfo_GetGPSession_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(GetGPInfoServer).GetGPSession(ctx, req.(*GetGPSessionReq))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 func _GetGPInfo_GetGPQuery_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(GetGPQueryReq)
 	if err := dec(in); err != nil {
@@ -248,24 +331,6 @@ func _GetGPInfo_GetGPQueries_Handler(srv interface{}, ctx context.Context, dec f
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
 		return srv.(GetGPInfoServer).GetGPQueries(ctx, req.(*GetGPQueriesReq))
-	}
-	return interceptor(ctx, in, info, handler)
-}
-
-func _GetGPInfo_GetGPSession_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(GetGPSessionReq)
-	if err := dec(in); err != nil {
-		return nil, err
-	}
-	if interceptor == nil {
-		return srv.(GetGPInfoServer).GetGPSession(ctx, in)
-	}
-	info := &grpc.UnaryServerInfo{
-		Server:     srv,
-		FullMethod: GetGPInfo_GetGPSession_FullMethodName,
-	}
-	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(GetGPInfoServer).GetGPSession(ctx, req.(*GetGPSessionReq))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -324,6 +389,78 @@ func _GetGPInfo_ListDatabases_Handler(srv interface{}, ctx context.Context, dec 
 	return interceptor(ctx, in, info, handler)
 }
 
+func _GetGPInfo_GetGPQueryRunningMatrics_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetGPQueryRunningMatricsReq)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(GetGPInfoServer).GetGPQueryRunningMatrics(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: GetGPInfo_GetGPQueryRunningMatrics_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(GetGPInfoServer).GetGPQueryRunningMatrics(ctx, req.(*GetGPQueryRunningMatricsReq))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _GetGPInfo_GetGPHostsRunningQueries_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetGPHostsRunningQueriesReq)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(GetGPInfoServer).GetGPHostsRunningQueries(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: GetGPInfo_GetGPHostsRunningQueries_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(GetGPInfoServer).GetGPHostsRunningQueries(ctx, req.(*GetGPHostsRunningQueriesReq))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _GetGPInfo_GetGPHostRunningQueries_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetGPHostRunningQueriesReq)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(GetGPInfoServer).GetGPHostRunningQueries(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: GetGPInfo_GetGPHostRunningQueries_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(GetGPInfoServer).GetGPHostRunningQueries(ctx, req.(*GetGPHostRunningQueriesReq))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _GetGPInfo_GetGpPidProcInfo_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetGpPidProcInfoReq)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(GetGPInfoServer).GetGpPidProcInfo(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: GetGPInfo_GetGpPidProcInfo_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(GetGPInfoServer).GetGpPidProcInfo(ctx, req.(*GetGpPidProcInfoReq))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // GetGPInfo_ServiceDesc is the grpc.ServiceDesc for GetGPInfo service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -336,16 +473,16 @@ var GetGPInfo_ServiceDesc = grpc.ServiceDesc{
 			Handler:    _GetGPInfo_GetGPSessions_Handler,
 		},
 		{
+			MethodName: "GetGPSession",
+			Handler:    _GetGPInfo_GetGPSession_Handler,
+		},
+		{
 			MethodName: "GetGPQuery",
 			Handler:    _GetGPInfo_GetGPQuery_Handler,
 		},
 		{
 			MethodName: "GetGPQueries",
 			Handler:    _GetGPInfo_GetGPQueries_Handler,
-		},
-		{
-			MethodName: "GetGPSession",
-			Handler:    _GetGPInfo_GetGPSession_Handler,
 		},
 		{
 			MethodName: "GetTotalSessionsStat",
@@ -358,6 +495,22 @@ var GetGPInfo_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "ListDatabases",
 			Handler:    _GetGPInfo_ListDatabases_Handler,
+		},
+		{
+			MethodName: "GetGPQueryRunningMatrics",
+			Handler:    _GetGPInfo_GetGPQueryRunningMatrics_Handler,
+		},
+		{
+			MethodName: "GetGPHostsRunningQueries",
+			Handler:    _GetGPInfo_GetGPHostsRunningQueries_Handler,
+		},
+		{
+			MethodName: "GetGPHostRunningQueries",
+			Handler:    _GetGPInfo_GetGPHostRunningQueries_Handler,
+		},
+		{
+			MethodName: "GetGpPidProcInfo",
+			Handler:    _GetGPInfo_GetGpPidProcInfo_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

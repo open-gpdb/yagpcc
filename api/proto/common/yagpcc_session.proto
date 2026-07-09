@@ -215,4 +215,10 @@ message SessionState {
 
     // Aggregate session stat how many query calls was performed
     AggregatedMetrics aggregated_metrics     = 17;
+
+    // Runtime statistics
+    RuntimeMetrics runtime_metrics           = 18;
+
+    // Data quality statistics
+    DataQuality data_quality                 = 19;
 }

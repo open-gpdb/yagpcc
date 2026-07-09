@@ -858,6 +858,59 @@ message GpPidProcInfo {
     ProcStatus proc_status = 7;
     ProcIO proc_io         = 8;
     ProcSpill proc_spill   = 9;
+
+    // Greenplum command count parsed from cmdline while collecting procfs data.
+    // Set to -1 when the backend cmdline does not contain command count information.
+    int32 ccnt             = 10;
+
+    // Greenplum slice identifier parsed from cmdline while collecting procfs data.
+    // Set to -1 when the backend cmdline does not contain slice information
+    // (for example, an idle session that is not attached to a running query).
+    int64 slice_id         = 11;
+}
+
+message RuntimeMetrics {
+
+    // Amount of time that this process has been scheduled in user mode,
+    // measured in clock ticks.
+    int64 utime = 1;
+
+    // Amount of time that this process has been scheduled in kernel mode,
+    // measured in clock ticks.
+    int64 stime = 2;
+
+    // Peak virtual memory size.
+    int64 vm_peak = 3;
+
+        // Resident set size (sum of RssAnon RssFile and RssShmem).
+    int64 vm_rss = 4;
+
+    ProcIO proc_io         = 5;
+
+    ProcSpill proc_spill   = 6;
+
+    // Aggregated process state for this runtime cell.
+    string state           = 7;
+}
+
+message DataQuality {
+    // how many segments should sent data
+    int64 segments_expected = 1;
+
+    // how many segments actually sent data
+    int64 segments_received = 2;
+
+    // data is incomplete
+    bool is_partial = 3;
+
+    // how many ms has passed since receiving the data
+    int64 freshness_ms = 4;
+}
+
+message Skew {
+    double skew = 1;
+
+    int32 segindex = 2;
 }
 
 message AggregatedMetrics {

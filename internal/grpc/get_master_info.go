@@ -254,7 +254,7 @@ func (s *GetMasterInfoServer) GetGPSession(ctx context.Context, in *pbm.GetGPSes
 		sessionState, err := s.backgroundStorage.SessionStorage.GetSessionDesc(
 			sKey,
 			sesI,
-			false,
+			true,
 			pbm.RunningQueryType_RQT_LAST,
 			-1)
 		if err != nil {
@@ -393,6 +393,49 @@ func (s *GetMasterInfoServer) GetGPQuery(ctx context.Context, in *pbm.GetGPQuery
 		metrics.YagpccMetrics.HandleLatencies.With(map[string]string{"method": "GetGPQuery"}).Observe(time.Since(start).Seconds())
 	}
 	return &queryResponse, nil
+}
+
+func (s *GetMasterInfoServer) GetGPQueryRunningMatrics(ctx context.Context, in *pbm.GetGPQueryRunningMatricsReq) (*pbm.GetGPQueryRunningMatricsResponse, error) {
+	s.logger.Debugf("got get query running metrics request %v", in)
+	if in.QueryKey == nil {
+		return nil, fmt.Errorf("invalid input - query key cannot be nil")
+	}
+	start := time.Now()
+	response := &pbm.GetGPQueryRunningMatricsResponse{
+		SliceId:     make([]int64, 0),
+		Segindex:    make([]int32, 0),
+		CellMetrics: make([]*pbm.CellMetrics, 0),
+	}
+
+	cellMetrics, skew, dataQuality, err := s.backgroundStorage.GetQueryRunningMetrics(in.QueryKey)
+	if err != nil {
+		s.logger.Errorf("failed to get query running metrics: %v", err)
+		if metrics.YagpccMetrics != nil {
+			metrics.YagpccMetrics.HandleLatencies.With(map[string]string{"method": "GetGPQueryRunningMatrics"}).Observe(time.Since(start).Seconds())
+		}
+		return response, nil
+	}
+
+	response.SliceId = make([]int64, 0, len(cellMetrics))
+	response.Segindex = make([]int32, 0, len(cellMetrics))
+	response.CellMetrics = make([]*pbm.CellMetrics, 0, len(cellMetrics))
+	response.Skew = skew
+	response.DataQuality = dataQuality
+	for _, cell := range cellMetrics {
+		response.SliceId = append(response.SliceId, cell.SliceID)
+		response.Segindex = append(response.Segindex, cell.Segindex)
+		response.CellMetrics = append(response.CellMetrics, &pbm.CellMetrics{
+			SliceId:        cell.SliceID,
+			Segindex:       cell.Segindex,
+			RuntimeMetrics: cell.RuntimeMetrics,
+		})
+	}
+
+	s.logger.Debugf("Get query running metrics took %v", time.Since(start))
+	if metrics.YagpccMetrics != nil {
+		metrics.YagpccMetrics.HandleLatencies.With(map[string]string{"method": "GetGPQueryRunningMatrics"}).Observe(time.Since(start).Seconds())
+	}
+	return response, nil
 }
 
 func (s *GetMasterInfoServer) GetGPExtensions(ctx context.Context, in *pbm.GetGPExtensionsReq) (*pbm.GetGPExtensionsResponse, error) {

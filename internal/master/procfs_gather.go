@@ -43,6 +43,9 @@ type (
 	ProcfsGatherStorage struct {
 		l                  *zap.SugaredLogger
 		statActivityLister statActivityLister
+		qualityMu          sync.RWMutex
+		lastHostsExpected  int64
+		lastHostsResponded int64
 	}
 )
 
@@ -51,6 +54,25 @@ func NewProcfsGatherStorage(l *zap.SugaredLogger, sActivityLister statActivityLi
 		l:                  l,
 		statActivityLister: sActivityLister,
 	}
+}
+
+func (ps *ProcfsGatherStorage) setLastQuality(hostsExpected, hostsResponded int64) {
+	ps.qualityMu.Lock()
+	ps.lastHostsExpected = hostsExpected
+	ps.lastHostsResponded = hostsResponded
+	ps.qualityMu.Unlock()
+}
+
+func (ps *ProcfsGatherStorage) LastHostsExpected() int64 {
+	ps.qualityMu.RLock()
+	defer ps.qualityMu.RUnlock()
+	return ps.lastHostsExpected
+}
+
+func (ps *ProcfsGatherStorage) LastHostsResponded() int64 {
+	ps.qualityMu.RLock()
+	defer ps.qualityMu.RUnlock()
+	return ps.lastHostsResponded
 }
 
 func (ps *ProcfsGatherStorage) getJobsMap(sessions []stat_activity.SessionPid) hostJobMap {
@@ -125,6 +147,7 @@ func (ps *ProcfsGatherStorage) GatherProcfsStat(ctx context.Context, nPullers in
 		return nil, fmt.Errorf("error listing sessions pids: %w", err)
 	}
 	hostJobs := ps.getJobsMap(sessions)
+	ps.setLastQuality(int64(len(hostJobs)), 0)
 
 	if len(hostJobs) == 0 {
 		return nil, nil
@@ -136,6 +159,7 @@ func (ps *ProcfsGatherStorage) GatherProcfsStat(ctx context.Context, nPullers in
 	var mu sync.Mutex
 	var collected []*pbc.GpPidProcInfo
 	var errs []string
+	respondedHosts := int64(0)
 	totalJobs := len(hostJobs)
 
 	sem := make(chan struct{}, nPullers)
@@ -156,11 +180,13 @@ func (ps *ProcfsGatherStorage) GatherProcfsStat(ctx context.Context, nPullers in
 				errs = append(errs, fmt.Sprintf("host %s: %v", hostname, errR))
 				return
 			}
+			respondedHosts++
 			collected = append(collected, result...)
 		}()
 	}
 
 	wg.Wait()
+	ps.setLastQuality(int64(totalJobs), respondedHosts)
 
 	if len(errs) == totalJobs {
 		return nil, fmt.Errorf("all %d hosts failed: %s", totalJobs, strings.Join(errs, "; "))

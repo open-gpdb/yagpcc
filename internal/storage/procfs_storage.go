@@ -19,10 +19,13 @@ package storage
 import (
 	"errors"
 	"fmt"
+	"sort"
+	"strings"
 	"sync"
 	"time"
 
 	pbc "github.com/open-gpdb/yagpcc/api/proto/common"
+	"github.com/open-gpdb/yagpcc/internal/utils"
 )
 
 type (
@@ -41,9 +44,22 @@ type (
 		Pid         int64
 	}
 
+	QueryCellKey struct {
+		SliceID  int64
+		Segindex int32
+	}
+
+	ProcfsCellMetric struct {
+		QueryCellKey
+		RuntimeMetrics *pbc.RuntimeMetrics
+		HasData        bool
+	}
+
 	ProcStat struct {
 		Cmdline    string
 		State      string
+		Ccnt       int32
+		SliceId    int64
 		ProcStat   *pbc.ProcStat
 		ProcStatus *pbc.ProcStatus
 		ProcIO     *pbc.ProcIO
@@ -59,6 +75,8 @@ func (ps *ProcStat) ToGpPidProcInfo(key ProcKey) *pbc.GpPidProcInfo {
 		Pid:         key.Pid,
 		Cmdline:     ps.Cmdline,
 		State:       ps.State,
+		Ccnt:        ps.Ccnt,
+		SliceId:     ps.SliceId,
 		ProcStat:    ps.ProcStat,
 		ProcStatus:  ps.ProcStatus,
 		ProcIo:      ps.ProcIO,
@@ -71,9 +89,11 @@ type (
 	ProcIndexMap map[ProcIndexKey][]*ProcIndexData
 
 	ProcfsStatType struct {
-		statTime     time.Time
-		pidProcData  ProcMap
-		pidProcIndex ProcIndexMap
+		statTime       time.Time
+		pidProcData    ProcMap
+		pidProcIndex   ProcIndexMap
+		hostsExpected  int64
+		hostsResponded int64
 	}
 
 	ProcfsStorage struct {
@@ -86,7 +106,9 @@ type (
 type ProcfsOption = func(*ProcfsStorage)
 
 const (
-	defaultStoredPoints = 30
+	defaultStoredPoints       = 30
+	procfsQueryMasterSliceID  = int64(0)
+	procfsQuerySegmentSliceID = utils.ProcfsQuerySegmentSliceID
 )
 
 func NewProcfsStorage(opts ...ProcfsOption) *ProcfsStorage {
@@ -120,10 +142,28 @@ func (p *ProcfsStorage) TidyUpProcfsStat() {
 }
 
 func (p *ProcfsStorage) RegisterProcfsStat(statTime time.Time, procfsStat []*pbc.GpPidProcInfo) {
+	respondedHosts := countProcfsHosts(procfsStat)
+	p.RegisterProcfsStatWithDataQuality(statTime, procfsStat, respondedHosts, respondedHosts)
+}
+
+func countProcfsHosts(procfsStat []*pbc.GpPidProcInfo) int64 {
+	hosts := make(map[string]struct{})
+	for _, proc := range procfsStat {
+		if proc == nil || proc.GpSegmentId < 0 {
+			continue
+		}
+		hosts[GetHostnameForSegindex(int32(proc.GpSegmentId))] = struct{}{}
+	}
+	return int64(len(hosts))
+}
+
+func (p *ProcfsStorage) RegisterProcfsStatWithDataQuality(statTime time.Time, procfsStat []*pbc.GpPidProcInfo, hostsExpected int64, hostsResponded int64) {
 	stat := ProcfsStatType{
-		statTime:     statTime,
-		pidProcData:  make(ProcMap, len(procfsStat)),
-		pidProcIndex: make(ProcIndexMap, len(procfsStat)),
+		statTime:       statTime,
+		pidProcData:    make(ProcMap, len(procfsStat)),
+		pidProcIndex:   make(ProcIndexMap, len(procfsStat)),
+		hostsExpected:  hostsExpected,
+		hostsResponded: hostsResponded,
 	}
 	// create map for fast access
 	for _, proc := range procfsStat {
@@ -134,6 +174,8 @@ func (p *ProcfsStorage) RegisterProcfsStat(statTime time.Time, procfsStat []*pbc
 		}] = &ProcStat{
 			Cmdline:    proc.Cmdline,
 			State:      proc.State,
+			Ccnt:       proc.Ccnt,
+			SliceId:    proc.SliceId,
 			ProcStat:   proc.ProcStat,
 			ProcStatus: proc.ProcStatus,
 			ProcIO:     proc.ProcIo,
@@ -160,6 +202,13 @@ func (p *ProcfsStorage) RegisterProcfsStat(statTime time.Time, procfsStat []*pbc
 
 	// delete old data
 	p.TidyUpProcfsStat()
+}
+
+func procfsDataQuality(stat *ProcfsStatType) *pbc.DataQuality {
+	if stat == nil {
+		return CalculateDataQuality(0, 0, time.Time{}, time.Now())
+	}
+	return CalculateDataQuality(stat.hostsExpected, stat.hostsResponded, stat.statTime, time.Now())
 }
 
 func absDuration(d time.Duration) time.Duration {
@@ -281,4 +330,256 @@ func (p *ProcfsStorage) GetProcfsSessions(sessIds []int64) (map[int64]*pbc.GpPid
 		result[sessId] = sessStat
 	}
 	return result, nil
+}
+
+func CalculateSkew(values map[int32]float64) *pbc.Skew {
+	result := &pbc.Skew{}
+	if len(values) == 0 {
+		return result
+	}
+
+	segindexes := make([]int32, 0, len(values))
+	for segindex := range values {
+		segindexes = append(segindexes, segindex)
+	}
+	sort.Slice(segindexes, func(i, j int) bool { return segindexes[i] < segindexes[j] })
+
+	var sum float64
+	maxValue := values[segindexes[0]]
+	hotSegindex := segindexes[0]
+	for _, segindex := range segindexes {
+		value := values[segindex]
+		sum += value
+		if value > maxValue {
+			maxValue = value
+			hotSegindex = segindex
+		}
+	}
+
+	result.Segindex = hotSegindex
+	if maxValue <= 0 {
+		return result
+	}
+	avg := sum / float64(len(values))
+	result.Skew = 1 - avg/maxValue
+	if result.Skew < 0 {
+		result.Skew = 0
+	}
+	return result
+}
+
+func CalculateDataQuality(segmentsExpected, segmentsReceived int64, statTime time.Time, now time.Time) *pbc.DataQuality {
+	freshness := int64(0)
+	if !statTime.IsZero() {
+		freshness = now.Sub(statTime).Milliseconds()
+		if freshness < 0 {
+			freshness = 0
+		}
+	}
+	return &pbc.DataQuality{
+		SegmentsExpected: segmentsExpected,
+		SegmentsReceived: segmentsReceived,
+		IsPartial:        segmentsReceived < segmentsExpected,
+		FreshnessMs:      freshness,
+	}
+}
+
+func addProcIO(dest *pbc.ProcIO, source *pbc.ProcIO) *pbc.ProcIO {
+	if source == nil {
+		return dest
+	}
+	if dest == nil {
+		dest = &pbc.ProcIO{}
+	}
+	dest.Rchar += source.Rchar
+	dest.Wchar += source.Wchar
+	dest.Syscr += source.Syscr
+	dest.Syscw += source.Syscw
+	dest.ReadBytes += source.ReadBytes
+	dest.WriteBytes += source.WriteBytes
+	dest.CancelledWriteBytes += source.CancelledWriteBytes
+	return dest
+}
+
+func addProcSpill(dest *pbc.ProcSpill, source *pbc.ProcSpill) *pbc.ProcSpill {
+	if source == nil {
+		return dest
+	}
+	if dest == nil {
+		dest = &pbc.ProcSpill{}
+	}
+	dest.Size += source.Size
+	dest.Files += source.Files
+	return dest
+}
+
+func isIdleProcState(state string) bool {
+	return strings.EqualFold(strings.TrimSpace(state), "idle")
+}
+
+func addProcfsRuntimeMetrics(dest *pbc.RuntimeMetrics, source *pbc.GpPidProcInfo) *pbc.RuntimeMetrics {
+	if source == nil {
+		return dest
+	}
+	if dest == nil {
+		dest = &pbc.RuntimeMetrics{}
+	}
+	if source.ProcStat != nil {
+		dest.Utime += source.ProcStat.Utime
+		dest.Stime += source.ProcStat.Stime
+	}
+	if source.ProcStatus != nil {
+		dest.VmPeak += source.ProcStatus.VmPeak
+		dest.VmRss += source.ProcStatus.VmRss
+	}
+	if source.State != "" && (dest.State == "" || isIdleProcState(dest.State) || !isIdleProcState(source.State)) {
+		dest.State = source.State
+	}
+	dest.ProcIo = addProcIO(dest.ProcIo, source.ProcIo)
+	dest.ProcSpill = addProcSpill(dest.ProcSpill, source.ProcSpill)
+	return dest
+}
+
+func procfsMatchesQuery(procData *ProcStat, ccnt int32) bool {
+	if ccnt != 0 && procData.Ccnt != ccnt {
+		return false
+	}
+	return procData.SliceId != UnsetSliceId || !isIdleProcState(procData.State)
+}
+
+func procfsCellForProc(segindex int32, sliceID int64) QueryCellKey {
+	if sliceID != UnsetSliceId {
+		return QueryCellKey{SliceID: sliceID, Segindex: segindex}
+	}
+	return QueryCellKey{SliceID: procfsQuerySegmentSliceID, Segindex: segindex}
+}
+
+func (p *ProcfsStorage) getProcfsQueryRuntimeMetrics(first, last *ProcfsStatType, queryKey *pbc.QueryKey) ([]*ProcfsCellMetric, error) {
+	if queryKey == nil {
+		return nil, fmt.Errorf("query key cannot be nil")
+	}
+	lastIds, okLast := last.pidProcIndex[ProcIndexKey{SessId: int64(queryKey.Ssid)}]
+	if !okLast {
+		return nil, nil
+	}
+
+	cellMetrics := make(map[QueryCellKey]*ProcfsCellMetric)
+	for _, id := range lastIds {
+		if id == nil {
+			continue
+		}
+		lastKey := ProcKey{SessId: int64(queryKey.Ssid), GpSegmentId: id.GpSegmentId, Pid: id.Pid}
+		lastProcData, okLast := last.pidProcData[lastKey]
+		if !okLast || lastProcData == nil || !procfsMatchesQuery(lastProcData, queryKey.Ccnt) {
+			continue
+		}
+		pidStat := lastProcData.ToGpPidProcInfo(lastKey)
+		firstProcData, okFirst := first.pidProcData[lastKey]
+		if okFirst {
+			diff, err := ProcfsDiff(firstProcData.ToGpPidProcInfo(lastKey), pidStat)
+			if err != nil {
+				return nil, fmt.Errorf("fail in diff: %w", err)
+			}
+			pidStat = diff
+		}
+
+		cell := procfsCellForProc(int32(id.GpSegmentId), pidStat.SliceId)
+		cellMetric, ok := cellMetrics[cell]
+		if !ok {
+			cellMetric = &ProcfsCellMetric{QueryCellKey: cell, HasData: true}
+			cellMetrics[cell] = cellMetric
+		}
+		cellMetric.RuntimeMetrics = addProcfsRuntimeMetrics(cellMetric.RuntimeMetrics, pidStat)
+	}
+
+	cells := make([]QueryCellKey, 0, len(cellMetrics))
+	for cell := range cellMetrics {
+		cells = append(cells, cell)
+	}
+	sort.Slice(cells, func(i, j int) bool {
+		if cells[i].SliceID != cells[j].SliceID {
+			return cells[i].SliceID < cells[j].SliceID
+		}
+		return cells[i].Segindex < cells[j].Segindex
+	})
+
+	result := make([]*ProcfsCellMetric, 0, len(cells))
+	for _, cell := range cells {
+		result = append(result, cellMetrics[cell])
+	}
+	return result, nil
+}
+
+type cpuTimeSkewAccumulator struct {
+	count       int64
+	sum         float64
+	max         float64
+	hotSegindex int32
+	initialized bool
+}
+
+func (a *cpuTimeSkewAccumulator) Add(segindex int32, cpuTime float64) {
+	a.count++
+	a.sum += cpuTime
+	if !a.initialized || cpuTime > a.max {
+		a.max = cpuTime
+		a.hotSegindex = segindex
+		a.initialized = true
+	}
+}
+
+func (a *cpuTimeSkewAccumulator) Skew() *pbc.Skew {
+	result := &pbc.Skew{}
+	if a == nil || a.count == 0 || !a.initialized {
+		return result
+	}
+	result.Segindex = a.hotSegindex
+	if a.max <= 0 {
+		return result
+	}
+	avg := a.sum / float64(a.count)
+	result.Skew = 1 - avg/a.max
+	if result.Skew < 0 {
+		result.Skew = 0
+	}
+	return result
+}
+
+func CalculateCPUTimeSkew(cells []*ProcfsCellMetric) *pbc.Skew {
+	result := &pbc.Skew{}
+	bySlice := make(map[int64]*cpuTimeSkewAccumulator)
+	for _, cell := range cells {
+		if cell == nil || !cell.HasData || cell.RuntimeMetrics == nil {
+			continue
+		}
+		if cell.Segindex < 0 {
+			continue
+		}
+		acc, ok := bySlice[cell.SliceID]
+		if !ok {
+			acc = &cpuTimeSkewAccumulator{}
+			bySlice[cell.SliceID] = acc
+		}
+		acc.Add(cell.Segindex, float64(cell.RuntimeMetrics.Utime+cell.RuntimeMetrics.Stime))
+	}
+	for _, acc := range bySlice {
+		current := acc.Skew()
+		if current.Skew > result.Skew {
+			result = current
+		}
+	}
+	return result
+}
+
+func (p *ProcfsStorage) GetQueryRunningMetrics(queryKey *pbc.QueryKey) ([]*ProcfsCellMetric, *pbc.Skew, *pbc.DataQuality, error) {
+	first, last, err := p.get5Min()
+	if err != nil {
+		return nil, nil, nil, fmt.Errorf("fail in get 5 min: %w", err)
+	}
+
+	result, err := p.getProcfsQueryRuntimeMetrics(first, last, queryKey)
+	if err != nil {
+		return nil, nil, nil, err
+	}
+	return result, CalculateCPUTimeSkew(result), procfsDataQuality(last), nil
 }

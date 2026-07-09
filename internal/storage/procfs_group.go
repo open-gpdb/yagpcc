@@ -124,6 +124,8 @@ func ProcfsDiff(first, last *pbc.GpPidProcInfo) (*pbc.GpPidProcInfo, error) {
 		Pid:         last.Pid,
 		Cmdline:     last.Cmdline,
 		State:       last.State,
+		Ccnt:        last.Ccnt,
+		SliceId:     last.SliceId,
 		ProcStatus:  last.ProcStatus,
 		ProcStat:    diffProcStat(first.ProcStat, last.ProcStat),
 		ProcIo:      diffProcIO(first.ProcIo, last.ProcIo),

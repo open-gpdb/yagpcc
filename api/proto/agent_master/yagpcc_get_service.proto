@@ -27,12 +27,81 @@ option go_package = "github.com/open-gpdb/yagpcc/api/proto/agent_master;greenplu
 
 service GetGPInfo {
     rpc GetGPSessions (GetGPSessionsReq) returns (GetGPSessionsResponse) {}
-    rpc GetGPQuery    (GetGPQueryReq) returns (GetGPQueryResponse) {}
-    rpc GetGPQueries (GetGPQueriesReq) returns (GetGPSessionsResponse) {}
     rpc GetGPSession  (GetGPSessionReq) returns (GetGPSessionResponse) {}
+    rpc GetGPQuery    (GetGPQueryReq) returns (GetGPQueryResponse) {}
+    rpc GetGPQueries (GetGPQueriesReq) returns (GetGPSessionsResponse) {}   
     rpc GetTotalSessionsStat (GetTotalSessionsReq) returns (GetTotalSessionsResponse) {}
     rpc GetGPExtensions (GetGPExtensionsReq) returns (GetGPExtensionsResponse) {}
     rpc ListDatabases (ListDatabasesReq) returns (ListDatabasesResponse) {}
+    rpc GetGPQueryRunningMatrics (GetGPQueryRunningMatricsReq) returns (GetGPQueryRunningMatricsResponse) {}
+    rpc GetGPHostsRunningQueries (GetGPHostsRunningQueriesReq) returns (GetGPHostsRunningQueriesResponse) {}
+    rpc GetGPHostRunningQueries (GetGPHostRunningQueriesReq) returns (GetGPHostRunningQueriesResponse) {}
+    rpc GetGpPidProcInfo (GetGpPidProcInfoReq) returns (GpPidProcInfo) {}
+}
+
+message GetGpPidProcInfoReq {
+    QueryKey query_key  = 1;
+    int32 segindex      = 2;
+    int64 slice_id      = 3;
+}
+
+message GetGPQueryRunningMatricsReq {
+    QueryKey query_key  = 1;
+}
+
+message CellMetrics {
+    int64 slice_id                 = 1;
+    int32 segindex                 = 2; 
+    RuntimeMetrics runtime_metrics = 3;
+}
+
+message GetGPQueryRunningMatricsResponse {
+    repeated int64 slice_id           = 1;
+    repeated int32 segindex           = 2; 
+    repeated CellMetrics cell_metrics = 3;
+    Skew skew                         = 4;
+    DataQuality data_quality          = 5;
+}
+
+message GetGPHostsRunningQueriesReq {
+}
+
+message RunningHostInfo {
+    string host_name         = 1;
+    repeated int32 segindex  = 2;
+    int64 active_queries     = 3;
+    int64 active_slices      = 4;
+    double cpu_usage         = 5;
+    int64 memory_usage       = 6;
+    int64 disk_usage         = 7;
+    int64 spill_bytes        = 8;
+    Skew skew                = 9;
+    DataQuality data_quality = 10;
+}
+
+message GetGPHostsRunningQueriesResponse {
+    repeated RunningHostInfo hosts = 1;
+}
+
+message GetGPHostRunningQueriesReq {
+    string host_name = 1;
+}
+
+message RunningQueryInfo {
+    QueryKey query_key             = 1;
+    string user_name               = 2;
+    string db_name                 = 3;
+    string query_text              = 4;
+    RuntimeMetrics runtime_metrics = 5;
+
+}
+
+message GetGPHostRunningQueriesResponse {
+    string host_name                     = 1;
+    repeated int32 segindex              = 2;
+    repeated RunningQueryInfo queries    = 3;
+    DataQuality data_quality             = 4;
+    string next_page_token               = 5;
 }
 
 message GetTotalSessionsReq {
@@ -127,6 +196,8 @@ message QueryStat {
     string session_state                            = 17;
     string message                                  = 18;
     int64 slices                                    = 19; // the number of registered slices for a query
+    Skew skew                                       = 20; // calculated query skew
+    DataQuality data_quality                        = 21;
 }
 
 message QueryStatWrite {
@@ -163,6 +234,7 @@ message SegmentMetrics {
     GPMetrics segment_metrics                      = 9;
     QueryKey query_key                             = 11; // set is used outside of TotalQueryData
     QueryInfo query_info                           = 12; // set is used outside of TotalQueryData
+    Skew skew                                      = 13;
 }
 
 message SegmentMetricsWrite {

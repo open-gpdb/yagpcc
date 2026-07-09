@@ -220,7 +220,7 @@ func TestRegisterProcfsStat_SingleEntry(t *testing.T) {
 	now := time.Now()
 	procs := []*pbc.GpPidProcInfo{{
 		GpSegmentId: 1, SessId: 100, Pid: 42,
-		Cmdline: "SELECT 1", State: "R",
+		Cmdline: "SELECT 1", State: "R", Ccnt: 5, SliceId: 2,
 		ProcStat: &pbc.ProcStat{Utime: 10}, ProcStatus: &pbc.ProcStatus{VmRss: 1024},
 		ProcIo: &pbc.ProcIO{ReadBytes: 512},
 	}}
@@ -234,6 +234,8 @@ func TestRegisterProcfsStat_SingleEntry(t *testing.T) {
 	require.True(t, ok)
 	assert.Equal(t, "SELECT 1", stat.Cmdline)
 	assert.Equal(t, "R", stat.State)
+	assert.Equal(t, int32(5), stat.Ccnt)
+	assert.Equal(t, int64(2), stat.SliceId)
 	assert.Equal(t, int64(10), stat.ProcStat.Utime)
 	assert.Equal(t, int64(1024), stat.ProcStatus.VmRss)
 	assert.Equal(t, int64(512), stat.ProcIO.ReadBytes)
@@ -355,6 +357,8 @@ func TestToGpPidProcInfo_ProcSpillRoundTrip(t *testing.T) {
 	ps := &ProcStat{
 		Cmdline:    "cmd",
 		State:      "R",
+		Ccnt:       5,
+		SliceId:    2,
 		ProcStat:   &pbc.ProcStat{Utime: 42},
 		ProcStatus: &pbc.ProcStatus{VmRss: 256},
 		ProcIO:     &pbc.ProcIO{WriteBytes: 512},
@@ -363,6 +367,8 @@ func TestToGpPidProcInfo_ProcSpillRoundTrip(t *testing.T) {
 	key := ProcKey{GpSegmentId: 3, SessId: 7, Pid: 111}
 	info := ps.ToGpPidProcInfo(key)
 
+	assert.Equal(t, int32(5), info.Ccnt)
+	assert.Equal(t, int64(2), info.SliceId)
 	require.NotNil(t, info.ProcSpill, "ToGpPidProcInfo must carry ProcSpill into the proto message")
 	assert.Equal(t, int64(8_000_000), info.ProcSpill.Size)
 	assert.Equal(t, int64(7), info.ProcSpill.Files)

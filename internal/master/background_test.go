@@ -37,6 +37,54 @@ func newTestBackgroundStorage() *BackgroundStorage {
 	}
 }
 
+func TestGetQueryRunningMetrics_NilProcfsStorage(t *testing.T) {
+	bs := newTestBackgroundStorage()
+
+	metrics, skew, quality, err := bs.GetQueryRunningMetrics(&pbc.QueryKey{Ssid: 1})
+
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "procfs storage is nil")
+	assert.Nil(t, metrics)
+	assert.Nil(t, skew)
+	assert.Nil(t, quality)
+}
+
+func TestGetQueryRunningMetrics(t *testing.T) {
+	procfsStorage := storage.NewProcfsStorage()
+	bs := newTestBackgroundStorage()
+	bs.procfsStorage = procfsStorage
+
+	base := time.Now().Add(-time.Second)
+	procfsStorage.RegisterProcfsStatWithDataQuality(base, []*pbc.GpPidProcInfo{
+		{GpSegmentId: 0, SessId: 100, Pid: 10, Ccnt: 7, SliceId: 1, Cmdline: "postgres: con100 cmd7 SELECT", ProcStat: &pbc.ProcStat{Utime: 0}, ProcStatus: &pbc.ProcStatus{VmPeak: 10, VmRss: 5}, ProcIo: &pbc.ProcIO{ReadBytes: 0}},
+		{GpSegmentId: 1, SessId: 100, Pid: 11, Ccnt: 7, SliceId: 1, Cmdline: "postgres: con100 cmd7 SELECT", ProcStat: &pbc.ProcStat{Utime: 0}, ProcStatus: &pbc.ProcStatus{VmPeak: 10, VmRss: 5}, ProcIo: &pbc.ProcIO{ReadBytes: 0}},
+	}, 3, 2)
+	procfsStorage.RegisterProcfsStatWithDataQuality(base.Add(time.Second), []*pbc.GpPidProcInfo{
+		{GpSegmentId: 0, SessId: 100, Pid: 10, Ccnt: 7, SliceId: 1, Cmdline: "postgres: con100 cmd7 SELECT", ProcStat: &pbc.ProcStat{Utime: 10, Stime: 1}, ProcStatus: &pbc.ProcStatus{VmPeak: 100, VmRss: 50}, ProcIo: &pbc.ProcIO{ReadBytes: 100}, ProcSpill: &pbc.ProcSpill{Size: 1000, Files: 1}},
+		{GpSegmentId: 1, SessId: 100, Pid: 11, Ccnt: 7, SliceId: 1, Cmdline: "postgres: con100 cmd7 SELECT", ProcStat: &pbc.ProcStat{Utime: 40, Stime: 2}, ProcStatus: &pbc.ProcStatus{VmPeak: 200, VmRss: 100}, ProcIo: &pbc.ProcIO{ReadBytes: 400}, ProcSpill: &pbc.ProcSpill{Size: 4000, Files: 4}},
+	}, 3, 2)
+
+	metrics, skew, quality, err := bs.GetQueryRunningMetrics(&pbc.QueryKey{Ssid: 100, Ccnt: 7})
+
+	require.NoError(t, err)
+	require.Len(t, metrics, 2)
+	assert.Equal(t, storage.QueryCellKey{SliceID: 1, Segindex: 0}, metrics[0].QueryCellKey)
+	assert.Equal(t, storage.QueryCellKey{SliceID: 1, Segindex: 1}, metrics[1].QueryCellKey)
+	assert.Equal(t, int64(10), metrics[0].RuntimeMetrics.Utime)
+	assert.Equal(t, int64(40), metrics[1].RuntimeMetrics.Utime)
+	assert.Equal(t, int64(400), metrics[1].RuntimeMetrics.ProcIo.ReadBytes)
+	assert.Equal(t, int64(4000), metrics[1].RuntimeMetrics.ProcSpill.Size)
+
+	require.NotNil(t, skew)
+	assert.InDelta(t, 0.369047619, skew.Skew, 0.000001)
+	assert.Equal(t, int32(1), skew.Segindex)
+
+	require.NotNil(t, quality)
+	assert.Equal(t, int64(3), quality.SegmentsExpected)
+	assert.Equal(t, int64(2), quality.SegmentsReceived)
+	assert.True(t, quality.IsPartial)
+}
+
 func TestMinSegmentRefreshTime_Empty(t *testing.T) {
 	bs := newTestBackgroundStorage()
 	// No segments recorded — should return zero time.
