@@ -22,6 +22,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/prometheus/procfs"
 	"google.golang.org/protobuf/proto"
 
 	pb "github.com/open-gpdb/yagpcc/api/proto/agent_segment"
@@ -38,6 +39,43 @@ type GetQueryInfoServer struct {
 	MaxMessageSize int
 	Logger         *zap.SugaredLogger
 	RQStorage      *storage.RunningQueriesStorage
+}
+
+func cpuUsage(stat procfs.CPUStat) float64 {
+	total := stat.User + stat.Nice + stat.System + stat.Idle + stat.Iowait + stat.IRQ + stat.SoftIRQ + stat.Steal
+	if total <= 0 {
+		return 0
+	}
+	idle := stat.Idle + stat.Iowait
+	return (total - idle) / total
+}
+
+func (s *GetQueryInfoServer) GetHostStat(ctx context.Context, in *pb.GetHostStatReq) (*pb.GetHostStatResponse, error) {
+	s.Logger.Debugf("got get host stat request %v", in)
+	start := time.Now()
+	fs, err := procfs.NewDefaultFS()
+	if err != nil {
+		return nil, fmt.Errorf("failed to open procfs: %w", err)
+	}
+	loadAvg, err := fs.LoadAvg()
+	if err != nil {
+		return nil, fmt.Errorf("failed to read loadavg: %w", err)
+	}
+	stat, err := fs.Stat()
+	if err != nil {
+		return nil, fmt.Errorf("failed to read proc stat: %w", err)
+	}
+	if metrics.YagpccMetrics != nil {
+		metrics.YagpccMetrics.HandleLatencies.With(map[string]string{"method": "GetHostStat"}).Observe(time.Since(start).Seconds())
+	}
+	return &pb.GetHostStatResponse{
+		LoadAvg: &pb.LoadAvg{
+			Avg1:  loadAvg.Load1,
+			Avg5:  loadAvg.Load5,
+			Avg15: loadAvg.Load15,
+		},
+		CpuUsage: &pb.CpuUsage{CpuUsage: cpuUsage(stat.CPUTotal)},
+	}, nil
 }
 
 func (s *GetQueryInfoServer) GetPidProcStat(ctx context.Context, in *pb.GetPidProcInfoReq) (*pb.GetPidProcInfoResponse, error) {

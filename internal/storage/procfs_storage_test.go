@@ -241,6 +241,29 @@ func TestRegisterProcfsStat_SingleEntry(t *testing.T) {
 	assert.Equal(t, int64(512), stat.ProcIO.ReadBytes)
 }
 
+func TestRegisterProcfsStatWithHostStat(t *testing.T) {
+	ps := NewProcfsStorage()
+	now := time.Now()
+	hostStats := HostStatMap{
+		"host-a": {
+			LoadAvg:  &HostLoadAvg{Avg1: 1.1, Avg5: 1.5, Avg15: 1.15},
+			CPUUsage: 0.75,
+		},
+	}
+
+	ps.RegisterProcfsStatWithHostStat(now, nil, hostStats, 2, 1)
+	ps.mx.RLock()
+	defer ps.mx.RUnlock()
+	require.Len(t, ps.procfsStat, 1)
+	stat := ps.procfsStat[0]
+	require.Contains(t, stat.hostStat, "host-a")
+	assert.Equal(t, 0.75, stat.hostStat["host-a"].CPUUsage)
+	require.NotNil(t, stat.hostStat["host-a"].LoadAvg)
+	assert.Equal(t, 1.5, stat.hostStat["host-a"].LoadAvg.Avg5)
+	assert.Equal(t, int64(2), stat.hostsExpected)
+	assert.Equal(t, int64(1), stat.hostsResponded)
+}
+
 func TestRegisterProcfsStat_MultipleProcesses(t *testing.T) {
 	ps := NewProcfsStorage()
 	now := time.Now()

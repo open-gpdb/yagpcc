@@ -6,6 +6,7 @@ import SessionDetailPage from "./pages/SessionDetailPage";
 import QueriesPage from "./pages/QueriesPage";
 import QueryDetailPage from "./pages/QueryDetailPage";
 import ExtensionsPage from "./pages/ExtensionsPage";
+import HostsPage from "./pages/HostsPage";
 
 export default function App() {
   return (
@@ -16,6 +17,7 @@ export default function App() {
         <Route path="/session/:sessId" element={<SessionDetailPage />} />
         <Route path="/queries" element={<QueriesPage />} />
         <Route path="/query/:ssid/:ccnt" element={<QueryDetailPage />} />
+        <Route path="/hosts" element={<HostsPage />} />
         <Route path="/extensions" element={<ExtensionsPage />} />
       </Route>
     </Routes>

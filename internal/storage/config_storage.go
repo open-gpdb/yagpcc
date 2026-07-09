@@ -18,6 +18,7 @@ package storage
 
 import (
 	"fmt"
+	"sort"
 	"sync"
 )
 
@@ -46,4 +47,38 @@ func SetHostnameForSegindex(segindex int32, fqdn string) {
 	SegmentConfigLock.Lock()
 	defer SegmentConfigLock.Unlock()
 	SegmentMap[SegmentKey{Segindex: segindex}] = &SegmentConfig{fqdn: fqdn}
+}
+
+func GetConfiguredHostnames() []string {
+	hostSegments := GetConfiguredHostSegments()
+	hostnames := make([]string, 0, len(hostSegments))
+	for hostname := range hostSegments {
+		hostnames = append(hostnames, hostname)
+	}
+	sort.Strings(hostnames)
+	return hostnames
+}
+
+func GetConfiguredHostSegments() map[string][]int32 {
+	SegmentConfigLock.RLock()
+	defer SegmentConfigLock.RUnlock()
+	hostSegments := make(map[string][]int32, len(SegmentMap))
+	seen := make(map[string]map[int32]struct{}, len(SegmentMap))
+	for key, segConfig := range SegmentMap {
+		if segConfig == nil || segConfig.fqdn == "" {
+			continue
+		}
+		if _, ok := seen[segConfig.fqdn]; !ok {
+			seen[segConfig.fqdn] = make(map[int32]struct{})
+		}
+		if _, ok := seen[segConfig.fqdn][key.Segindex]; ok {
+			continue
+		}
+		seen[segConfig.fqdn][key.Segindex] = struct{}{}
+		hostSegments[segConfig.fqdn] = append(hostSegments[segConfig.fqdn], key.Segindex)
+	}
+	for hostname := range hostSegments {
+		sort.Slice(hostSegments[hostname], func(i, j int) bool { return hostSegments[hostname][i] < hostSegments[hostname][j] })
+	}
+	return hostSegments
 }

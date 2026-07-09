@@ -27,7 +27,30 @@ option go_package = "github.com/open-gpdb/yagpcc/api/proto/agent_segment;greenpl
 service GetQueryInfo {
     rpc GetMetricQueries (GetQueriesInfoReq) returns (GetQueriesInfoResponse) {}
     rpc GetPidProcStat (GetPidProcInfoReq) returns (GetPidProcInfoResponse) {}
+    rpc GetHostStat (GetHostStatReq) returns (GetHostStatResponse) {}
 }
+
+message GetHostStatReq {
+}
+
+message LoadAvg {
+ double avg1  = 1;
+ double avg5  = 2;
+ double avg15 = 3; 
+}
+
+message CpuUsage {
+    double cpu_usage = 1;
+}
+
+message GetHostStatResponse {
+
+    // /proc/loadavg statistics
+    LoadAvg load_avg = 1;
+
+    // cpu usage
+    CpuUsage cpu_usage = 2;
+}    
 
 message QueryData {
     QueryStatus query_status              = 1;
