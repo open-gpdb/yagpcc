@@ -771,9 +771,6 @@ func (p *ProcfsStorage) GetHostsRunningQueries() ([]*HostRunningQueriesInfo, err
 		}
 		active := lastProc.Ccnt >= 0 && !isIdleProcState(lastProc.State)
 		segindex := int32(key.GpSegmentId)
-		if segindex < 0 {
-			segindex = 0 // Use 0 for master processes in cell metrics.
-		}
 		acc.addProc(segindex, key.SessId, lastProc, pidStat, active)
 	}
 	sort.Strings(hostnames)
