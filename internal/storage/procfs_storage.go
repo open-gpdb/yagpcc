@@ -314,9 +314,23 @@ func hostDataQuality(hostname string, last *ProcfsStatType) *pbc.DataQuality {
 	if last == nil {
 		return CalculateDataQuality(1, 0, time.Time{}, time.Now())
 	}
-	_, ok := last.hostStat[hostname]
-	if ok {
+	if _, ok := last.hostStat[hostname]; ok {
 		return CalculateDataQuality(1, 1, last.statTime, time.Now())
+	}
+	localHostname, err := os.Hostname()
+	if err != nil || localHostname == "" {
+		localHostname = "localhost"
+	}
+	for key := range last.pidProcData {
+		if key.GpSegmentId < 0 {
+			if hostname == localHostname {
+				return CalculateDataQuality(1, 1, last.statTime, time.Now())
+			}
+			continue
+		}
+		if GetHostnameForSegindex(int32(key.GpSegmentId)) == hostname {
+			return CalculateDataQuality(1, 1, last.statTime, time.Now())
+		}
 	}
 	return CalculateDataQuality(1, 0, last.statTime, time.Now())
 }

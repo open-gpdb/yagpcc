@@ -487,7 +487,10 @@ func TestGetHostsRunningQueriesRichMultiHost(t *testing.T) {
 	fallbackHost := byHost["4"]
 	assert.Equal(t, []int32{4}, fallbackHost.Segindex)
 	assert.Equal(t, int64(1), fallbackHost.ActiveQueries)
-	assert.True(t, fallbackHost.DataQuality.IsPartial)
+	require.NotNil(t, fallbackHost.DataQuality)
+	assert.Equal(t, int64(1), fallbackHost.DataQuality.SegmentsExpected)
+	assert.Equal(t, int64(1), fallbackHost.DataQuality.SegmentsReceived)
+	assert.False(t, fallbackHost.DataQuality.IsPartial)
 }
 
 func TestGetProcfsQueryRuntimeMetricsNilAndMissingQuery(t *testing.T) {
