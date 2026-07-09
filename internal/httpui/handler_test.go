@@ -74,6 +74,7 @@ func TestGETEndpointsRejectPOST(t *testing.T) {
 		"/api/stats/sessions",
 		"/api/extensions",
 		"/api/databases",
+		"/api/hosts/running-queries",
 	}
 
 	for _, endpoint := range getEndpoints {
@@ -123,6 +124,7 @@ func TestNilGRPCServerReturns503(t *testing.T) {
 		"/api/stats/sessions",
 		"/api/extensions",
 		"/api/databases",
+		"/api/hosts/running-queries",
 	}
 	for _, endpoint := range noParamEndpoints {
 		t.Run(endpoint, func(t *testing.T) {

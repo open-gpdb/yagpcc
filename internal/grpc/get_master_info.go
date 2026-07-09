@@ -455,6 +455,7 @@ func (s *GetMasterInfoServer) GetGPHostsRunningQueries(ctx context.Context, in *
 			Segindex:      host.Segindex,
 			ActiveQueries: host.ActiveQueries,
 			ActiveSlices:  host.ActiveSlices,
+			TotalSessions: host.TotalSessions,
 			CpuUsage:      host.CPUUsage,
 			MemoryUsage:   host.MemoryUsage,
 			DiskUsage:     host.DiskUsage,

@@ -19,6 +19,7 @@ package storage
 import (
 	"errors"
 	"fmt"
+	"os"
 	"sort"
 	"strings"
 	"sync"
@@ -106,6 +107,7 @@ type (
 		Segindex      []int32
 		ActiveQueries int64
 		ActiveSlices  int64
+		TotalSessions int64
 		CPUUsage      float64
 		Avg5          float64
 		MemoryUsage   int64
@@ -648,6 +650,7 @@ type hostRunningAccumulator struct {
 	info          *HostRunningQueriesInfo
 	activeQueries map[int32]struct{}
 	activeSlices  map[hostSliceKey]struct{}
+	totalSessions map[int64]struct{}
 	cellMetrics   map[QueryCellKey]*ProcfsCellMetric
 }
 
@@ -660,14 +663,17 @@ func newHostRunningAccumulator(hostname string, segindexes []int32, dataQuality 
 		},
 		activeQueries: make(map[int32]struct{}),
 		activeSlices:  make(map[hostSliceKey]struct{}),
+		totalSessions: make(map[int64]struct{}),
 		cellMetrics:   make(map[QueryCellKey]*ProcfsCellMetric),
 	}
 }
 
-func (a *hostRunningAccumulator) addProc(segindex int32, lastProc *ProcStat, pidStat *pbc.GpPidProcInfo, active bool) {
+func (a *hostRunningAccumulator) addProc(segindex int32, sessId int64, lastProc *ProcStat, pidStat *pbc.GpPidProcInfo, active bool) {
 	if lastProc == nil || pidStat == nil {
 		return
 	}
+	// Record total sessions for all processes (active and idle).
+	a.totalSessions[sessId] = struct{}{}
 	if lastProc.ProcStatus != nil {
 		a.info.MemoryUsage += lastProc.ProcStatus.VmRss
 	}
@@ -701,6 +707,7 @@ func (a *hostRunningAccumulator) result() *HostRunningQueriesInfo {
 	}
 	a.info.ActiveQueries = int64(len(a.activeQueries))
 	a.info.ActiveSlices = int64(len(a.activeSlices))
+	a.info.TotalSessions = int64(len(a.totalSessions))
 	a.info.Skew = CalculateCPUTimeSkew(cells)
 	return a.info
 }
@@ -727,14 +734,28 @@ func (p *ProcfsStorage) GetHostsRunningQueries() ([]*HostRunningQueriesInfo, err
 		}
 	}
 
+	// Get local hostname for master processes (segindex == -1).
+	localHostname, _ := os.Hostname()
+
 	for key, lastProc := range last.pidProcData {
-		if key.GpSegmentId < 0 || lastProc == nil {
+		if lastProc == nil {
 			continue
 		}
-		hostname := GetHostnameForSegindex(int32(key.GpSegmentId))
+		// Determine hostname: use segment mapping for segments, local hostname for master.
+		var hostname string
+		if key.GpSegmentId < 0 {
+			// Master process - use local hostname.
+			hostname = localHostname
+		} else {
+			hostname = GetHostnameForSegindex(int32(key.GpSegmentId))
+		}
 		acc, ok := byHost[hostname]
 		if !ok {
-			acc = newHostRunningAccumulator(hostname, []int32{int32(key.GpSegmentId)}, hostDataQuality(hostname, last))
+			segindexes := []int32{}
+			if key.GpSegmentId >= 0 {
+				segindexes = []int32{int32(key.GpSegmentId)}
+			}
+			acc = newHostRunningAccumulator(hostname, segindexes, hostDataQuality(hostname, last))
 			byHost[hostname] = acc
 			hostnames = append(hostnames, hostname)
 		}
@@ -747,7 +768,11 @@ func (p *ProcfsStorage) GetHostsRunningQueries() ([]*HostRunningQueriesInfo, err
 			pidStat = diff
 		}
 		active := lastProc.Ccnt >= 0 && !isIdleProcState(lastProc.State)
-		acc.addProc(int32(key.GpSegmentId), lastProc, pidStat, active)
+		segindex := int32(key.GpSegmentId)
+		if segindex < 0 {
+			segindex = 0 // Use 0 for master processes in cell metrics.
+		}
+		acc.addProc(segindex, key.SessId, lastProc, pidStat, active)
 	}
 	sort.Strings(hostnames)
 	result := make([]*HostRunningQueriesInfo, 0, len(hostnames))

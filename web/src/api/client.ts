@@ -514,6 +514,35 @@ export interface TerminateResponse {
   statusText: string;
 }
 
+// ---------------------------------------------------------------------------
+// Hosts running queries
+// ---------------------------------------------------------------------------
+
+export interface RunningHostInfo {
+  hostName: string;
+  segindex: number[];
+  activeQueries: number;
+  activeSlices: number;
+  cpuUsage: number;
+  memoryUsage: number;
+  diskUsage: number;
+  spillBytes: number;
+  skew: SkewInfo | null;
+  dataQuality: DataQuality | null;
+  avg5: number;
+  diskReads: number;
+  diskWrites: number;
+  totalSessions: number;
+}
+
+export interface HostsRunningQueriesResponse {
+  hosts: RunningHostInfo[];
+}
+
+export function getHostsRunningQueries() {
+  return get<HostsRunningQueriesResponse>("/api/hosts/running-queries");
+}
+
 export interface TerminateResponses {
   terminateResponse: TerminateResponse[];
 }

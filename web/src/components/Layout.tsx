@@ -5,6 +5,7 @@ import {
   DashboardOutlined,
   UserOutlined,
   CodeOutlined,
+  ClusterOutlined,
   AppstoreOutlined,
   MenuFoldOutlined,
   MenuUnfoldOutlined,
@@ -20,6 +21,7 @@ const menuItems = [
   { key: "/", icon: <DashboardOutlined />, label: "Dashboard" },
   { key: "/sessions", icon: <UserOutlined />, label: "Sessions" },
   { key: "/queries", icon: <CodeOutlined />, label: "Queries" },
+  { key: "/hosts", icon: <ClusterOutlined />, label: "Hosts" },
   { key: "/extensions", icon: <AppstoreOutlined />, label: "Extensions" },
 ];
 

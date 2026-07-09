@@ -377,18 +377,18 @@ func TestGetHostsRunningQueries(t *testing.T) {
 
 func TestHostRunningAccumulatorCornerCases(t *testing.T) {
 	acc := newHostRunningAccumulator("host-x", []int32{3, 4}, &pbc.DataQuality{})
-	acc.addProc(3, nil, nil, true)
-	acc.addProc(3,
+	acc.addProc(3, 0, nil, nil, true)
+	acc.addProc(3, 100,
 		&ProcStat{Ccnt: 5, SliceId: 1, State: "idle", ProcStatus: &pbc.ProcStatus{VmRss: 10}},
 		&pbc.GpPidProcInfo{ProcIo: &pbc.ProcIO{ReadBytes: 1, WriteBytes: 2}},
 		false,
 	)
-	acc.addProc(4,
+	acc.addProc(4, 200,
 		&ProcStat{Ccnt: 6, SliceId: UnsetSliceId, State: "SELECT", ProcStatus: &pbc.ProcStatus{VmRss: 20}, ProcSpill: &pbc.ProcSpill{Size: 30}},
 		&pbc.GpPidProcInfo{ProcStat: &pbc.ProcStat{Utime: 10}, ProcIo: &pbc.ProcIO{ReadBytes: 3, WriteBytes: 4}},
 		true,
 	)
-	acc.addProc(4,
+	acc.addProc(4, 200,
 		&ProcStat{Ccnt: 6, SliceId: UnsetSliceId, State: "SELECT", ProcStatus: &pbc.ProcStatus{VmRss: 40}},
 		&pbc.GpPidProcInfo{ProcStat: &pbc.ProcStat{Utime: 20}, ProcIo: &pbc.ProcIO{ReadBytes: 5, WriteBytes: 6}},
 		true,
@@ -399,6 +399,7 @@ func TestHostRunningAccumulatorCornerCases(t *testing.T) {
 	assert.Equal(t, []int32{3, 4}, result.Segindex)
 	assert.Equal(t, int64(1), result.ActiveQueries)
 	assert.Equal(t, int64(1), result.ActiveSlices)
+	assert.Equal(t, int64(2), result.TotalSessions) // sessions 100 and 200
 	assert.Equal(t, int64(70), result.MemoryUsage)
 	assert.Equal(t, int64(9), result.DiskReads)
 	assert.Equal(t, int64(12), result.DiskWrites)

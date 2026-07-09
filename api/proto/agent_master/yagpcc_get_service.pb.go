@@ -1258,6 +1258,7 @@ type RunningHostInfo struct {
 	Avg5          float64                `protobuf:"fixed64,11,opt,name=avg5,proto3" json:"avg5,omitempty"`
 	DiskReads     int64                  `protobuf:"varint,12,opt,name=disk_reads,json=diskReads,proto3" json:"disk_reads,omitempty"`
 	DiskWrites    int64                  `protobuf:"varint,13,opt,name=disk_writes,json=diskWrites,proto3" json:"disk_writes,omitempty"`
+	TotalSessions int64                  `protobuf:"varint,14,opt,name=total_sessions,json=totalSessions,proto3" json:"total_sessions,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -1379,6 +1380,13 @@ func (x *RunningHostInfo) GetDiskReads() int64 {
 func (x *RunningHostInfo) GetDiskWrites() int64 {
 	if x != nil {
 		return x.DiskWrites
+	}
+	return 0
+}
+
+func (x *RunningHostInfo) GetTotalSessions() int64 {
+	if x != nil {
+		return x.TotalSessions
 	}
 	return 0
 }
@@ -3300,7 +3308,7 @@ const file_api_proto_agent_master_yagpcc_get_service_proto_rawDesc = "" +
 	"\fcell_metrics\x18\x03 \x03(\v2\x13.yagpcc.CellMetricsR\vcellMetrics\x12 \n" +
 	"\x04skew\x18\x04 \x01(\v2\f.yagpcc.SkewR\x04skew\x126\n" +
 	"\fdata_quality\x18\x05 \x01(\v2\x13.yagpcc.DataQualityR\vdataQuality\"\x1d\n" +
-	"\x1bGetGPHostsRunningQueriesReq\"\xc4\x03\n" +
+	"\x1bGetGPHostsRunningQueriesReq\"\xeb\x03\n" +
 	"\x0fRunningHostInfo\x12\x1b\n" +
 	"\thost_name\x18\x01 \x01(\tR\bhostName\x12\x1a\n" +
 	"\bsegindex\x18\x02 \x03(\x05R\bsegindex\x12%\n" +
@@ -3319,7 +3327,8 @@ const file_api_proto_agent_master_yagpcc_get_service_proto_rawDesc = "" +
 	"\n" +
 	"disk_reads\x18\f \x01(\x03R\tdiskReads\x12\x1f\n" +
 	"\vdisk_writes\x18\r \x01(\x03R\n" +
-	"diskWrites\"Q\n" +
+	"diskWrites\x12%\n" +
+	"\x0etotal_sessions\x18\x0e \x01(\x03R\rtotalSessions\"Q\n" +
 	" GetGPHostsRunningQueriesResponse\x12-\n" +
 	"\x05hosts\x18\x01 \x03(\v2\x17.yagpcc.RunningHostInfoR\x05hosts\"9\n" +
 	"\x1aGetGPHostRunningQueriesReq\x12\x1b\n" +

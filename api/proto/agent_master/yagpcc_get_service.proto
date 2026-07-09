@@ -80,6 +80,7 @@ message RunningHostInfo {
     double avg5              = 11;
     int64 disk_reads         = 12;
     int64 disk_writes        = 13;
+    int64 total_sessions     = 14;
 }
 
 message GetGPHostsRunningQueriesResponse {
