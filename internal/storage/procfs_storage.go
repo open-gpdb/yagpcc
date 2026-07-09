@@ -734,9 +734,11 @@ func (p *ProcfsStorage) GetHostsRunningQueries() ([]*HostRunningQueriesInfo, err
 		}
 	}
 
-	// Get local hostname for master processes (segindex == -1).
-	localHostname, _ := os.Hostname()
-
+	// Get local hostname for master processes (segindex < 0).
+	localHostname, err := os.Hostname()
+	if err != nil || localHostname == "" {
+		localHostname = "localhost"
+	}
 	for key, lastProc := range last.pidProcData {
 		if lastProc == nil {
 			continue
