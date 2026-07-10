@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
+import { Link } from "react-router-dom";
 import { Table, Card, Typography, Button, Space, Tag, Tooltip } from "antd";
 import { ReloadOutlined } from "@ant-design/icons";
 import { useApi } from "../hooks/useApi";
@@ -110,14 +111,26 @@ function HostQueriesExpandedRow({ hostName }: { hostName: string }) {
       title: "Session",
       dataIndex: ["queryKey", "ssid"],
       width: 110,
-      render: (v: number | undefined) => v ?? "—",
+      render: (v: number | undefined) =>
+        v !== undefined ? <Link to={`/session/${v}`}>{v}</Link> : "—",
     },
     {
       title: "CCNT",
       dataIndex: ["queryKey", "ccnt"],
       width: 90,
-      render: (_: unknown, row: HostRunningQueryInfo) =>
-        row.isIdle ? <Tag>Unset</Tag> : (row.queryKey?.ccnt ?? "—"),
+      render: (_: unknown, row: HostRunningQueryInfo) => {
+        const ssid = row.queryKey?.ssid;
+        const ccnt = row.queryKey?.ccnt;
+        if (ccnt === undefined || ccnt < 0) return <Tag>Unset</Tag>;
+        if (ssid === undefined) return ccnt;
+        return <Link to={`/query/${ssid}/${ccnt}`}>{ccnt}</Link>;
+      },
+    },
+    {
+      title: "User",
+      dataIndex: "userName",
+      width: 120,
+      render: (v: string) => v || "—",
     },
     {
       title: "State",

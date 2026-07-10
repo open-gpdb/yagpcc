@@ -482,32 +482,49 @@ func (bs *BackgroundStorage) GetHostRunningQueries(hostname string) (*storage.Ho
 		return result, nil
 	}
 	for _, row := range result.Queries {
-		if row == nil || row.IsIdle || row.QueryKey == nil {
+		if row == nil || row.QueryKey == nil || row.QueryKey.Ccnt < 0 {
 			continue
 		}
 		query, ok := bs.RQStorage.GetQuery(storage.QueryKey{Ssid: row.QueryKey.Ssid, Ccnt: row.QueryKey.Ccnt})
 		if !ok || query == nil {
 			continue
 		}
-		query.QueryLock.RLock()
-		for _, data := range query.QueriesData {
-			if data == nil {
-				continue
-			}
-			data.QueryDataLock.RLock()
-			if data.QueryInfo == nil {
-				data.QueryDataLock.RUnlock()
-				continue
-			}
-			row.UserName = data.QueryInfo.GetUserName()
-			row.DbName = data.QueryInfo.GetDatabaseName()
-			row.QueryText = data.QueryInfo.GetQueryText()
-			data.QueryDataLock.RUnlock()
-			break
-		}
-		query.QueryLock.RUnlock()
+		enrichHostRunningQueryInfo(row, query)
 	}
 	return result, nil
+}
+
+func enrichHostRunningQueryInfo(row *storage.HostRunningQueryDetailInfo, query *storage.RunningQuery) bool {
+	query.QueryLock.RLock()
+	defer query.QueryLock.RUnlock()
+
+	masterData, ok := findMasterQueryData(query.QueriesData)
+	if !ok || masterData == nil {
+		return false
+	}
+	masterData.QueryDataLock.RLock()
+	defer masterData.QueryDataLock.RUnlock()
+	if masterData.QueryInfo == nil {
+		return false
+	}
+	row.UserName = masterData.QueryInfo.GetUserName()
+	row.DbName = masterData.QueryInfo.GetDatabaseName()
+	row.QueryText = masterData.QueryInfo.GetQueryText()
+	return true
+}
+
+func findMasterQueryData(queries storage.QueryMap) (*storage.QueryData, bool) {
+	for key, data := range queries {
+		if key.SKey.Segindex == -1 && (key.SliceID == storage.MainSliceId || key.SliceID == storage.UnsetSliceId) {
+			return data, true
+		}
+	}
+	for key, data := range queries {
+		if key.SKey.Segindex == -1 {
+			return data, true
+		}
+	}
+	return nil, false
 }
 
 func (bs *BackgroundStorage) TryRefreshSessionsFromGP(

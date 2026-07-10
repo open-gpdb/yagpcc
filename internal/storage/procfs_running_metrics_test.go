@@ -512,14 +512,14 @@ func TestGetHostRunningQueriesDetails(t *testing.T) {
 	ps.RegisterProcfsStatWithDataQuality(base, []*pbc.GpPidProcInfo{
 		{GpSegmentId: 0, SessId: 100, Pid: 10, Ccnt: 7, SliceId: 1, State: "SELECT waiting", ProcStat: &pbc.ProcStat{Utime: 1}, ProcStatus: &pbc.ProcStatus{VmRss: 1}, ProcIo: &pbc.ProcIO{}},
 		{GpSegmentId: 1, SessId: 100, Pid: 11, Ccnt: 7, SliceId: 1, State: "SELECT waiting", ProcStat: &pbc.ProcStat{Utime: 2}, ProcStatus: &pbc.ProcStatus{VmRss: 2}, ProcIo: &pbc.ProcIO{}},
-		{GpSegmentId: 0, SessId: 200, Pid: 20, Ccnt: UnsetSliceId, SliceId: UnsetSliceId, State: "idle", ProcStat: &pbc.ProcStat{Utime: 3}, ProcStatus: &pbc.ProcStatus{VmRss: 3}, ProcIo: &pbc.ProcIO{}},
+		{GpSegmentId: 0, SessId: 200, Pid: 20, Ccnt: 8, SliceId: UnsetSliceId, State: "idle", ProcStat: &pbc.ProcStat{Utime: 3}, ProcStatus: &pbc.ProcStatus{VmRss: 3}, ProcIo: &pbc.ProcIO{}},
 		{GpSegmentId: 1, SessId: 200, Pid: 21, Ccnt: UnsetSliceId, SliceId: UnsetSliceId, State: "idle", ProcStat: &pbc.ProcStat{Utime: 4}, ProcStatus: &pbc.ProcStatus{VmRss: 4}, ProcIo: &pbc.ProcIO{}},
 		{GpSegmentId: 2, SessId: 300, Pid: 30, Ccnt: 9, SliceId: 1, State: "SELECT", ProcStat: &pbc.ProcStat{Utime: 5}, ProcStatus: &pbc.ProcStatus{VmRss: 5}, ProcIo: &pbc.ProcIO{}},
 	}, 2, 2)
 	ps.RegisterProcfsStatWithDataQuality(base.Add(time.Second), []*pbc.GpPidProcInfo{
 		{GpSegmentId: 0, SessId: 100, Pid: 10, Ccnt: 7, SliceId: 1, State: "SELECT waiting", ProcStat: &pbc.ProcStat{Utime: 11}, ProcStatus: &pbc.ProcStatus{VmRss: 10}, ProcIo: &pbc.ProcIO{ReadBytes: 10}},
 		{GpSegmentId: 1, SessId: 100, Pid: 11, Ccnt: 7, SliceId: 1, State: "SELECT waiting", ProcStat: &pbc.ProcStat{Utime: 42}, ProcStatus: &pbc.ProcStatus{VmRss: 20}, ProcIo: &pbc.ProcIO{ReadBytes: 20}},
-		{GpSegmentId: 0, SessId: 200, Pid: 20, Ccnt: UnsetSliceId, SliceId: UnsetSliceId, State: "idle", ProcStat: &pbc.ProcStat{Utime: 13}, ProcStatus: &pbc.ProcStatus{VmRss: 30}, ProcIo: &pbc.ProcIO{ReadBytes: 30}},
+		{GpSegmentId: 0, SessId: 200, Pid: 20, Ccnt: 8, SliceId: UnsetSliceId, State: "idle", ProcStat: &pbc.ProcStat{Utime: 13}, ProcStatus: &pbc.ProcStatus{VmRss: 30}, ProcIo: &pbc.ProcIO{ReadBytes: 30}},
 		{GpSegmentId: 1, SessId: 200, Pid: 21, Ccnt: UnsetSliceId, SliceId: UnsetSliceId, State: "idle", ProcStat: &pbc.ProcStat{Utime: 24}, ProcStatus: &pbc.ProcStatus{VmRss: 40}, ProcIo: &pbc.ProcIO{ReadBytes: 40}},
 		{GpSegmentId: 2, SessId: 300, Pid: 30, Ccnt: 9, SliceId: 1, State: "SELECT", ProcStat: &pbc.ProcStat{Utime: 15}, ProcStatus: &pbc.ProcStatus{VmRss: 50}, ProcIo: &pbc.ProcIO{ReadBytes: 50}},
 	}, 2, 2)
@@ -543,7 +543,7 @@ func TestGetHostRunningQueriesDetails(t *testing.T) {
 	idle := result.Queries[1]
 	require.NotNil(t, idle.QueryKey)
 	assert.Equal(t, int32(200), idle.QueryKey.Ssid)
-	assert.Equal(t, int32(UnsetSliceId), idle.QueryKey.Ccnt)
+	assert.Equal(t, int32(8), idle.QueryKey.Ccnt)
 	assert.True(t, idle.IsIdle)
 	assert.Equal(t, "idle", idle.State)
 	require.NotNil(t, idle.RuntimeMetrics)

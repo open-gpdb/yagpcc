@@ -450,6 +450,18 @@ func TestGetGPHostRunningQueries(t *testing.T) {
 		{GpSegmentId: 0, SessId: 99, Pid: 10, Ccnt: 3, SliceId: 1, State: "SELECT waiting", ProcStat: &pbc.ProcStat{Utime: 9}, ProcStatus: &pbc.ProcStatus{VmRss: 90}, ProcIo: &pbc.ProcIO{ReadBytes: 900}},
 		{GpSegmentId: 0, SessId: 100, Pid: 20, Ccnt: storage.UnsetSliceId, SliceId: storage.UnsetSliceId, State: "idle", ProcStat: &pbc.ProcStat{Utime: 1}, ProcStatus: &pbc.ProcStatus{VmRss: 10}, ProcIo: &pbc.ProcIO{ReadBytes: 100}},
 	}, 1, 1)
+	_, err := clientSet.SetQueryInfoClient().SetMetricQuery(context.Background(), &pb.SetQueryReq{
+		QueryStatus: pbc.QueryStatus_QUERY_STATUS_START,
+		Datetime:    timestamppb.New(base.Add(time.Second)),
+		QueryKey:    &pbc.QueryKey{Ssid: 99, Ccnt: 3},
+		SegmentKey:  &pbc.SegmentKey{Segindex: -1},
+		QueryInfo: &pbc.QueryInfo{
+			UserName:     "host_user",
+			DatabaseName: "host_db",
+			QueryText:    "select * from host_detail_source",
+		},
+	})
+	require.NoError(t, err)
 
 	response, err := clientSet.GetGetGPInfoClient().GetGPHostRunningQueries(context.Background(), &pbm.GetGPHostRunningQueriesReq{
 		HostName: "grpc-detail-host",
@@ -464,6 +476,9 @@ func TestGetGPHostRunningQueries(t *testing.T) {
 	assert.Equal(t, int32(99), active.QueryKey.Ssid)
 	assert.Equal(t, int32(3), active.QueryKey.Ccnt)
 	assert.Equal(t, "SELECT waiting", active.State)
+	assert.Equal(t, "host_user", active.UserName)
+	assert.Equal(t, "host_db", active.DbName)
+	assert.Equal(t, "select * from host_detail_source", active.QueryText)
 	require.NotNil(t, active.RuntimeMetrics)
 	assert.Equal(t, int64(9), active.RuntimeMetrics.Utime)
 

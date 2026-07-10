@@ -932,6 +932,9 @@ func (p *ProcfsStorage) GetHostRunningQueries(hostname string) (*HostRunningQuer
 			acc = newHostRunningQueryDetailAccumulator(detailKey, lastProc.State, isIdle, dataQuality)
 			accs[detailKey] = acc
 		}
+		if isIdle && lastProc.Ccnt >= 0 && acc.info.QueryKey.Ccnt < 0 {
+			acc.info.QueryKey.Ccnt = lastProc.Ccnt
+		}
 		acc.addProc(int32(key.GpSegmentId), lastProc, pidStat)
 	}
 
