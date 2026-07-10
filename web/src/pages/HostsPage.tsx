@@ -102,7 +102,8 @@ function HostQueriesExpandedRow({ hostName }: { hostName: string }) {
 
   useEffect(() => {
     load();
-  }, [load]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [hostName, page]);
 
   const columns = [
     {
