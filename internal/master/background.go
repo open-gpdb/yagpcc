@@ -470,6 +470,46 @@ func (bs *BackgroundStorage) GetHostsRunningQueries() ([]*storage.HostRunningQue
 	return bs.procfsStorage.GetHostsRunningQueries()
 }
 
+func (bs *BackgroundStorage) GetHostRunningQueries(hostname string) (*storage.HostRunningQueriesDetailInfo, error) {
+	if bs.procfsStorage == nil {
+		return nil, fmt.Errorf("procfs storage is nil")
+	}
+	result, err := bs.procfsStorage.GetHostRunningQueries(hostname)
+	if err != nil {
+		return nil, err
+	}
+	if bs.RQStorage == nil || result == nil {
+		return result, nil
+	}
+	for _, row := range result.Queries {
+		if row == nil || row.IsIdle || row.QueryKey == nil {
+			continue
+		}
+		query, ok := bs.RQStorage.GetQuery(storage.QueryKey{Ssid: row.QueryKey.Ssid, Ccnt: row.QueryKey.Ccnt})
+		if !ok || query == nil {
+			continue
+		}
+		query.QueryLock.RLock()
+		for _, data := range query.QueriesData {
+			if data == nil {
+				continue
+			}
+			data.QueryDataLock.RLock()
+			if data.QueryInfo == nil {
+				data.QueryDataLock.RUnlock()
+				continue
+			}
+			row.UserName = data.QueryInfo.GetUserName()
+			row.DbName = data.QueryInfo.GetDatabaseName()
+			row.QueryText = data.QueryInfo.GetQueryText()
+			data.QueryDataLock.RUnlock()
+			break
+		}
+		query.QueryLock.RUnlock()
+	}
+	return result, nil
+}
+
 func (bs *BackgroundStorage) TryRefreshSessionsFromGP(
 	ctx context.Context,
 	clearDeletedSessions bool,

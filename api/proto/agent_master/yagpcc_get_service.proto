@@ -88,7 +88,9 @@ message GetGPHostsRunningQueriesResponse {
 }
 
 message GetGPHostRunningQueriesReq {
-    string host_name = 1;
+    string host_name        = 1;
+    int64 page_size         =  2;
+    string page_token       =  3;
 }
 
 message RunningQueryInfo {
@@ -97,6 +99,10 @@ message RunningQueryInfo {
     string db_name                 = 3;
     string query_text              = 4;
     RuntimeMetrics runtime_metrics = 5;
+    Skew skew                      = 6;
+    DataQuality data_quality       = 7;
+    string state                   = 8;
+    bool is_idle                   = 9;
 
 }
 

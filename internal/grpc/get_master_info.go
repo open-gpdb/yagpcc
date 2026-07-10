@@ -25,8 +25,6 @@ import (
 	"sync/atomic"
 	"time"
 
-	"google.golang.org/protobuf/proto"
-
 	pbm "github.com/open-gpdb/yagpcc/api/proto/agent_master"
 	pbc "github.com/open-gpdb/yagpcc/api/proto/common"
 	"github.com/open-gpdb/yagpcc/internal/gp"
@@ -194,43 +192,12 @@ func (s *GetMasterInfoServer) GetGPSessions(ctx context.Context, in *pbm.GetGPSe
 	if len(filteredState) > 0 {
 		s.logger.Debugf("first filtered state data is %v", filteredState[0])
 	}
-	currentToken := int64(0)
-	queryToken := int64(0)
-	if in.PageToken != "" {
-		var err error
-		queryToken, err = strconv.ParseInt(in.PageToken, 10, 64)
-		if err != nil {
-			return nil, fmt.Errorf("invalid input - fail to parse page token")
-		}
-	}
-	more := false
-	pageSize := in.PageSize
-	if pageSize == 0 {
-		pageSize = 100
-	}
-	msgSize := 0
-	for _, sessionState := range filteredState {
-		currentToken += 1
-		if currentToken < queryToken {
-			continue
-		}
-		msgSize += proto.Size(sessionState)
-		if len(result.SessionsState) >= int(pageSize) {
-			more = true
-			break
-		}
-		if msgSize >= s.maxMessageSize {
-			more = true
-			s.logger.Infof("current sizes %d more then max %d", msgSize, s.maxMessageSize)
-			break
-		}
-		result.SessionsState = append(result.SessionsState, sessionState)
+	result.SessionsState, result.NextPageToken, err = paginateProtoMessages(filteredState, in.PageSize, in.PageToken, 100, s.maxMessageSize)
+	if err != nil {
+		return nil, err
 	}
 	if len(result.SessionsState) > 0 {
 		s.logger.Debugf("first result state data is %v", result.SessionsState[0])
-	}
-	if more {
-		result.NextPageToken = fmt.Sprintf("%d", currentToken)
 	}
 	s.logger.Debugf("Get session total processing time took %v", time.Since(start))
 	if metrics.YagpccMetrics != nil {
@@ -326,40 +293,9 @@ func (s *GetMasterInfoServer) GetGPQueries(ctx context.Context, in *pbm.GetGPQue
 		s.logger.Debugf("data not sorted: no sort field specified")
 	}
 	s.logger.Debugf("Sort data len %v took %v", len(filteredState), time.Since(start))
-	currentToken := int64(0)
-	queryToken := int64(0)
-	if in.PageToken != "" {
-		var err error
-		queryToken, err = strconv.ParseInt(in.PageToken, 10, 64)
-		if err != nil {
-			return nil, fmt.Errorf("invalid input - fail to parse page token")
-		}
-	}
-	more := false
-	pageSize := in.PageSize
-	if pageSize == 0 {
-		pageSize = 100
-	}
-	msgSize := 0
-	for _, sessionState := range filteredState {
-		currentToken += 1
-		if currentToken < queryToken {
-			continue
-		}
-		msgSize += proto.Size(sessionState)
-		if len(result.SessionsState) >= int(pageSize) {
-			more = true
-			break
-		}
-		if msgSize >= s.maxMessageSize {
-			more = true
-			s.logger.Infof("current sizes %d more then max %d", msgSize, s.maxMessageSize)
-			break
-		}
-		result.SessionsState = append(result.SessionsState, sessionState)
-	}
-	if more {
-		result.NextPageToken = fmt.Sprintf("%d", currentToken)
+	result.SessionsState, result.NextPageToken, err = paginateProtoMessages(filteredState, in.PageSize, in.PageToken, 100, s.maxMessageSize)
+	if err != nil {
+		return nil, err
 	}
 	s.logger.Debugf("Result dataset size is %v", len(result.SessionsState))
 	s.logger.Debugf("Get running queries took %v", time.Since(start))
@@ -469,6 +405,49 @@ func (s *GetMasterInfoServer) GetGPHostsRunningQueries(ctx context.Context, in *
 	}
 	if metrics.YagpccMetrics != nil {
 		metrics.YagpccMetrics.HandleLatencies.With(map[string]string{"method": "GetGPHostsRunningQueries"}).Observe(time.Since(start).Seconds())
+	}
+	return response, nil
+}
+
+func (s *GetMasterInfoServer) GetGPHostRunningQueries(ctx context.Context, in *pbm.GetGPHostRunningQueriesReq) (*pbm.GetGPHostRunningQueriesResponse, error) {
+	s.logger.Debugf("got get host running queries request %v", in)
+	start := time.Now()
+	if strings.TrimSpace(in.GetHostName()) == "" {
+		return nil, fmt.Errorf("invalid input - host name cannot be empty")
+	}
+	result, err := s.backgroundStorage.GetHostRunningQueries(in.GetHostName())
+	if err != nil {
+		return nil, fmt.Errorf("failed to get host running queries: %w", err)
+	}
+	queries, nextPageToken, err := paginateItems(result.Queries, in.GetPageSize(), in.GetPageToken(), 50)
+	if err != nil {
+		return nil, err
+	}
+	response := &pbm.GetGPHostRunningQueriesResponse{
+		HostName:      result.HostName,
+		Segindex:      result.Segindex,
+		Queries:       make([]*pbm.RunningQueryInfo, 0, len(queries)),
+		DataQuality:   result.DataQuality,
+		NextPageToken: nextPageToken,
+	}
+	for _, query := range queries {
+		if query == nil {
+			continue
+		}
+		response.Queries = append(response.Queries, &pbm.RunningQueryInfo{
+			QueryKey:       query.QueryKey,
+			UserName:       query.UserName,
+			DbName:         query.DbName,
+			QueryText:      query.QueryText,
+			RuntimeMetrics: query.RuntimeMetrics,
+			Skew:           query.Skew,
+			DataQuality:    query.DataQuality,
+			State:          query.State,
+			IsIdle:         query.IsIdle,
+		})
+	}
+	if metrics.YagpccMetrics != nil {
+		metrics.YagpccMetrics.HandleLatencies.With(map[string]string{"method": "GetGPHostRunningQueries"}).Observe(time.Since(start).Seconds())
 	}
 	return response, nil
 }

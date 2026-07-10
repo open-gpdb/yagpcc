@@ -136,7 +136,7 @@ Service for querying Greenplum sessions, queries, and aggregate statistics.
 
 #### GetGPHostRunningQueriesReq / GetGPHostRunningQueriesResponse
 
-- **GetGPHostRunningQueriesReq**: `host_name` (string).
+- **GetGPHostRunningQueriesReq**: `host_name` (string), `page_size` (`int64`, default 50), `page_token` (string offset token).
 - **GetGPHostRunningQueriesResponse**:
   - `host_name` (`string`) — hostname.
   - `segindex` (`repeated int32`) — segment indices on this host.
@@ -148,11 +148,15 @@ Service for querying Greenplum sessions, queries, and aggregate statistics.
 
 | Field | Type | Description |
 |-------|------|-------------|
-| `query_key` | `QueryKey` | Query identifier. |
-| `user_name` | `string` | Database user. |
-| `db_name` | `string` | Database name. |
-| `query_text` | `string` | Query text. |
+| `query_key` | `QueryKey` | Query identifier. For idle rows, `ccnt` is unset (`-1`). |
+| `user_name` | `string` | Database user. Empty for idle rows. |
+| `db_name` | `string` | Database name. Empty for idle rows. |
+| `query_text` | `string` | Query text. Empty for idle rows. The UI shows an approximately 100-character preview with full text in a tooltip. |
 | `runtime_metrics` | `RuntimeMetrics` | Process-level runtime metrics. |
+| `skew` | `Skew` | CPU-time skew for this query row. Empty for idle rows. |
+| `data_quality` | `DataQuality` | Completeness/freshness metadata. |
+| `state` | `string` | Full procfs process state. The UI shows only the first word with the full state in a tooltip. |
+| `is_idle` | `bool` | True when the row represents idle session processes grouped by session ID. |
 
 #### GetGpPidProcInfoReq / GpPidProcInfo
 
@@ -738,6 +742,7 @@ serialized using `protojson` with camelCase field names and zero-value fields in
 | `GET` | `/api/query/{ssid}/{ccnt}` | Get a single query by SSID and CCNT |
 | `GET` | `/api/query/{ssid}/{ccnt}/running-metrics` | Get procfs runtime metrics matrix cells for a query. Returns `cellMetrics[]` with `sliceId`, `segindex`, and `runtimeMetrics` (`utime`, `stime`, `vmPeak`, `vmRss`, `state`, `procIo`, `procSpill`), plus `skew` and `dataQuality`. Idle cells can be rendered separately using `runtimeMetrics.state == "idle"`. |
 | `GET` | `/api/hosts/running-queries` | Get aggregated host-level statistics for all hosts with running queries. Returns `hosts[]` with `hostName`, `segindex[]`, `activeQueries`, `activeSlices`, `cpuUsage`, `memoryUsage`, `diskUsage`, `spillBytes`, `skew`, `dataQuality`, `avg5`, `diskReads`, `diskWrites`, `totalSessions`. |
+| `GET` | `/api/hosts/{host_name}/running-queries` | Get paginated per-host process/query details. Query params: `page_size` (default 50), `page_token`. Idle session processes are grouped by session ID and returned with `isIdle=true`, unset `queryKey.ccnt`, empty `dbName`/`queryText`, and runtime metrics. |
 | `GET` | `/api/stats/sessions` | Get session state statistics (counts by state) |
 | `GET` | `/api/extensions` | List extensions (optional `database_name` param) |
 | `GET` | `/api/databases` | List available databases |

@@ -1438,6 +1438,8 @@ func (x *GetGPHostsRunningQueriesResponse) GetHosts() []*RunningHostInfo {
 type GetGPHostRunningQueriesReq struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	HostName      string                 `protobuf:"bytes,1,opt,name=host_name,json=hostName,proto3" json:"host_name,omitempty"`
+	PageSize      int64                  `protobuf:"varint,2,opt,name=page_size,json=pageSize,proto3" json:"page_size,omitempty"`
+	PageToken     string                 `protobuf:"bytes,3,opt,name=page_token,json=pageToken,proto3" json:"page_token,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -1479,6 +1481,20 @@ func (x *GetGPHostRunningQueriesReq) GetHostName() string {
 	return ""
 }
 
+func (x *GetGPHostRunningQueriesReq) GetPageSize() int64 {
+	if x != nil {
+		return x.PageSize
+	}
+	return 0
+}
+
+func (x *GetGPHostRunningQueriesReq) GetPageToken() string {
+	if x != nil {
+		return x.PageToken
+	}
+	return ""
+}
+
 type RunningQueryInfo struct {
 	state          protoimpl.MessageState `protogen:"open.v1"`
 	QueryKey       *common.QueryKey       `protobuf:"bytes,1,opt,name=query_key,json=queryKey,proto3" json:"query_key,omitempty"`
@@ -1486,6 +1502,10 @@ type RunningQueryInfo struct {
 	DbName         string                 `protobuf:"bytes,3,opt,name=db_name,json=dbName,proto3" json:"db_name,omitempty"`
 	QueryText      string                 `protobuf:"bytes,4,opt,name=query_text,json=queryText,proto3" json:"query_text,omitempty"`
 	RuntimeMetrics *common.RuntimeMetrics `protobuf:"bytes,5,opt,name=runtime_metrics,json=runtimeMetrics,proto3" json:"runtime_metrics,omitempty"`
+	Skew           *common.Skew           `protobuf:"bytes,6,opt,name=skew,proto3" json:"skew,omitempty"`
+	DataQuality    *common.DataQuality    `protobuf:"bytes,7,opt,name=data_quality,json=dataQuality,proto3" json:"data_quality,omitempty"`
+	State          string                 `protobuf:"bytes,8,opt,name=state,proto3" json:"state,omitempty"`
+	IsIdle         bool                   `protobuf:"varint,9,opt,name=is_idle,json=isIdle,proto3" json:"is_idle,omitempty"`
 	unknownFields  protoimpl.UnknownFields
 	sizeCache      protoimpl.SizeCache
 }
@@ -1553,6 +1573,34 @@ func (x *RunningQueryInfo) GetRuntimeMetrics() *common.RuntimeMetrics {
 		return x.RuntimeMetrics
 	}
 	return nil
+}
+
+func (x *RunningQueryInfo) GetSkew() *common.Skew {
+	if x != nil {
+		return x.Skew
+	}
+	return nil
+}
+
+func (x *RunningQueryInfo) GetDataQuality() *common.DataQuality {
+	if x != nil {
+		return x.DataQuality
+	}
+	return nil
+}
+
+func (x *RunningQueryInfo) GetState() string {
+	if x != nil {
+		return x.State
+	}
+	return ""
+}
+
+func (x *RunningQueryInfo) GetIsIdle() bool {
+	if x != nil {
+		return x.IsIdle
+	}
+	return false
 }
 
 type GetGPHostRunningQueriesResponse struct {
@@ -3330,16 +3378,23 @@ const file_api_proto_agent_master_yagpcc_get_service_proto_rawDesc = "" +
 	"diskWrites\x12%\n" +
 	"\x0etotal_sessions\x18\x0e \x01(\x03R\rtotalSessions\"Q\n" +
 	" GetGPHostsRunningQueriesResponse\x12-\n" +
-	"\x05hosts\x18\x01 \x03(\v2\x17.yagpcc.RunningHostInfoR\x05hosts\"9\n" +
+	"\x05hosts\x18\x01 \x03(\v2\x17.yagpcc.RunningHostInfoR\x05hosts\"u\n" +
 	"\x1aGetGPHostRunningQueriesReq\x12\x1b\n" +
-	"\thost_name\x18\x01 \x01(\tR\bhostName\"\xd7\x01\n" +
+	"\thost_name\x18\x01 \x01(\tR\bhostName\x12\x1b\n" +
+	"\tpage_size\x18\x02 \x01(\x03R\bpageSize\x12\x1d\n" +
+	"\n" +
+	"page_token\x18\x03 \x01(\tR\tpageToken\"\xe0\x02\n" +
 	"\x10RunningQueryInfo\x12-\n" +
 	"\tquery_key\x18\x01 \x01(\v2\x10.yagpcc.QueryKeyR\bqueryKey\x12\x1b\n" +
 	"\tuser_name\x18\x02 \x01(\tR\buserName\x12\x17\n" +
 	"\adb_name\x18\x03 \x01(\tR\x06dbName\x12\x1d\n" +
 	"\n" +
 	"query_text\x18\x04 \x01(\tR\tqueryText\x12?\n" +
-	"\x0fruntime_metrics\x18\x05 \x01(\v2\x16.yagpcc.RuntimeMetricsR\x0eruntimeMetrics\"\xee\x01\n" +
+	"\x0fruntime_metrics\x18\x05 \x01(\v2\x16.yagpcc.RuntimeMetricsR\x0eruntimeMetrics\x12 \n" +
+	"\x04skew\x18\x06 \x01(\v2\f.yagpcc.SkewR\x04skew\x126\n" +
+	"\fdata_quality\x18\a \x01(\v2\x13.yagpcc.DataQualityR\vdataQuality\x12\x14\n" +
+	"\x05state\x18\b \x01(\tR\x05state\x12\x17\n" +
+	"\ais_idle\x18\t \x01(\bR\x06isIdle\"\xee\x01\n" +
 	"\x1fGetGPHostRunningQueriesResponse\x12\x1b\n" +
 	"\thost_name\x18\x01 \x01(\tR\bhostName\x12\x1a\n" +
 	"\bsegindex\x18\x02 \x03(\x05R\bsegindex\x122\n" +
@@ -3849,85 +3904,87 @@ var file_api_proto_agent_master_yagpcc_get_service_proto_depIdxs = []int32{
 	10, // 8: yagpcc.GetGPHostsRunningQueriesResponse.hosts:type_name -> yagpcc.RunningHostInfo
 	39, // 9: yagpcc.RunningQueryInfo.query_key:type_name -> yagpcc.QueryKey
 	40, // 10: yagpcc.RunningQueryInfo.runtime_metrics:type_name -> yagpcc.RuntimeMetrics
-	13, // 11: yagpcc.GetGPHostRunningQueriesResponse.queries:type_name -> yagpcc.RunningQueryInfo
-	42, // 12: yagpcc.GetGPHostRunningQueriesResponse.data_quality:type_name -> yagpcc.DataQuality
-	30, // 13: yagpcc.GetGPQueriesReq.field:type_name -> yagpcc.SessionFieldWrapper
-	31, // 14: yagpcc.GetGPQueriesReq.filter:type_name -> yagpcc.SessionFilter
-	17, // 15: yagpcc.GetTotalSessionsResponse.sessions_stat:type_name -> yagpcc.SessionStat
-	30, // 16: yagpcc.GetGPSessionsReq.field:type_name -> yagpcc.SessionFieldWrapper
-	31, // 17: yagpcc.GetGPSessionsReq.filter:type_name -> yagpcc.SessionFilter
-	0,  // 18: yagpcc.GetGPSessionsReq.show_query_type:type_name -> yagpcc.RunningQueryType
-	43, // 19: yagpcc.GetGPSessionsResponse.sessions_state:type_name -> yagpcc.SessionState
-	39, // 20: yagpcc.GetGPQueryReq.query_key:type_name -> yagpcc.QueryKey
-	25, // 21: yagpcc.GetGPQueryResponse.queries_data:type_name -> yagpcc.TotalQueryData
-	44, // 22: yagpcc.GetGPSessionReq.session_key:type_name -> yagpcc.SessionKey
-	43, // 23: yagpcc.GetGPSessionResponse.sessions_state:type_name -> yagpcc.SessionState
-	26, // 24: yagpcc.TotalQueryData.query_stat:type_name -> yagpcc.QueryStat
-	28, // 25: yagpcc.TotalQueryData.segment_query_metrics:type_name -> yagpcc.SegmentMetrics
-	45, // 26: yagpcc.QueryStat.collect_time:type_name -> google.protobuf.Timestamp
-	39, // 27: yagpcc.QueryStat.query_key:type_name -> yagpcc.QueryKey
-	46, // 28: yagpcc.QueryStat.query_info:type_name -> yagpcc.QueryInfo
-	1,  // 29: yagpcc.QueryStat.stat_kind:type_name -> yagpcc.StatKind
-	47, // 30: yagpcc.QueryStat.query_status:type_name -> yagpcc.QueryStatus
-	45, // 31: yagpcc.QueryStat.start_time:type_name -> google.protobuf.Timestamp
-	45, // 32: yagpcc.QueryStat.end_time:type_name -> google.protobuf.Timestamp
-	48, // 33: yagpcc.QueryStat.total_query_metrics:type_name -> yagpcc.GPMetrics
-	49, // 34: yagpcc.QueryStat.aggregated_metrics:type_name -> yagpcc.AggregatedMetrics
-	41, // 35: yagpcc.QueryStat.skew:type_name -> yagpcc.Skew
-	42, // 36: yagpcc.QueryStat.data_quality:type_name -> yagpcc.DataQuality
-	39, // 37: yagpcc.QueryStatWrite.query_key:type_name -> yagpcc.QueryKey
-	46, // 38: yagpcc.QueryStatWrite.query_info:type_name -> yagpcc.QueryInfo
-	1,  // 39: yagpcc.QueryStatWrite.stat_kind:type_name -> yagpcc.StatKind
-	47, // 40: yagpcc.QueryStatWrite.query_status:type_name -> yagpcc.QueryStatus
-	48, // 41: yagpcc.QueryStatWrite.total_query_metrics:type_name -> yagpcc.GPMetrics
-	49, // 42: yagpcc.QueryStatWrite.aggregated_metrics:type_name -> yagpcc.AggregatedMetrics
-	45, // 43: yagpcc.SegmentMetrics.collect_time:type_name -> google.protobuf.Timestamp
-	50, // 44: yagpcc.SegmentMetrics.segment_key:type_name -> yagpcc.SegmentKey
-	47, // 45: yagpcc.SegmentMetrics.query_status:type_name -> yagpcc.QueryStatus
-	45, // 46: yagpcc.SegmentMetrics.start_time:type_name -> google.protobuf.Timestamp
-	45, // 47: yagpcc.SegmentMetrics.end_time:type_name -> google.protobuf.Timestamp
-	48, // 48: yagpcc.SegmentMetrics.segment_metrics:type_name -> yagpcc.GPMetrics
-	39, // 49: yagpcc.SegmentMetrics.query_key:type_name -> yagpcc.QueryKey
-	46, // 50: yagpcc.SegmentMetrics.query_info:type_name -> yagpcc.QueryInfo
-	41, // 51: yagpcc.SegmentMetrics.skew:type_name -> yagpcc.Skew
-	50, // 52: yagpcc.SegmentMetricsWrite.segment_key:type_name -> yagpcc.SegmentKey
-	47, // 53: yagpcc.SegmentMetricsWrite.query_status:type_name -> yagpcc.QueryStatus
-	48, // 54: yagpcc.SegmentMetricsWrite.segment_metrics:type_name -> yagpcc.GPMetrics
-	39, // 55: yagpcc.SegmentMetricsWrite.query_key:type_name -> yagpcc.QueryKey
-	46, // 56: yagpcc.SegmentMetricsWrite.query_info:type_name -> yagpcc.QueryInfo
-	3,  // 57: yagpcc.SessionFieldWrapper.field_name:type_name -> yagpcc.SessionField
-	2,  // 58: yagpcc.SessionFieldWrapper.order:type_name -> yagpcc.SortOrder
-	4,  // 59: yagpcc.SessionFilter.field_name:type_name -> yagpcc.SessionFilterEnum
-	34, // 60: yagpcc.ListDatabasesResponse.databases:type_name -> yagpcc.DatabaseInfo
-	36, // 61: yagpcc.DatabaseExtensionsInfo.extensions:type_name -> yagpcc.Extension
-	37, // 62: yagpcc.GetGPExtensionsResponse.databases:type_name -> yagpcc.DatabaseExtensionsInfo
-	19, // 63: yagpcc.GetGPInfo.GetGPSessions:input_type -> yagpcc.GetGPSessionsReq
-	23, // 64: yagpcc.GetGPInfo.GetGPSession:input_type -> yagpcc.GetGPSessionReq
-	21, // 65: yagpcc.GetGPInfo.GetGPQuery:input_type -> yagpcc.GetGPQueryReq
-	16, // 66: yagpcc.GetGPInfo.GetGPQueries:input_type -> yagpcc.GetGPQueriesReq
-	15, // 67: yagpcc.GetGPInfo.GetTotalSessionsStat:input_type -> yagpcc.GetTotalSessionsReq
-	32, // 68: yagpcc.GetGPInfo.GetGPExtensions:input_type -> yagpcc.GetGPExtensionsReq
-	33, // 69: yagpcc.GetGPInfo.ListDatabases:input_type -> yagpcc.ListDatabasesReq
-	6,  // 70: yagpcc.GetGPInfo.GetGPQueryRunningMatrics:input_type -> yagpcc.GetGPQueryRunningMatricsReq
-	9,  // 71: yagpcc.GetGPInfo.GetGPHostsRunningQueries:input_type -> yagpcc.GetGPHostsRunningQueriesReq
-	12, // 72: yagpcc.GetGPInfo.GetGPHostRunningQueries:input_type -> yagpcc.GetGPHostRunningQueriesReq
-	5,  // 73: yagpcc.GetGPInfo.GetGpPidProcInfo:input_type -> yagpcc.GetGpPidProcInfoReq
-	20, // 74: yagpcc.GetGPInfo.GetGPSessions:output_type -> yagpcc.GetGPSessionsResponse
-	24, // 75: yagpcc.GetGPInfo.GetGPSession:output_type -> yagpcc.GetGPSessionResponse
-	22, // 76: yagpcc.GetGPInfo.GetGPQuery:output_type -> yagpcc.GetGPQueryResponse
-	20, // 77: yagpcc.GetGPInfo.GetGPQueries:output_type -> yagpcc.GetGPSessionsResponse
-	18, // 78: yagpcc.GetGPInfo.GetTotalSessionsStat:output_type -> yagpcc.GetTotalSessionsResponse
-	38, // 79: yagpcc.GetGPInfo.GetGPExtensions:output_type -> yagpcc.GetGPExtensionsResponse
-	35, // 80: yagpcc.GetGPInfo.ListDatabases:output_type -> yagpcc.ListDatabasesResponse
-	8,  // 81: yagpcc.GetGPInfo.GetGPQueryRunningMatrics:output_type -> yagpcc.GetGPQueryRunningMatricsResponse
-	11, // 82: yagpcc.GetGPInfo.GetGPHostsRunningQueries:output_type -> yagpcc.GetGPHostsRunningQueriesResponse
-	14, // 83: yagpcc.GetGPInfo.GetGPHostRunningQueries:output_type -> yagpcc.GetGPHostRunningQueriesResponse
-	51, // 84: yagpcc.GetGPInfo.GetGpPidProcInfo:output_type -> yagpcc.GpPidProcInfo
-	74, // [74:85] is the sub-list for method output_type
-	63, // [63:74] is the sub-list for method input_type
-	63, // [63:63] is the sub-list for extension type_name
-	63, // [63:63] is the sub-list for extension extendee
-	0,  // [0:63] is the sub-list for field type_name
+	41, // 11: yagpcc.RunningQueryInfo.skew:type_name -> yagpcc.Skew
+	42, // 12: yagpcc.RunningQueryInfo.data_quality:type_name -> yagpcc.DataQuality
+	13, // 13: yagpcc.GetGPHostRunningQueriesResponse.queries:type_name -> yagpcc.RunningQueryInfo
+	42, // 14: yagpcc.GetGPHostRunningQueriesResponse.data_quality:type_name -> yagpcc.DataQuality
+	30, // 15: yagpcc.GetGPQueriesReq.field:type_name -> yagpcc.SessionFieldWrapper
+	31, // 16: yagpcc.GetGPQueriesReq.filter:type_name -> yagpcc.SessionFilter
+	17, // 17: yagpcc.GetTotalSessionsResponse.sessions_stat:type_name -> yagpcc.SessionStat
+	30, // 18: yagpcc.GetGPSessionsReq.field:type_name -> yagpcc.SessionFieldWrapper
+	31, // 19: yagpcc.GetGPSessionsReq.filter:type_name -> yagpcc.SessionFilter
+	0,  // 20: yagpcc.GetGPSessionsReq.show_query_type:type_name -> yagpcc.RunningQueryType
+	43, // 21: yagpcc.GetGPSessionsResponse.sessions_state:type_name -> yagpcc.SessionState
+	39, // 22: yagpcc.GetGPQueryReq.query_key:type_name -> yagpcc.QueryKey
+	25, // 23: yagpcc.GetGPQueryResponse.queries_data:type_name -> yagpcc.TotalQueryData
+	44, // 24: yagpcc.GetGPSessionReq.session_key:type_name -> yagpcc.SessionKey
+	43, // 25: yagpcc.GetGPSessionResponse.sessions_state:type_name -> yagpcc.SessionState
+	26, // 26: yagpcc.TotalQueryData.query_stat:type_name -> yagpcc.QueryStat
+	28, // 27: yagpcc.TotalQueryData.segment_query_metrics:type_name -> yagpcc.SegmentMetrics
+	45, // 28: yagpcc.QueryStat.collect_time:type_name -> google.protobuf.Timestamp
+	39, // 29: yagpcc.QueryStat.query_key:type_name -> yagpcc.QueryKey
+	46, // 30: yagpcc.QueryStat.query_info:type_name -> yagpcc.QueryInfo
+	1,  // 31: yagpcc.QueryStat.stat_kind:type_name -> yagpcc.StatKind
+	47, // 32: yagpcc.QueryStat.query_status:type_name -> yagpcc.QueryStatus
+	45, // 33: yagpcc.QueryStat.start_time:type_name -> google.protobuf.Timestamp
+	45, // 34: yagpcc.QueryStat.end_time:type_name -> google.protobuf.Timestamp
+	48, // 35: yagpcc.QueryStat.total_query_metrics:type_name -> yagpcc.GPMetrics
+	49, // 36: yagpcc.QueryStat.aggregated_metrics:type_name -> yagpcc.AggregatedMetrics
+	41, // 37: yagpcc.QueryStat.skew:type_name -> yagpcc.Skew
+	42, // 38: yagpcc.QueryStat.data_quality:type_name -> yagpcc.DataQuality
+	39, // 39: yagpcc.QueryStatWrite.query_key:type_name -> yagpcc.QueryKey
+	46, // 40: yagpcc.QueryStatWrite.query_info:type_name -> yagpcc.QueryInfo
+	1,  // 41: yagpcc.QueryStatWrite.stat_kind:type_name -> yagpcc.StatKind
+	47, // 42: yagpcc.QueryStatWrite.query_status:type_name -> yagpcc.QueryStatus
+	48, // 43: yagpcc.QueryStatWrite.total_query_metrics:type_name -> yagpcc.GPMetrics
+	49, // 44: yagpcc.QueryStatWrite.aggregated_metrics:type_name -> yagpcc.AggregatedMetrics
+	45, // 45: yagpcc.SegmentMetrics.collect_time:type_name -> google.protobuf.Timestamp
+	50, // 46: yagpcc.SegmentMetrics.segment_key:type_name -> yagpcc.SegmentKey
+	47, // 47: yagpcc.SegmentMetrics.query_status:type_name -> yagpcc.QueryStatus
+	45, // 48: yagpcc.SegmentMetrics.start_time:type_name -> google.protobuf.Timestamp
+	45, // 49: yagpcc.SegmentMetrics.end_time:type_name -> google.protobuf.Timestamp
+	48, // 50: yagpcc.SegmentMetrics.segment_metrics:type_name -> yagpcc.GPMetrics
+	39, // 51: yagpcc.SegmentMetrics.query_key:type_name -> yagpcc.QueryKey
+	46, // 52: yagpcc.SegmentMetrics.query_info:type_name -> yagpcc.QueryInfo
+	41, // 53: yagpcc.SegmentMetrics.skew:type_name -> yagpcc.Skew
+	50, // 54: yagpcc.SegmentMetricsWrite.segment_key:type_name -> yagpcc.SegmentKey
+	47, // 55: yagpcc.SegmentMetricsWrite.query_status:type_name -> yagpcc.QueryStatus
+	48, // 56: yagpcc.SegmentMetricsWrite.segment_metrics:type_name -> yagpcc.GPMetrics
+	39, // 57: yagpcc.SegmentMetricsWrite.query_key:type_name -> yagpcc.QueryKey
+	46, // 58: yagpcc.SegmentMetricsWrite.query_info:type_name -> yagpcc.QueryInfo
+	3,  // 59: yagpcc.SessionFieldWrapper.field_name:type_name -> yagpcc.SessionField
+	2,  // 60: yagpcc.SessionFieldWrapper.order:type_name -> yagpcc.SortOrder
+	4,  // 61: yagpcc.SessionFilter.field_name:type_name -> yagpcc.SessionFilterEnum
+	34, // 62: yagpcc.ListDatabasesResponse.databases:type_name -> yagpcc.DatabaseInfo
+	36, // 63: yagpcc.DatabaseExtensionsInfo.extensions:type_name -> yagpcc.Extension
+	37, // 64: yagpcc.GetGPExtensionsResponse.databases:type_name -> yagpcc.DatabaseExtensionsInfo
+	19, // 65: yagpcc.GetGPInfo.GetGPSessions:input_type -> yagpcc.GetGPSessionsReq
+	23, // 66: yagpcc.GetGPInfo.GetGPSession:input_type -> yagpcc.GetGPSessionReq
+	21, // 67: yagpcc.GetGPInfo.GetGPQuery:input_type -> yagpcc.GetGPQueryReq
+	16, // 68: yagpcc.GetGPInfo.GetGPQueries:input_type -> yagpcc.GetGPQueriesReq
+	15, // 69: yagpcc.GetGPInfo.GetTotalSessionsStat:input_type -> yagpcc.GetTotalSessionsReq
+	32, // 70: yagpcc.GetGPInfo.GetGPExtensions:input_type -> yagpcc.GetGPExtensionsReq
+	33, // 71: yagpcc.GetGPInfo.ListDatabases:input_type -> yagpcc.ListDatabasesReq
+	6,  // 72: yagpcc.GetGPInfo.GetGPQueryRunningMatrics:input_type -> yagpcc.GetGPQueryRunningMatricsReq
+	9,  // 73: yagpcc.GetGPInfo.GetGPHostsRunningQueries:input_type -> yagpcc.GetGPHostsRunningQueriesReq
+	12, // 74: yagpcc.GetGPInfo.GetGPHostRunningQueries:input_type -> yagpcc.GetGPHostRunningQueriesReq
+	5,  // 75: yagpcc.GetGPInfo.GetGpPidProcInfo:input_type -> yagpcc.GetGpPidProcInfoReq
+	20, // 76: yagpcc.GetGPInfo.GetGPSessions:output_type -> yagpcc.GetGPSessionsResponse
+	24, // 77: yagpcc.GetGPInfo.GetGPSession:output_type -> yagpcc.GetGPSessionResponse
+	22, // 78: yagpcc.GetGPInfo.GetGPQuery:output_type -> yagpcc.GetGPQueryResponse
+	20, // 79: yagpcc.GetGPInfo.GetGPQueries:output_type -> yagpcc.GetGPSessionsResponse
+	18, // 80: yagpcc.GetGPInfo.GetTotalSessionsStat:output_type -> yagpcc.GetTotalSessionsResponse
+	38, // 81: yagpcc.GetGPInfo.GetGPExtensions:output_type -> yagpcc.GetGPExtensionsResponse
+	35, // 82: yagpcc.GetGPInfo.ListDatabases:output_type -> yagpcc.ListDatabasesResponse
+	8,  // 83: yagpcc.GetGPInfo.GetGPQueryRunningMatrics:output_type -> yagpcc.GetGPQueryRunningMatricsResponse
+	11, // 84: yagpcc.GetGPInfo.GetGPHostsRunningQueries:output_type -> yagpcc.GetGPHostsRunningQueriesResponse
+	14, // 85: yagpcc.GetGPInfo.GetGPHostRunningQueries:output_type -> yagpcc.GetGPHostRunningQueriesResponse
+	51, // 86: yagpcc.GetGPInfo.GetGpPidProcInfo:output_type -> yagpcc.GpPidProcInfo
+	76, // [76:87] is the sub-list for method output_type
+	65, // [65:76] is the sub-list for method input_type
+	65, // [65:65] is the sub-list for extension type_name
+	65, // [65:65] is the sub-list for extension extendee
+	0,  // [0:65] is the sub-list for field type_name
 }
 
 func init() { file_api_proto_agent_master_yagpcc_get_service_proto_init() }

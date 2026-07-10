@@ -119,6 +119,26 @@ type (
 		DataQuality   *pbc.DataQuality
 	}
 
+	HostRunningQueryDetailInfo struct {
+		QueryKey       *pbc.QueryKey
+		UserName       string
+		DbName         string
+		QueryText      string
+		RuntimeMetrics *pbc.RuntimeMetrics
+		Skew           *pbc.Skew
+		DataQuality    *pbc.DataQuality
+		State          string
+		IsIdle         bool
+	}
+
+	HostRunningQueriesDetailInfo struct {
+		HostName      string
+		Segindex      []int32
+		Queries       []*HostRunningQueryDetailInfo
+		DataQuality   *pbc.DataQuality
+		NextPageToken string
+	}
+
 	ProcfsStatType struct {
 		statTime       time.Time
 		pidProcData    ProcMap
@@ -660,6 +680,65 @@ type hostSliceKey struct {
 	SliceID  int64
 }
 
+type hostRunningQueryDetailKey struct {
+	Ssid int64
+	Ccnt int32
+}
+
+type hostRunningQueryDetailAccumulator struct {
+	info        *HostRunningQueryDetailInfo
+	cellMetrics map[QueryCellKey]*ProcfsCellMetric
+}
+
+func newHostRunningQueryDetailAccumulator(key hostRunningQueryDetailKey, state string, isIdle bool, dataQuality *pbc.DataQuality) *hostRunningQueryDetailAccumulator {
+	ccnt := key.Ccnt
+	if isIdle {
+		ccnt = UnsetSliceId
+	}
+	return &hostRunningQueryDetailAccumulator{
+		info: &HostRunningQueryDetailInfo{
+			QueryKey:    &pbc.QueryKey{Ssid: int32(key.Ssid), Ccnt: ccnt},
+			DataQuality: dataQuality,
+			State:       state,
+			IsIdle:      isIdle,
+		},
+		cellMetrics: make(map[QueryCellKey]*ProcfsCellMetric),
+	}
+}
+
+func (a *hostRunningQueryDetailAccumulator) addProc(segindex int32, lastProc *ProcStat, pidStat *pbc.GpPidProcInfo) {
+	if a == nil || a.info == nil || lastProc == nil || pidStat == nil {
+		return
+	}
+	a.info.RuntimeMetrics = addProcfsRuntimeMetrics(a.info.RuntimeMetrics, pidStat)
+	if a.info.RuntimeMetrics != nil && a.info.RuntimeMetrics.State != "" {
+		a.info.State = a.info.RuntimeMetrics.State
+	}
+	if a.info.IsIdle {
+		return
+	}
+	sliceID := procfsCellForProc(segindex, lastProc.SliceId).SliceID
+	cell := QueryCellKey{SliceID: sliceID, Segindex: segindex}
+	cellMetric, ok := a.cellMetrics[cell]
+	if !ok {
+		cellMetric = &ProcfsCellMetric{QueryCellKey: cell, HasData: true}
+		a.cellMetrics[cell] = cellMetric
+	}
+	cellMetric.RuntimeMetrics = addProcfsRuntimeMetrics(cellMetric.RuntimeMetrics, pidStat)
+}
+
+func (a *hostRunningQueryDetailAccumulator) result() *HostRunningQueryDetailInfo {
+	if a == nil || a.info == nil {
+		return nil
+	}
+	cells := make([]*ProcfsCellMetric, 0, len(a.cellMetrics))
+	for _, cell := range a.cellMetrics {
+		cells = append(cells, cell)
+	}
+	a.info.Skew = CalculateCPUTimeSkew(cells)
+	return a.info
+}
+
 type hostRunningAccumulator struct {
 	info          *HostRunningQueriesInfo
 	activeQueries map[int32]struct{}
@@ -798,6 +877,113 @@ func (p *ProcfsStorage) GetHostsRunningQueries() ([]*HostRunningQueriesInfo, err
 		result = append(result, byHost[hostname].result())
 	}
 	return result, nil
+}
+
+func (p *ProcfsStorage) GetHostRunningQueries(hostname string) (*HostRunningQueriesDetailInfo, error) {
+	if strings.TrimSpace(hostname) == "" {
+		return nil, fmt.Errorf("hostname cannot be empty")
+	}
+
+	first, last, err := p.get5Min()
+	if err != nil {
+		return nil, fmt.Errorf("fail in get 5 min: %w", err)
+	}
+	hostSegments := configuredHostSegmentsWithFallback(last)
+	segindexes := append([]int32(nil), hostSegments[hostname]...)
+	dataQuality := hostDataQuality(hostname, last)
+	accs := make(map[hostRunningQueryDetailKey]*hostRunningQueryDetailAccumulator)
+
+	localHostname, err := os.Hostname()
+	if err != nil || localHostname == "" {
+		localHostname = "localhost"
+	}
+	for key, lastProc := range last.pidProcData {
+		if lastProc == nil {
+			continue
+		}
+		procHostname := localHostname
+		if key.GpSegmentId >= 0 {
+			procHostname = GetHostnameForSegindex(int32(key.GpSegmentId))
+		}
+		if procHostname != hostname {
+			continue
+		}
+		if key.GpSegmentId >= 0 && len(hostSegments[hostname]) == 0 {
+			segindexes = append(segindexes, int32(key.GpSegmentId))
+		}
+
+		pidStat := lastProc.ToGpPidProcInfo(key)
+		if firstProc, ok := first.pidProcData[key]; ok {
+			diff, err := ProcfsDiff(firstProc.ToGpPidProcInfo(key), pidStat)
+			if err != nil {
+				return nil, fmt.Errorf("fail in diff: %w", err)
+			}
+			pidStat = diff
+		}
+
+		isIdle := lastProc.Ccnt < 0 || isIdleProcState(lastProc.State)
+		ccnt := lastProc.Ccnt
+		if isIdle {
+			ccnt = UnsetSliceId
+		}
+		detailKey := hostRunningQueryDetailKey{Ssid: key.SessId, Ccnt: ccnt}
+		acc, ok := accs[detailKey]
+		if !ok {
+			acc = newHostRunningQueryDetailAccumulator(detailKey, lastProc.State, isIdle, dataQuality)
+			accs[detailKey] = acc
+		}
+		acc.addProc(int32(key.GpSegmentId), lastProc, pidStat)
+	}
+
+	if len(hostSegments[hostname]) == 0 {
+		sort.Slice(segindexes, func(i, j int) bool { return segindexes[i] < segindexes[j] })
+		segindexes = uniqueInt32s(segindexes)
+	}
+
+	keys := make([]hostRunningQueryDetailKey, 0, len(accs))
+	for key := range accs {
+		keys = append(keys, key)
+	}
+	sort.Slice(keys, func(i, j int) bool {
+		left := accs[keys[i]].info
+		right := accs[keys[j]].info
+		if left.IsIdle != right.IsIdle {
+			return !left.IsIdle
+		}
+		if keys[i].Ssid != keys[j].Ssid {
+			return keys[i].Ssid < keys[j].Ssid
+		}
+		return keys[i].Ccnt < keys[j].Ccnt
+	})
+
+	queries := make([]*HostRunningQueryDetailInfo, 0, len(keys))
+	for _, key := range keys {
+		if result := accs[key].result(); result != nil {
+			queries = append(queries, result)
+		}
+	}
+	return &HostRunningQueriesDetailInfo{
+		HostName:    hostname,
+		Segindex:    segindexes,
+		Queries:     queries,
+		DataQuality: dataQuality,
+	}, nil
+}
+
+func uniqueInt32s(values []int32) []int32 {
+	if len(values) == 0 {
+		return values
+	}
+	result := values[:0]
+	var last int32
+	for i, value := range values {
+		if i > 0 && value == last {
+			continue
+		}
+		result = append(result, value)
+		last = value
+	}
+	return result
 }
 
 func (p *ProcfsStorage) GetQueryRunningMetrics(queryKey *pbc.QueryKey) ([]*ProcfsCellMetric, *pbc.Skew, *pbc.DataQuality, error) {

@@ -1,12 +1,21 @@
-import { Table, Card, Typography, Button, Space, Tag } from "antd";
+import { useCallback, useEffect, useState } from "react";
+import { Table, Card, Typography, Button, Space, Tag, Tooltip } from "antd";
 import { ReloadOutlined } from "@ant-design/icons";
 import { useApi } from "../hooks/useApi";
-import { getHostsRunningQueries, type RunningHostInfo } from "../api/client";
+import {
+  getHostRunningQueries,
+  getHostsRunningQueries,
+  type DataQuality,
+  type HostRunningQueriesResponse,
+  type HostRunningQueryInfo,
+  type RunningHostInfo,
+} from "../api/client";
 import ErrorAlert from "../components/ErrorAlert";
 import { useTheme } from "../contexts/ThemeContext";
 import { getColors, FONT_MONO } from "../theme";
 
 const { Title } = Typography;
+const HOST_DETAIL_PAGE_SIZE = 50;
 
 /** Format bytes into a human-readable string. */
 function formatBytes(value?: number | null): string {
@@ -18,6 +27,34 @@ function formatBytes(value?: number | null): string {
   return `${(v / Math.pow(1024, i)).toFixed(i ? 1 : 0)} ${units[i]}`;
 }
 
+function formatDataQualityTag(dq: DataQuality | null | undefined) {
+  if (!dq) return "—";
+  const { segmentsReceived, segmentsExpected, freshnessMs } = dq;
+  const pct =
+    segmentsExpected > 0
+      ? Math.round((segmentsReceived / segmentsExpected) * 100)
+      : 100;
+  const color = pct === 100 ? "green" : pct > 50 ? "orange" : "red";
+  const ageSec = Math.round(freshnessMs / 1000);
+  return (
+    <Tag color={color} title={`${ageSec}s ago`}>
+      {segmentsReceived}/{segmentsExpected} ({pct}%, {ageSec}s)
+    </Tag>
+  );
+}
+
+function firstWord(value?: string | null): string {
+  const trimmed = (value ?? "").trim();
+  if (!trimmed) return "—";
+  return trimmed.split(/\s+/, 1)[0] ?? "—";
+}
+
+function queryPreview(value?: string | null): string {
+  const trimmed = (value ?? "").trim();
+  if (!trimmed) return "—";
+  return trimmed.length > 100 ? `${trimmed.slice(0, 100)}…` : trimmed;
+}
+
 /** Render a color-coded CPU usage badge. */
 function CpuUsageBadge({ value }: { value: number }) {
   const { mode } = useTheme();
@@ -27,6 +64,166 @@ function CpuUsageBadge({ value }: { value: number }) {
   if (pct > 80) color = c.red;
   else if (pct > 50) color = c.yellow;
   return <Tag color={color}>{pct}%</Tag>;
+}
+
+function HostQueriesExpandedRow({ hostName }: { hostName: string }) {
+  const [data, setData] = useState<HostRunningQueriesResponse | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<Error | null>(null);
+  const [page, setPage] = useState(1);
+  const [pageTokens, setPageTokens] = useState<string[]>([""]);
+
+  const load = useCallback(() => {
+    const pageToken = pageTokens[page - 1] ?? "";
+    setLoading(true);
+    setError(null);
+    getHostRunningQueries(hostName, {
+      pageSize: HOST_DETAIL_PAGE_SIZE,
+      pageToken,
+    })
+      .then((response) => {
+        setData(response);
+        if (response.nextPageToken) {
+          setPageTokens((prev) => {
+            if (prev[page] === response.nextPageToken) return prev;
+            const next = prev.slice(0, page);
+            next[page] = response.nextPageToken;
+            return next;
+          });
+        }
+      })
+      .catch((err: unknown) => {
+        setError(err instanceof Error ? err : new Error(String(err)));
+      })
+      .finally(() => {
+        setLoading(false);
+      });
+  }, [hostName, page, pageTokens]);
+
+  useEffect(() => {
+    load();
+  }, [load]);
+
+  const columns = [
+    {
+      title: "Session",
+      dataIndex: ["queryKey", "ssid"],
+      width: 110,
+      render: (v: number | undefined) => v ?? "—",
+    },
+    {
+      title: "CCNT",
+      dataIndex: ["queryKey", "ccnt"],
+      width: 90,
+      render: (_: unknown, row: HostRunningQueryInfo) =>
+        row.isIdle ? <Tag>Unset</Tag> : (row.queryKey?.ccnt ?? "—"),
+    },
+    {
+      title: "State",
+      dataIndex: "state",
+      width: 120,
+      render: (v: string, row: HostRunningQueryInfo) => (
+        <Space size={4}>
+          {row.isIdle && <Tag color="default">Idle process</Tag>}
+          <Tooltip title={v || "—"}>
+            <span>{firstWord(v)}</span>
+          </Tooltip>
+        </Space>
+      ),
+    },
+    {
+      title: "Database",
+      dataIndex: "dbName",
+      width: 120,
+      render: (v: string) => v || "—",
+    },
+    {
+      title: "Query",
+      dataIndex: "queryText",
+      width: 360,
+      render: (v: string, row: HostRunningQueryInfo) => {
+        if (row.isIdle) return <Typography.Text type="secondary">—</Typography.Text>;
+        return (
+          <Tooltip title={v || "—"}>
+            <Typography.Text style={{ fontFamily: FONT_MONO }}>{queryPreview(v)}</Typography.Text>
+          </Tooltip>
+        );
+      },
+    },
+    {
+      title: "CPU ticks",
+      width: 110,
+      render: (_: unknown, row: HostRunningQueryInfo) =>
+        (row.runtimeMetrics?.utime ?? 0) + (row.runtimeMetrics?.stime ?? 0),
+    },
+    {
+      title: "Memory RSS",
+      width: 120,
+      render: (_: unknown, row: HostRunningQueryInfo) => formatBytes(row.runtimeMetrics?.vmRss ?? 0),
+    },
+    {
+      title: "Disk R/W",
+      width: 150,
+      render: (_: unknown, row: HostRunningQueryInfo) => {
+        const read = row.runtimeMetrics?.procIo?.readBytes ?? 0;
+        const write = row.runtimeMetrics?.procIo?.writeBytes ?? 0;
+        return `${formatBytes(read)} / ${formatBytes(write)}`;
+      },
+    },
+    {
+      title: "Spill",
+      width: 110,
+      render: (_: unknown, row: HostRunningQueryInfo) => formatBytes(row.runtimeMetrics?.procSpill?.size ?? 0),
+    },
+    {
+      title: "Skew",
+      dataIndex: ["skew", "skew"],
+      width: 90,
+      render: (v: number | undefined) => (v !== undefined ? v.toFixed(2) : "—"),
+    },
+    {
+      title: "Data Quality",
+      dataIndex: "dataQuality",
+      width: 160,
+      render: (dq: DataQuality | null) => formatDataQualityTag(dq),
+    },
+  ];
+
+  const hasNext = Boolean(data?.nextPageToken);
+  return (
+    <div style={{ padding: 16 }}>
+      <ErrorAlert error={error} />
+      <Space style={{ marginBottom: 12 }}>
+        <Button icon={<ReloadOutlined />} onClick={load} loading={loading}>
+          Refresh details
+        </Button>
+        <Typography.Text type="secondary">
+          {data?.hostName ?? hostName} · {data?.queries?.length ?? 0} rows
+        </Typography.Text>
+      </Space>
+      <Table
+        loading={loading}
+        dataSource={data?.queries ?? []}
+        columns={columns}
+        rowKey={(row) => `${row.queryKey?.ssid ?? ""}-${row.queryKey?.ccnt ?? ""}-${row.isIdle}`}
+        size="small"
+        pagination={false}
+        scroll={{ x: 1500 }}
+      />
+      <Space style={{ marginTop: 12 }}>
+        <Button
+          disabled={page <= 1 || loading}
+          onClick={() => setPage((prev) => Math.max(1, prev - 1))}
+        >
+          Previous
+        </Button>
+        <Typography.Text>Page {page}</Typography.Text>
+        <Button disabled={!hasNext || loading} onClick={() => setPage((prev) => prev + 1)}>
+          Next
+        </Button>
+      </Space>
+    </div>
+  );
 }
 
 export default function HostsPage() {
@@ -140,21 +337,7 @@ export default function HostsPage() {
       title: "Data Quality",
       dataIndex: "dataQuality",
       width: 160,
-      render: (dq: { segmentsExpected: number; segmentsReceived: number; freshnessMs: number } | null) => {
-        if (!dq) return "—";
-        const { segmentsReceived, segmentsExpected, freshnessMs } = dq;
-        const pct =
-          segmentsExpected > 0
-            ? Math.round((segmentsReceived / segmentsExpected) * 100)
-            : 100;
-        const color = pct === 100 ? "green" : pct > 50 ? "orange" : "red";
-        const ageSec = Math.round(freshnessMs / 1000);
-        return (
-          <Tag color={color} title={`${ageSec}s ago`}>
-            {segmentsReceived}/{segmentsExpected} ({pct}%, {ageSec}s)
-          </Tag>
-        );
-      },
+      render: (dq: DataQuality | null) => formatDataQualityTag(dq),
     },
   ];
 
@@ -181,12 +364,8 @@ export default function HostsPage() {
           pagination={false}
           scroll={{ x: 2000 }}
           expandable={{
-            expandedRowRender: () => (
-              <div style={{ padding: 16 }}>
-                <Typography.Text type="secondary">
-                  Per-query breakdown coming soon
-                </Typography.Text>
-              </div>
+            expandedRowRender: (record: RunningHostInfo) => (
+              <HostQueriesExpandedRow hostName={record.hostName} />
             ),
           }}
         />
