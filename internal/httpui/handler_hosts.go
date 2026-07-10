@@ -75,8 +75,10 @@ func (s *Server) handleGetHostRunningQueries(w http.ResponseWriter, r *http.Requ
 
 	pageSize := int64(50)
 	if raw := r.URL.Query().Get("page_size"); raw != "" {
-		parsed, err := strconv.ParseInt(raw, 10, 64)
-		if err != nil || parsed <= 0 {
+		var parsed int64
+		var parseErr error
+		parsed, parseErr = strconv.ParseInt(raw, 10, 64)
+		if parseErr != nil || parsed <= 0 {
 			writeJSONError(w, http.StatusBadRequest, "invalid page_size")
 			return
 		}
