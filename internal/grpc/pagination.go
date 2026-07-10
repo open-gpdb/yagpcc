@@ -50,6 +50,7 @@ func nextPageToken(nextOffset int64, total int) string {
 	return ""
 }
 
+// paginateItems interprets pageToken as a 0-based offset (stringified slice index).
 func paginateItems[T any](items []T, pageSize int64, pageToken string, defaultPageSize int64) ([]T, string, error) {
 	page, err := newPaginationRequest(pageSize, pageToken, defaultPageSize)
 	if err != nil {
@@ -60,6 +61,8 @@ func paginateItems[T any](items []T, pageSize int64, pageToken string, defaultPa
 	return items[start:end], nextPageToken(end, len(items)), nil
 }
 
+// paginateProtoMessages interprets pageToken as a 1-based offset (stringified item position),
+// matching historical GetGPSessions/GetGPQueries pagination behavior.
 func paginateProtoMessages[T proto.Message](items []T, pageSize int64, pageToken string, defaultPageSize int64, maxMessageSize int) ([]T, string, error) {
 	page, err := newPaginationRequest(pageSize, pageToken, defaultPageSize)
 	if err != nil {
