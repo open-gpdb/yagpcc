@@ -68,7 +68,7 @@ func (s *Server) handleGetHostRunningQueries(w http.ResponseWriter, r *http.Requ
 		return
 	}
 	hostname, err := url.PathUnescape(encodedHost)
-	if err != nil {
+	if err != nil || strings.Contains(hostname, "/") || hostname == "." || hostname == ".." {
 		writeJSONError(w, http.StatusBadRequest, "invalid host name")
 		return
 	}
