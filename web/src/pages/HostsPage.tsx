@@ -238,7 +238,7 @@ function HostQueriesExpandedRow({ hostName }: { hostName: string }) {
             if (ssid === undefined) return;
             const params = new URLSearchParams({ hostname: hostName, ssid: String(ssid) });
             const ccnt = row.queryKey?.ccnt;
-            if (ccnt !== undefined && ccnt >= 0) params.set("ccnt", String(ccnt));
+            if (ccnt !== undefined && ccnt > 0) params.set("ccnt", String(ccnt));
             navigate(`/procfs/pid-proc-info?${params.toString()}`);
           },
           style: { cursor: row.queryKey?.ssid !== undefined ? "pointer" : "default" },
