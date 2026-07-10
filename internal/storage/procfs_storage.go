@@ -741,6 +741,16 @@ func (a *hostRunningQueryDetailAccumulator) addProc(segindex int32, lastProc *Pr
 	if a == nil || a.info == nil || lastProc == nil || pidStat == nil {
 		return
 	}
+	if a.info.UserName == "" || a.info.DbName == "" {
+		if userName, dbName, ok := parsePostgresCmdlineUserDB(lastProc.Cmdline); ok {
+			if a.info.UserName == "" {
+				a.info.UserName = userName
+			}
+			if a.info.DbName == "" {
+				a.info.DbName = dbName
+			}
+		}
+	}
 	a.info.RuntimeMetrics = addProcfsRuntimeMetrics(a.info.RuntimeMetrics, pidStat)
 	if a.info.RuntimeMetrics != nil && a.info.RuntimeMetrics.State != "" {
 		a.info.State = a.info.RuntimeMetrics.State
@@ -756,6 +766,18 @@ func (a *hostRunningQueryDetailAccumulator) addProc(segindex int32, lastProc *Pr
 		a.cellMetrics[cell] = cellMetric
 	}
 	cellMetric.RuntimeMetrics = addProcfsRuntimeMetrics(cellMetric.RuntimeMetrics, pidStat)
+}
+
+func parsePostgresCmdlineUserDB(cmdline string) (string, string, bool) {
+	trimmed := strings.TrimSpace(cmdline)
+	if !strings.HasPrefix(trimmed, "postgres:") {
+		return "", "", false
+	}
+	parts := strings.Fields(strings.TrimSpace(strings.TrimPrefix(trimmed, "postgres:")))
+	if len(parts) < 3 || !strings.HasSuffix(parts[0], ",") {
+		return "", "", false
+	}
+	return parts[1], parts[2], true
 }
 
 func (a *hostRunningQueryDetailAccumulator) result() *HostRunningQueryDetailInfo {
