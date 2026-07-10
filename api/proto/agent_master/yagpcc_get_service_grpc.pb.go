@@ -24,7 +24,6 @@ package greenplum
 
 import (
 	context "context"
-	common "github.com/open-gpdb/yagpcc/api/proto/common"
 	grpc "google.golang.org/grpc"
 	codes "google.golang.org/grpc/codes"
 	status "google.golang.org/grpc/status"
@@ -63,7 +62,7 @@ type GetGPInfoClient interface {
 	GetGPQueryRunningMatrics(ctx context.Context, in *GetGPQueryRunningMatricsReq, opts ...grpc.CallOption) (*GetGPQueryRunningMatricsResponse, error)
 	GetGPHostsRunningQueries(ctx context.Context, in *GetGPHostsRunningQueriesReq, opts ...grpc.CallOption) (*GetGPHostsRunningQueriesResponse, error)
 	GetGPHostRunningQueries(ctx context.Context, in *GetGPHostRunningQueriesReq, opts ...grpc.CallOption) (*GetGPHostRunningQueriesResponse, error)
-	GetGpPidProcInfo(ctx context.Context, in *GetGpPidProcInfoReq, opts ...grpc.CallOption) (*common.GpPidProcInfo, error)
+	GetGpPidProcInfo(ctx context.Context, in *GetGpPidProcInfoReq, opts ...grpc.CallOption) (*GpPidProcInfoResponse, error)
 }
 
 type getGPInfoClient struct {
@@ -174,9 +173,9 @@ func (c *getGPInfoClient) GetGPHostRunningQueries(ctx context.Context, in *GetGP
 	return out, nil
 }
 
-func (c *getGPInfoClient) GetGpPidProcInfo(ctx context.Context, in *GetGpPidProcInfoReq, opts ...grpc.CallOption) (*common.GpPidProcInfo, error) {
+func (c *getGPInfoClient) GetGpPidProcInfo(ctx context.Context, in *GetGpPidProcInfoReq, opts ...grpc.CallOption) (*GpPidProcInfoResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(common.GpPidProcInfo)
+	out := new(GpPidProcInfoResponse)
 	err := c.cc.Invoke(ctx, GetGPInfo_GetGpPidProcInfo_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
@@ -198,7 +197,7 @@ type GetGPInfoServer interface {
 	GetGPQueryRunningMatrics(context.Context, *GetGPQueryRunningMatricsReq) (*GetGPQueryRunningMatricsResponse, error)
 	GetGPHostsRunningQueries(context.Context, *GetGPHostsRunningQueriesReq) (*GetGPHostsRunningQueriesResponse, error)
 	GetGPHostRunningQueries(context.Context, *GetGPHostRunningQueriesReq) (*GetGPHostRunningQueriesResponse, error)
-	GetGpPidProcInfo(context.Context, *GetGpPidProcInfoReq) (*common.GpPidProcInfo, error)
+	GetGpPidProcInfo(context.Context, *GetGpPidProcInfoReq) (*GpPidProcInfoResponse, error)
 	mustEmbedUnimplementedGetGPInfoServer()
 }
 
@@ -239,7 +238,7 @@ func (UnimplementedGetGPInfoServer) GetGPHostsRunningQueries(context.Context, *G
 func (UnimplementedGetGPInfoServer) GetGPHostRunningQueries(context.Context, *GetGPHostRunningQueriesReq) (*GetGPHostRunningQueriesResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method GetGPHostRunningQueries not implemented")
 }
-func (UnimplementedGetGPInfoServer) GetGpPidProcInfo(context.Context, *GetGpPidProcInfoReq) (*common.GpPidProcInfo, error) {
+func (UnimplementedGetGPInfoServer) GetGpPidProcInfo(context.Context, *GetGpPidProcInfoReq) (*GpPidProcInfoResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method GetGpPidProcInfo not implemented")
 }
 func (UnimplementedGetGPInfoServer) mustEmbedUnimplementedGetGPInfoServer() {}

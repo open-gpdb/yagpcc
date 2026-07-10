@@ -325,6 +325,10 @@ func TestMultipleSlices(t *testing.T) {
 	assert.Equal(t, sliceZero.QueryMetrics.Instrumentation.Nloops, uint64(1))
 	sliceOne := runningQ.QueriesData[NodeKey{QKey: QueryKey{Ssid: 1, Ccnt: 2}, SKey: SegmentKey{Segindex: 1}, SliceID: 1}]
 	assert.Equal(t, sliceOne.QueryMetrics.Instrumentation.Nloops, uint64(2))
+
+	queryData, err := s.GetQueryInfo(QueryKey{Ssid: 1, Ccnt: 2}, 0)
+	assert.NoError(t, err)
+	assert.Equal(t, int64(2), queryData.QueryStat.Slices)
 }
 
 func TestGetQueriesStartTime_Empty(t *testing.T) {

@@ -39,8 +39,7 @@ const (
 	AggMasterOnly AggregateKind = 1 << iota
 	AggSegmentHost
 	AggMax
-	// AggSlices
-	// AggSegmentAndSlices
+	AggSlicesOnly
 )
 
 const (
@@ -112,6 +111,9 @@ func (s *RunningQueriesStorage) MergeSegmentData(queriesInfo *pb.GetQueriesInfoR
 }
 
 func AggregateQueryStat(resultQ *pbm.TotalQueryData, qKey QueryKey, rQ *RunningQuery, tmID int64, aggKind AggregateKind) error {
+	if aggKind&AggMasterOnly != 0 {
+		aggKind |= AggSlicesOnly
+	}
 	rQ.QueryLock.RLock()
 	qKeyResult := &pbc.QueryKey{
 		Ssid: qKey.Ssid,
@@ -127,13 +129,15 @@ func AggregateQueryStat(resultQ *pbm.TotalQueryData, qKey QueryKey, rQ *RunningQ
 	intermediateResults := make(map[MapAggregateKey]uint64, 0)
 	for keyS, valS := range rQ.QueriesData {
 		valS.QueryDataLock.RLock()
-		if aggKind == AggSegmentHost {
+		if aggKind&AggSlicesOnly != 0 || aggKind&AggSegmentHost != 0 {
+			slices = append(slices, keyS.SliceID)
+		}
+		if aggKind&AggSegmentHost != 0 {
 			segmentKey := &pbc.SegmentKey{
 				Dbid:     keyS.SKey.Dbid,
 				Segindex: keyS.SKey.Segindex,
 			}
 			segmentData, ok := segmentQueryMap[segmentKey.Segindex]
-			slices = append(slices, keyS.SliceID)
 			// here we store data in per-segindex map. For segindex we should sum all the data
 			segHost := strconv.Itoa(int(segmentKey.Segindex))
 			if !ok {
@@ -241,7 +245,7 @@ func (s *RunningQueriesStorage) GetQueryInfo(queryKey QueryKey, tmID int64) (*pb
 	rQ, okQ := s.runningQueries[queryKey]
 	s.mx.RUnlock()
 	if okQ {
-		err := AggregateQueryStat(qT, queryKey, rQ, tmID, AggMasterOnly)
+		err := AggregateQueryStat(qT, queryKey, rQ, tmID, AggMasterOnly|AggSlicesOnly)
 		if err != nil {
 			return nil, err
 		}

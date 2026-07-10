@@ -434,6 +434,120 @@ func TestGetGPHostsRunningQueries(t *testing.T) {
 	assert.False(t, host.DataQuality.IsPartial)
 }
 
+func TestGetGPHostRunningQueries(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	sessionMocker := NewMockStatActivityLister(ctrl)
+	clientSet, cleanup := setupGRPCClientSet(t, sessionMocker)
+	defer cleanup()
+
+	storage.SetHostnameForSegindex(0, "grpc-detail-host")
+	base := time.Now().Add(-time.Second)
+	clientSet.procfsStorage.RegisterProcfsStatWithDataQuality(base, []*pbc.GpPidProcInfo{
+		{GpSegmentId: 0, SessId: 99, Pid: 10, Ccnt: 3, SliceId: 1, State: "SELECT waiting", ProcStat: &pbc.ProcStat{Utime: 0}, ProcStatus: &pbc.ProcStatus{VmRss: 0}, ProcIo: &pbc.ProcIO{}},
+		{GpSegmentId: 0, SessId: 100, Pid: 20, Ccnt: storage.UnsetSliceId, SliceId: storage.UnsetSliceId, State: "idle", ProcStat: &pbc.ProcStat{Utime: 0}, ProcStatus: &pbc.ProcStatus{VmRss: 0}, ProcIo: &pbc.ProcIO{}},
+	}, 1, 1)
+	clientSet.procfsStorage.RegisterProcfsStatWithDataQuality(base.Add(time.Second), []*pbc.GpPidProcInfo{
+		{GpSegmentId: 0, SessId: 99, Pid: 10, Ccnt: 3, SliceId: 1, State: "SELECT waiting", ProcStat: &pbc.ProcStat{Utime: 9}, ProcStatus: &pbc.ProcStatus{VmRss: 90}, ProcIo: &pbc.ProcIO{ReadBytes: 900}},
+		{GpSegmentId: 0, SessId: 100, Pid: 20, Ccnt: storage.UnsetSliceId, SliceId: storage.UnsetSliceId, State: "idle", ProcStat: &pbc.ProcStat{Utime: 1}, ProcStatus: &pbc.ProcStatus{VmRss: 10}, ProcIo: &pbc.ProcIO{ReadBytes: 100}},
+	}, 1, 1)
+	_, err := clientSet.SetQueryInfoClient().SetMetricQuery(context.Background(), &pb.SetQueryReq{
+		QueryStatus: pbc.QueryStatus_QUERY_STATUS_START,
+		Datetime:    timestamppb.New(base.Add(time.Second)),
+		QueryKey:    &pbc.QueryKey{Ssid: 99, Ccnt: 3},
+		SegmentKey:  &pbc.SegmentKey{Segindex: -1},
+		QueryInfo: &pbc.QueryInfo{
+			UserName:     "host_user",
+			DatabaseName: "host_db",
+			QueryText:    "select * from host_detail_source",
+		},
+	})
+	require.NoError(t, err)
+
+	response, err := clientSet.GetGetGPInfoClient().GetGPHostRunningQueries(context.Background(), &pbm.GetGPHostRunningQueriesReq{
+		HostName: "grpc-detail-host",
+		PageSize: 1,
+	})
+	require.NoError(t, err)
+	assert.Equal(t, "1", response.NextPageToken)
+	require.Equal(t, "grpc-detail-host", response.HostName)
+	require.Len(t, response.Queries, 1)
+	active := response.Queries[0]
+	assert.False(t, active.IsIdle)
+	assert.Equal(t, int32(99), active.QueryKey.Ssid)
+	assert.Equal(t, int32(3), active.QueryKey.Ccnt)
+	assert.Equal(t, "SELECT waiting", active.State)
+	assert.Equal(t, "host_user", active.UserName)
+	assert.Equal(t, "host_db", active.DbName)
+	assert.Equal(t, "select * from host_detail_source", active.QueryText)
+	require.NotNil(t, active.RuntimeMetrics)
+	assert.Equal(t, int64(9), active.RuntimeMetrics.Utime)
+
+	response, err = clientSet.GetGetGPInfoClient().GetGPHostRunningQueries(context.Background(), &pbm.GetGPHostRunningQueriesReq{
+		HostName:  "grpc-detail-host",
+		PageSize:  1,
+		PageToken: response.NextPageToken,
+	})
+	require.NoError(t, err)
+	assert.Empty(t, response.NextPageToken)
+	require.Len(t, response.Queries, 1)
+	idle := response.Queries[0]
+	assert.True(t, idle.IsIdle)
+	assert.Equal(t, int32(100), idle.QueryKey.Ssid)
+	assert.Equal(t, int32(storage.UnsetSliceId), idle.QueryKey.Ccnt)
+	assert.Equal(t, "idle", idle.State)
+
+	_, err = clientSet.GetGetGPInfoClient().GetGPHostRunningQueries(context.Background(), &pbm.GetGPHostRunningQueriesReq{})
+	require.Error(t, err)
+}
+
+func TestGetGpPidProcInfo(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	sessionMocker := NewMockStatActivityLister(ctrl)
+	clientSet, cleanup := setupGRPCClientSet(t, sessionMocker)
+	defer cleanup()
+
+	storage.SetHostnameForSegindex(0, "pidproc-host")
+	base := time.Now().Add(-time.Second)
+	clientSet.procfsStorage.RegisterProcfsStat(base, []*pbc.GpPidProcInfo{
+		{GpSegmentId: 0, SessId: 501, Pid: 10, Ccnt: 1, SliceId: 1, State: "SELECT", ProcStat: &pbc.ProcStat{Utime: 0, Stime: 0}, ProcStatus: &pbc.ProcStatus{VmRss: 10}, ProcIo: &pbc.ProcIO{ReadBytes: 0}},
+		{GpSegmentId: 0, SessId: 501, Pid: 11, Ccnt: 1, SliceId: 2, State: "SELECT", ProcStat: &pbc.ProcStat{Utime: 0, Stime: 0}, ProcStatus: &pbc.ProcStatus{VmRss: 20}, ProcIo: &pbc.ProcIO{ReadBytes: 0}},
+		{GpSegmentId: 0, SessId: 999, Pid: 12, Ccnt: 1, SliceId: 1, State: "SELECT", ProcStat: &pbc.ProcStat{Utime: 0, Stime: 0}},
+	})
+	clientSet.procfsStorage.RegisterProcfsStat(base.Add(time.Second), []*pbc.GpPidProcInfo{
+		{GpSegmentId: 0, SessId: 501, Pid: 10, Ccnt: 1, SliceId: 1, State: "SELECT", ProcStat: &pbc.ProcStat{Utime: 10, Stime: 1}, ProcStatus: &pbc.ProcStatus{VmRss: 100}, ProcIo: &pbc.ProcIO{ReadBytes: 100}},
+		{GpSegmentId: 0, SessId: 501, Pid: 11, Ccnt: 1, SliceId: 2, State: "SELECT", ProcStat: &pbc.ProcStat{Utime: 20, Stime: 1}, ProcStatus: &pbc.ProcStatus{VmRss: 200}, ProcIo: &pbc.ProcIO{ReadBytes: 200}},
+		{GpSegmentId: 0, SessId: 999, Pid: 12, Ccnt: 1, SliceId: 1, State: "SELECT", ProcStat: &pbc.ProcStat{Utime: 30, Stime: 1}},
+	})
+
+	response, err := clientSet.GetGetGPInfoClient().GetGpPidProcInfo(context.Background(), &pbm.GetGpPidProcInfoReq{
+		QueryKey:  &pbc.QueryKey{Ssid: 501},
+		Hostname:  "pidproc-host",
+		PageSize:  1,
+		PageToken: "",
+	})
+	require.NoError(t, err)
+	require.Len(t, response.PidProcData, 1)
+	assert.Equal(t, int64(11), response.PidProcData[0].Pid)
+	assert.Equal(t, int64(21), response.PidProcData[0].ProcStat.Utime+response.PidProcData[0].ProcStat.Stime)
+	assert.Equal(t, "1", response.NextPageToken)
+
+	segindex := int32(0)
+	sliceID := int64(1)
+	response, err = clientSet.GetGetGPInfoClient().GetGpPidProcInfo(context.Background(), &pbm.GetGpPidProcInfoReq{
+		QueryKey: &pbc.QueryKey{Ssid: 501, Ccnt: 1},
+		Segindex: &segindex,
+		SliceId:  &sliceID,
+	})
+	require.NoError(t, err)
+	require.Len(t, response.PidProcData, 1)
+	assert.Equal(t, int64(10), response.PidProcData[0].Pid)
+
+	_, err = clientSet.GetGetGPInfoClient().GetGpPidProcInfo(context.Background(), &pbm.GetGpPidProcInfoReq{
+		QueryKey: &pbc.QueryKey{Ssid: 501},
+	})
+	require.Error(t, err)
+}
+
 func TestGetGPQueryRunningMatricsReturnsEmptyOnNoProcfsData(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	sessionMocker := NewMockStatActivityLister(ctrl)

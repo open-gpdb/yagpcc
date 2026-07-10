@@ -249,7 +249,7 @@ func TestQuery42(t *testing.T) {
 			StartTime:         timestamppb.New(time.Unix(1763388103, 0)),
 			EndTime:           timestamppb.New(time.Unix(1763388103, 0)),
 			Completed:         true,
-			Slices:            0,
+			Slices:            1,
 			TotalQueryMetrics: &pbc.GPMetrics{},
 		},
 

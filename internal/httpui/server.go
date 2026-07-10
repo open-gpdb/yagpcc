@@ -67,6 +67,8 @@ func (s *Server) RegisterRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("/api/extensions", s.handleGetExtensions)
 	mux.HandleFunc("/api/databases", s.handleListDatabases)
 	mux.HandleFunc("/api/hosts/running-queries", s.handleGetHostsRunningQueries)
+	mux.HandleFunc("/api/hosts/", s.handleGetHostRunningQueries)
+	mux.HandleFunc("/api/procfs/pid-proc-info", s.handleGetPidProcInfo)
 
 	// JSON API — action endpoints
 	mux.HandleFunc("/api/action/terminate-session", s.handleTerminateSession)

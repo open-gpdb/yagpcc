@@ -7,6 +7,7 @@ import QueriesPage from "./pages/QueriesPage";
 import QueryDetailPage from "./pages/QueryDetailPage";
 import ExtensionsPage from "./pages/ExtensionsPage";
 import HostsPage from "./pages/HostsPage";
+import PidProcInfoPage from "./pages/PidProcInfoPage";
 
 export default function App() {
   return (
@@ -18,6 +19,7 @@ export default function App() {
         <Route path="/queries" element={<QueriesPage />} />
         <Route path="/query/:ssid/:ccnt" element={<QueryDetailPage />} />
         <Route path="/hosts" element={<HostsPage />} />
+        <Route path="/procfs/pid-proc-info" element={<PidProcInfoPage />} />
         <Route path="/extensions" element={<ExtensionsPage />} />
       </Route>
     </Routes>

@@ -1064,3 +1064,93 @@ func TestGetProcfsSessions_MemoryAggregation_SegmentsOnDifferentHosts(t *testing
 	assert.Equal(t, int64(5000), sess.ProcStat.Vsize)
 	assert.Equal(t, int64(2500), sess.ProcStat.Rss)
 }
+
+func TestMatchesProcInfoFilter(t *testing.T) {
+	segindex := int32(1)
+	sliceID := int64(5)
+	localHostname := "test-host"
+
+	t.Run("empty filter matches all", func(t *testing.T) {
+		key := ProcKey{GpSegmentId: 1, SessId: 100, Pid: 10}
+		proc := &ProcStat{Ccnt: 3, SliceId: 5}
+		assert.True(t, matchesProcInfoFilter(key, proc, ProcInfoFilter{}, localHostname))
+	})
+
+	t.Run("ssid filter matches", func(t *testing.T) {
+		key := ProcKey{GpSegmentId: 1, SessId: 100, Pid: 10}
+		proc := &ProcStat{Ccnt: 3, SliceId: 5}
+		filter := ProcInfoFilter{QueryKey: &pbc.QueryKey{Ssid: 100}}
+		assert.True(t, matchesProcInfoFilter(key, proc, filter, localHostname))
+	})
+
+	t.Run("ssid filter excludes", func(t *testing.T) {
+		key := ProcKey{GpSegmentId: 1, SessId: 200, Pid: 10}
+		proc := &ProcStat{Ccnt: 3, SliceId: 5}
+		filter := ProcInfoFilter{QueryKey: &pbc.QueryKey{Ssid: 100}}
+		assert.False(t, matchesProcInfoFilter(key, proc, filter, localHostname))
+	})
+
+	t.Run("ccnt filter matches", func(t *testing.T) {
+		key := ProcKey{GpSegmentId: 1, SessId: 100, Pid: 10}
+		proc := &ProcStat{Ccnt: 3, SliceId: 5}
+		filter := ProcInfoFilter{QueryKey: &pbc.QueryKey{Ssid: 100, Ccnt: 3}}
+		assert.True(t, matchesProcInfoFilter(key, proc, filter, localHostname))
+	})
+
+	t.Run("ccnt filter excludes", func(t *testing.T) {
+		key := ProcKey{GpSegmentId: 1, SessId: 100, Pid: 10}
+		proc := &ProcStat{Ccnt: 5, SliceId: 5}
+		filter := ProcInfoFilter{QueryKey: &pbc.QueryKey{Ssid: 100, Ccnt: 3}}
+		assert.False(t, matchesProcInfoFilter(key, proc, filter, localHostname))
+	})
+
+	t.Run("segindex filter matches", func(t *testing.T) {
+		key := ProcKey{GpSegmentId: 1, SessId: 100, Pid: 10}
+		proc := &ProcStat{Ccnt: 3, SliceId: 5}
+		filter := ProcInfoFilter{Segindex: &segindex}
+		assert.True(t, matchesProcInfoFilter(key, proc, filter, localHostname))
+	})
+
+	t.Run("segindex filter excludes", func(t *testing.T) {
+		key := ProcKey{GpSegmentId: 2, SessId: 100, Pid: 10}
+		proc := &ProcStat{Ccnt: 3, SliceId: 5}
+		filter := ProcInfoFilter{Segindex: &segindex}
+		assert.False(t, matchesProcInfoFilter(key, proc, filter, localHostname))
+	})
+
+	t.Run("slice_id filter matches", func(t *testing.T) {
+		key := ProcKey{GpSegmentId: 1, SessId: 100, Pid: 10}
+		proc := &ProcStat{Ccnt: 3, SliceId: 5}
+		filter := ProcInfoFilter{SliceID: &sliceID}
+		assert.True(t, matchesProcInfoFilter(key, proc, filter, localHostname))
+	})
+
+	t.Run("slice_id filter excludes", func(t *testing.T) {
+		key := ProcKey{GpSegmentId: 1, SessId: 100, Pid: 10}
+		proc := &ProcStat{Ccnt: 3, SliceId: 10}
+		filter := ProcInfoFilter{SliceID: &sliceID}
+		assert.False(t, matchesProcInfoFilter(key, proc, filter, localHostname))
+	})
+
+	t.Run("combined filters match", func(t *testing.T) {
+		key := ProcKey{GpSegmentId: 1, SessId: 100, Pid: 10}
+		proc := &ProcStat{Ccnt: 3, SliceId: 5}
+		filter := ProcInfoFilter{
+			QueryKey: &pbc.QueryKey{Ssid: 100, Ccnt: 3},
+			Segindex: &segindex,
+			SliceID:  &sliceID,
+		}
+		assert.True(t, matchesProcInfoFilter(key, proc, filter, localHostname))
+	})
+
+	t.Run("combined filters exclude by one", func(t *testing.T) {
+		key := ProcKey{GpSegmentId: 1, SessId: 100, Pid: 10}
+		proc := &ProcStat{Ccnt: 3, SliceId: 10}
+		filter := ProcInfoFilter{
+			QueryKey: &pbc.QueryKey{Ssid: 100, Ccnt: 3},
+			Segindex: &segindex,
+			SliceID:  &sliceID,
+		}
+		assert.False(t, matchesProcInfoFilter(key, proc, filter, localHostname))
+	})
+}

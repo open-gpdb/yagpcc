@@ -470,6 +470,71 @@ func (bs *BackgroundStorage) GetHostsRunningQueries() ([]*storage.HostRunningQue
 	return bs.procfsStorage.GetHostsRunningQueries()
 }
 
+func (bs *BackgroundStorage) GetHostRunningQueries(hostname string) (*storage.HostRunningQueriesDetailInfo, error) {
+	if bs.procfsStorage == nil {
+		return nil, fmt.Errorf("procfs storage is nil")
+	}
+	result, err := bs.procfsStorage.GetHostRunningQueries(hostname)
+	if err != nil {
+		return nil, err
+	}
+	if bs.RQStorage == nil || result == nil {
+		return result, nil
+	}
+	for _, row := range result.Queries {
+		if row == nil || row.QueryKey == nil || row.QueryKey.Ccnt < 0 {
+			continue
+		}
+		query, ok := bs.RQStorage.GetQuery(storage.QueryKey{Ssid: row.QueryKey.Ssid, Ccnt: row.QueryKey.Ccnt})
+		if !ok || query == nil {
+			continue
+		}
+		enrichHostRunningQueryInfo(row, query)
+	}
+	return result, nil
+}
+
+func enrichHostRunningQueryInfo(row *storage.HostRunningQueryDetailInfo, query *storage.RunningQuery) bool {
+	query.QueryLock.RLock()
+	defer query.QueryLock.RUnlock()
+
+	masterData, ok := findMasterQueryData(query.QueriesData)
+	if !ok || masterData == nil {
+		return false
+	}
+	masterData.QueryDataLock.RLock()
+	defer masterData.QueryDataLock.RUnlock()
+	if masterData.QueryInfo == nil {
+		return false
+	}
+	row.UserName = masterData.QueryInfo.GetUserName()
+	row.DbName = masterData.QueryInfo.GetDatabaseName()
+	row.QueryText = masterData.QueryInfo.GetQueryText()
+	return true
+}
+
+func findMasterQueryData(queries storage.QueryMap) (*storage.QueryData, bool) {
+	for key, data := range queries {
+		if key.SKey.Segindex == -1 && (key.SliceID == storage.MainSliceId || key.SliceID == storage.UnsetSliceId) {
+			return data, true
+		}
+	}
+	for key, data := range queries {
+		if key.SKey.Segindex == -1 {
+			return data, true
+		}
+	}
+	return nil, false
+}
+
+// GetGpPidProcInfo scans procfs storage for process rows matching the given filter.
+func (bs *BackgroundStorage) GetGpPidProcInfo(filter storage.ProcInfoFilter) ([]*pbc.GpPidProcInfo, error) {
+	if bs.procfsStorage == nil {
+		return nil, fmt.Errorf("procfs storage is nil")
+	}
+	return bs.procfsStorage.GetGpPidProcInfoRows(filter)
+}
+
 func (bs *BackgroundStorage) TryRefreshSessionsFromGP(
 	ctx context.Context,
 	clearDeletedSessions bool,
@@ -710,6 +775,9 @@ func (bs *BackgroundStorage) RefreshProcfs(ctx context.Context, procfsRefreshInt
 			if err != nil {
 				// just log error, do not fail the whole service
 				bs.l.Errorf("fail to get procfs data %v", err)
+				if metrics.YagpccMetrics != nil {
+					metrics.YagpccMetrics.ProcfsRefreshErrors.Inc()
+				}
 				continue
 			}
 

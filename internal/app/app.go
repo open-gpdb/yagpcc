@@ -254,6 +254,17 @@ func InitMetrics() {
 		QueriesInFlight:         promauto.NewGauge(prometheus.GaugeOpts{Name: "queries_in_flight"}),
 		ExecutingQueryLatencies: metrics.NewTimeGaugeHistogram("executing_query", "executing queries latencies", prometheus.DefaultRegisterer, requestQueryBuckets()),
 
+		ProcfsRefreshes:              promauto.NewCounter(prometheus.CounterOpts{Name: "procfs_refreshes_total", Help: "Total successful procfs refresh cycles"}),
+		ProcfsRefreshErrors:          promauto.NewCounter(prometheus.CounterOpts{Name: "procfs_refresh_errors_total", Help: "Total failed procfs refresh cycles"}),
+		ProcfsStorageSnapshots:       promauto.NewGauge(prometheus.GaugeOpts{Name: "procfs_storage_snapshots", Help: "Number of procfs snapshots currently stored"}),
+		ProcfsStorageRows:            promauto.NewGauge(prometheus.GaugeOpts{Name: "procfs_storage_rows", Help: "Total number of process rows across all stored procfs snapshots"}),
+		ProcfsLatestRows:             promauto.NewGauge(prometheus.GaugeOpts{Name: "procfs_latest_rows", Help: "Number of process rows in the latest procfs snapshot"}),
+		ProcfsHostsExpected:          promauto.NewGauge(prometheus.GaugeOpts{Name: "procfs_hosts_expected", Help: "Number of hosts expected in the latest procfs refresh"}),
+		ProcfsHostsResponded:         promauto.NewGauge(prometheus.GaugeOpts{Name: "procfs_hosts_responded", Help: "Number of hosts that responded in the latest procfs refresh"}),
+		ProcfsLastRefreshUnix:        promauto.NewGauge(prometheus.GaugeOpts{Name: "procfs_last_refresh_unix", Help: "Unix timestamp of the latest successful procfs refresh"}),
+		ProcfsRefreshIntervalSeconds: promauto.NewGauge(prometheus.GaugeOpts{Name: "procfs_refresh_interval_seconds", Help: "Observed interval between successful procfs refreshes"}),
+		ProcfsFreshnessSeconds:       promauto.NewGauge(prometheus.GaugeOpts{Name: "procfs_freshness_seconds", Help: "Age in seconds of the latest stored procfs snapshot at update time"}),
+
 		GCRuns:            promauto.NewCounter(prometheus.CounterOpts{Name: "gc_runs"}),
 		GCDeletedQueries:  promauto.NewCounter(prometheus.CounterOpts{Name: "gc_deleted_queries"}),
 		GCArchivedQueries: promauto.NewCounter(prometheus.CounterOpts{Name: "gc_archived_queries"}),

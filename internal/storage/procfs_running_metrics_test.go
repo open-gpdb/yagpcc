@@ -493,6 +493,70 @@ func TestGetHostsRunningQueriesRichMultiHost(t *testing.T) {
 	assert.False(t, fallbackHost.DataQuality.IsPartial)
 }
 
+func TestGetHostRunningQueriesDetails(t *testing.T) {
+	SegmentConfigLock.Lock()
+	oldMap := SegmentMap
+	SegmentMap = make(map[SegmentKey]*SegmentConfig)
+	SegmentConfigLock.Unlock()
+	defer func() {
+		SegmentConfigLock.Lock()
+		SegmentMap = oldMap
+		SegmentConfigLock.Unlock()
+	}()
+	SetHostnameForSegindex(0, "host-a")
+	SetHostnameForSegindex(1, "host-a")
+	SetHostnameForSegindex(2, "host-b")
+
+	ps := NewProcfsStorage()
+	base := time.Now().Add(-time.Second)
+	ps.RegisterProcfsStatWithDataQuality(base, []*pbc.GpPidProcInfo{
+		{GpSegmentId: 0, SessId: 100, Pid: 10, Ccnt: 7, SliceId: 1, State: "SELECT waiting", Cmdline: "postgres: 6000, queryuser querydb 127.0.0.1(1) con100 seg0 SELECT", ProcStat: &pbc.ProcStat{Utime: 1}, ProcStatus: &pbc.ProcStatus{VmRss: 1}, ProcIo: &pbc.ProcIO{}},
+		{GpSegmentId: 1, SessId: 100, Pid: 11, Ccnt: 7, SliceId: 1, State: "SELECT waiting", Cmdline: "postgres: 6000, queryuser querydb 127.0.0.1(1) con100 seg1 SELECT", ProcStat: &pbc.ProcStat{Utime: 2}, ProcStatus: &pbc.ProcStatus{VmRss: 2}, ProcIo: &pbc.ProcIO{}},
+		{GpSegmentId: 0, SessId: 200, Pid: 20, Ccnt: 8, SliceId: UnsetSliceId, State: "idle", Cmdline: "postgres: 6000, monitor postgres 2a02:6b8:c42:1b27:0:67c6:f2a9:31bb(31570) con19675359 seg0 idle", ProcStat: &pbc.ProcStat{Utime: 3}, ProcStatus: &pbc.ProcStatus{VmRss: 3}, ProcIo: &pbc.ProcIO{}},
+		{GpSegmentId: 1, SessId: 200, Pid: 21, Ccnt: UnsetSliceId, SliceId: UnsetSliceId, State: "idle", Cmdline: "postgres: 6000, monitor postgres 2a02:6b8:c42:1b27:0:67c6:f2a9:31bb(31570) con19675359 seg1 idle", ProcStat: &pbc.ProcStat{Utime: 4}, ProcStatus: &pbc.ProcStatus{VmRss: 4}, ProcIo: &pbc.ProcIO{}},
+		{GpSegmentId: 2, SessId: 300, Pid: 30, Ccnt: 9, SliceId: 1, State: "SELECT", ProcStat: &pbc.ProcStat{Utime: 5}, ProcStatus: &pbc.ProcStatus{VmRss: 5}, ProcIo: &pbc.ProcIO{}},
+	}, 2, 2)
+	ps.RegisterProcfsStatWithDataQuality(base.Add(time.Second), []*pbc.GpPidProcInfo{
+		{GpSegmentId: 0, SessId: 100, Pid: 10, Ccnt: 7, SliceId: 1, State: "SELECT waiting", Cmdline: "postgres: 6000, queryuser querydb 127.0.0.1(1) con100 seg0 SELECT", ProcStat: &pbc.ProcStat{Utime: 11}, ProcStatus: &pbc.ProcStatus{VmRss: 10}, ProcIo: &pbc.ProcIO{ReadBytes: 10}},
+		{GpSegmentId: 1, SessId: 100, Pid: 11, Ccnt: 7, SliceId: 1, State: "SELECT waiting", Cmdline: "postgres: 6000, queryuser querydb 127.0.0.1(1) con100 seg1 SELECT", ProcStat: &pbc.ProcStat{Utime: 42}, ProcStatus: &pbc.ProcStatus{VmRss: 20}, ProcIo: &pbc.ProcIO{ReadBytes: 20}},
+		{GpSegmentId: 0, SessId: 200, Pid: 20, Ccnt: 8, SliceId: UnsetSliceId, State: "idle", Cmdline: "postgres: 6000, monitor postgres 2a02:6b8:c42:1b27:0:67c6:f2a9:31bb(31570) con19675359 seg0 idle", ProcStat: &pbc.ProcStat{Utime: 13}, ProcStatus: &pbc.ProcStatus{VmRss: 30}, ProcIo: &pbc.ProcIO{ReadBytes: 30}},
+		{GpSegmentId: 1, SessId: 200, Pid: 21, Ccnt: UnsetSliceId, SliceId: UnsetSliceId, State: "idle", Cmdline: "postgres: 6000, monitor postgres 2a02:6b8:c42:1b27:0:67c6:f2a9:31bb(31570) con19675359 seg1 idle", ProcStat: &pbc.ProcStat{Utime: 24}, ProcStatus: &pbc.ProcStatus{VmRss: 40}, ProcIo: &pbc.ProcIO{ReadBytes: 40}},
+		{GpSegmentId: 2, SessId: 300, Pid: 30, Ccnt: 9, SliceId: 1, State: "SELECT", ProcStat: &pbc.ProcStat{Utime: 15}, ProcStatus: &pbc.ProcStatus{VmRss: 50}, ProcIo: &pbc.ProcIO{ReadBytes: 50}},
+	}, 2, 2)
+
+	result, err := ps.GetHostRunningQueries("host-a")
+	require.NoError(t, err)
+	require.Equal(t, "host-a", result.HostName)
+	require.Equal(t, []int32{0, 1}, result.Segindex)
+	require.Len(t, result.Queries, 2)
+	active := result.Queries[0]
+	require.NotNil(t, active.QueryKey)
+	assert.Equal(t, int32(100), active.QueryKey.Ssid)
+	assert.Equal(t, int32(7), active.QueryKey.Ccnt)
+	assert.False(t, active.IsIdle)
+	assert.Equal(t, "SELECT waiting", active.State)
+	assert.Equal(t, "queryuser", active.UserName)
+	assert.Equal(t, "querydb", active.DbName)
+	require.NotNil(t, active.RuntimeMetrics)
+	assert.Equal(t, int64(50), active.RuntimeMetrics.Utime)
+	assert.Equal(t, int64(30), active.RuntimeMetrics.VmRss)
+	assert.Equal(t, int64(30), active.RuntimeMetrics.ProcIo.ReadBytes)
+
+	idle := result.Queries[1]
+	require.NotNil(t, idle.QueryKey)
+	assert.Equal(t, int32(200), idle.QueryKey.Ssid)
+	assert.Equal(t, int32(8), idle.QueryKey.Ccnt)
+	assert.True(t, idle.IsIdle)
+	assert.Equal(t, "idle", idle.State)
+	assert.Equal(t, "monitor", idle.UserName)
+	assert.Equal(t, "postgres", idle.DbName)
+	require.NotNil(t, idle.RuntimeMetrics)
+	assert.Equal(t, int64(30), idle.RuntimeMetrics.Utime)
+	assert.Equal(t, int64(70), idle.RuntimeMetrics.VmRss)
+	assert.Equal(t, int64(70), idle.RuntimeMetrics.ProcIo.ReadBytes)
+	assert.Empty(t, result.NextPageToken)
+}
+
 func TestGetProcfsQueryRuntimeMetricsNilAndMissingQuery(t *testing.T) {
 	ps := NewProcfsStorage()
 	base := time.Now().Add(-time.Second)
