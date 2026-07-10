@@ -26,6 +26,7 @@ import (
 	"time"
 
 	pbc "github.com/open-gpdb/yagpcc/api/proto/common"
+	"github.com/open-gpdb/yagpcc/internal/metrics"
 	"github.com/open-gpdb/yagpcc/internal/utils"
 )
 
@@ -256,12 +257,42 @@ func (p *ProcfsStorage) RegisterProcfsStatWithHostStat(statTime time.Time, procf
 	}
 
 	// store new map
+	var refreshInterval float64
 	p.mx.Lock()
+	if len(p.procfsStat) > 0 {
+		refreshInterval = statTime.Sub(p.procfsStat[len(p.procfsStat)-1].statTime).Seconds()
+	}
 	p.procfsStat = append(p.procfsStat, stat)
 	p.mx.Unlock()
 
 	// delete old data
 	p.TidyUpProcfsStat()
+	p.updateProcfsStorageMetrics(statTime, len(stat.pidProcData), hostsExpected, hostsResponded, refreshInterval)
+}
+
+func (p *ProcfsStorage) updateProcfsStorageMetrics(statTime time.Time, latestRows int, hostsExpected int64, hostsResponded int64, refreshInterval float64) {
+	if metrics.YagpccMetrics == nil {
+		return
+	}
+	p.mx.RLock()
+	snapshots := len(p.procfsStat)
+	totalRows := 0
+	for _, stat := range p.procfsStat {
+		totalRows += len(stat.pidProcData)
+	}
+	p.mx.RUnlock()
+
+	metrics.YagpccMetrics.ProcfsRefreshes.Inc()
+	metrics.YagpccMetrics.ProcfsStorageSnapshots.Set(float64(snapshots))
+	metrics.YagpccMetrics.ProcfsStorageRows.Set(float64(totalRows))
+	metrics.YagpccMetrics.ProcfsLatestRows.Set(float64(latestRows))
+	metrics.YagpccMetrics.ProcfsHostsExpected.Set(float64(hostsExpected))
+	metrics.YagpccMetrics.ProcfsHostsResponded.Set(float64(hostsResponded))
+	metrics.YagpccMetrics.ProcfsLastRefreshUnix.Set(float64(statTime.Unix()))
+	metrics.YagpccMetrics.ProcfsFreshnessSeconds.Set(time.Since(statTime).Seconds())
+	if refreshInterval > 0 {
+		metrics.YagpccMetrics.ProcfsRefreshIntervalSeconds.Set(refreshInterval)
+	}
 }
 
 func procfsDataQuality(stat *ProcfsStatType) *pbc.DataQuality {
@@ -1000,4 +1031,83 @@ func (p *ProcfsStorage) GetQueryRunningMetrics(queryKey *pbc.QueryKey) ([]*Procf
 		return nil, nil, nil, err
 	}
 	return result, CalculateCPUTimeSkew(result), procfsDataQuality(last), nil
+}
+
+// ProcInfoFilter holds the criteria for scanning procfs process rows.
+// Validation of required fields belongs in the gRPC layer; storage treats
+// nil/zero values as "not set" and therefore not filtered.
+type ProcInfoFilter struct {
+	QueryKey *pbc.QueryKey
+	Hostname string
+	Segindex *int32
+	SliceID  *int64
+}
+
+// matchesProcInfoFilter returns true when the process row satisfies every
+// non-empty criterion in the filter.
+func matchesProcInfoFilter(key ProcKey, lastProc *ProcStat, filter ProcInfoFilter, localHostname string) bool {
+	if filter.QueryKey != nil {
+		if filter.QueryKey.Ssid != 0 && key.SessId != int64(filter.QueryKey.Ssid) {
+			return false
+		}
+		if filter.QueryKey.Ccnt > 0 && lastProc.Ccnt != filter.QueryKey.Ccnt {
+			return false
+		}
+	}
+
+	if filter.Hostname != "" {
+		procHostname := localHostname
+		if key.GpSegmentId >= 0 {
+			procHostname = GetHostnameForSegindex(int32(key.GpSegmentId))
+		}
+		if procHostname != filter.Hostname {
+			return false
+		}
+	}
+
+	if filter.Segindex != nil && int64(key.GpSegmentId) != int64(*filter.Segindex) {
+		return false
+	}
+
+	if filter.SliceID != nil && lastProc.SliceId != *filter.SliceID {
+		return false
+	}
+
+	return true
+}
+
+// GetGpPidProcInfoRows scans the last 5-minute procfs diff and returns all
+// process rows matching the given filter.
+func (p *ProcfsStorage) GetGpPidProcInfoRows(filter ProcInfoFilter) ([]*pbc.GpPidProcInfo, error) {
+	first, last, err := p.get5Min()
+	if err != nil {
+		return nil, fmt.Errorf("fail to get 5min procfs data: %w", err)
+	}
+
+	localHostname, err := os.Hostname()
+	if err != nil {
+		return nil, fmt.Errorf("fail to get local hostname: %w", err)
+	}
+
+	var results []*pbc.GpPidProcInfo
+	for key, lastProc := range last.pidProcData {
+		if lastProc == nil {
+			continue
+		}
+		if !matchesProcInfoFilter(key, lastProc, filter, localHostname) {
+			continue
+		}
+
+		pidStat := lastProc.ToGpPidProcInfo(key)
+		if firstProc, ok := first.pidProcData[key]; ok {
+			diff, err := ProcfsDiff(firstProc.ToGpPidProcInfo(key), pidStat)
+			if err != nil {
+				return nil, fmt.Errorf("fail in diff: %w", err)
+			}
+			pidStat = diff
+		}
+		results = append(results, pidStat)
+	}
+
+	return results, nil
 }

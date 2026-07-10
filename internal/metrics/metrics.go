@@ -40,6 +40,18 @@ type YagpccMetricsType struct {
 	QueriesInFlight         prometheus.Gauge
 	ExecutingQueryLatencies *TimeGaugeHistogram
 
+	// Procfs storage metrics
+	ProcfsRefreshes              prometheus.Counter
+	ProcfsRefreshErrors          prometheus.Counter
+	ProcfsStorageSnapshots       prometheus.Gauge
+	ProcfsStorageRows            prometheus.Gauge
+	ProcfsLatestRows             prometheus.Gauge
+	ProcfsHostsExpected          prometheus.Gauge
+	ProcfsHostsResponded         prometheus.Gauge
+	ProcfsLastRefreshUnix        prometheus.Gauge
+	ProcfsRefreshIntervalSeconds prometheus.Gauge
+	ProcfsFreshnessSeconds       prometheus.Gauge
+
 	// GC metrics
 	GCRuns            prometheus.Counter
 	GCDeletedQueries  prometheus.Counter

@@ -102,6 +102,28 @@ export function getQueryRunningMetrics(ssid: number, ccnt: number) {
   return get<QueryRunningMetricsResponse>(`/api/query/${ssid}/${ccnt}/running-metrics`);
 }
 
+export interface GetPidProcInfoParams {
+  hostname?: string;
+  ssid: number;
+  ccnt?: number;
+  segindex?: number;
+  sliceId?: number;
+  pageSize?: number;
+  pageToken?: string;
+}
+
+export function getPidProcInfo(params: GetPidProcInfoParams) {
+  const q = new URLSearchParams();
+  if (params.hostname) q.set("hostname", params.hostname);
+  q.set("ssid", String(params.ssid));
+  if (params.ccnt !== undefined) q.set("ccnt", String(params.ccnt));
+  if (params.segindex !== undefined) q.set("segindex", String(params.segindex));
+  if (params.sliceId !== undefined) q.set("slice_id", String(params.sliceId));
+  if (params.pageSize) q.set("page_size", String(params.pageSize));
+  if (params.pageToken) q.set("page_token", params.pageToken);
+  return get<PidProcInfoResponse>(`/api/procfs/pid-proc-info?${q.toString()}`);
+}
+
 export function getSessionStats() {
   return get<SessionStatsResponse>("/api/stats/sessions");
 }
@@ -416,6 +438,37 @@ export interface RuntimeMetrics {
   state: string;
   procIo: ProcIO | null;
   procSpill: ProcSpill | null;
+}
+
+export interface ProcStat {
+  utime: number;
+  stime: number;
+  vsize: number;
+  rss: number;
+}
+
+export interface ProcStatus {
+  vmPeak: number;
+  vmRss: number;
+}
+
+export interface GpPidProcInfo {
+  gpSegmentId: string;
+  sessId: string;
+  pid: string;
+  cmdline: string;
+  state: string;
+  procStat: ProcStat | null;
+  procStatus: ProcStatus | null;
+  procIo: ProcIO | null;
+  procSpill: ProcSpill | null;
+  ccnt: number;
+  sliceId: string;
+}
+
+export interface PidProcInfoResponse {
+  pidProcData: GpPidProcInfo[];
+  nextPageToken: string;
 }
 
 export interface SkewInfo {

@@ -452,6 +452,219 @@ func (s *GetMasterInfoServer) GetGPHostRunningQueries(ctx context.Context, in *p
 	return response, nil
 }
 
+func (s *GetMasterInfoServer) GetGpPidProcInfo(ctx context.Context, in *pbm.GetGpPidProcInfoReq) (*pbm.GpPidProcInfoResponse, error) {
+	s.logger.Debugf("got get pid proc info request %v", in)
+	start := time.Now()
+
+	// Validate required fields
+	if in.GetQueryKey() == nil || in.GetQueryKey().GetSsid() == 0 {
+		return nil, fmt.Errorf("invalid input - query key with non-zero ssid is required")
+	}
+	if strings.TrimSpace(in.GetHostname()) == "" && in.Segindex == nil {
+		return nil, fmt.Errorf("invalid input - either hostname or segindex must be set")
+	}
+
+	// Build storage filter
+	filter := storage.ProcInfoFilter{
+		QueryKey: in.GetQueryKey(),
+		Hostname: in.GetHostname(),
+	}
+	if in.SliceId != nil {
+		sliceID := in.GetSliceId()
+		filter.SliceID = &sliceID
+	}
+	if in.Segindex != nil {
+		segindex := in.GetSegindex()
+		filter.Segindex = &segindex
+	}
+
+	// Fetch matching rows from storage
+	rows, err := s.backgroundStorage.GetGpPidProcInfo(filter)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get pid proc info: %w", err)
+	}
+
+	// Sort rows
+	sortProcInfoRows(rows, in.GetField())
+
+	// Paginate
+	pagedRows, nextPageToken, err := paginateItems(rows, in.GetPageSize(), in.GetPageToken(), 50)
+	if err != nil {
+		return nil, err
+	}
+
+	if metrics.YagpccMetrics != nil {
+		metrics.YagpccMetrics.HandleLatencies.With(map[string]string{"method": "GetGpPidProcInfo"}).Observe(time.Since(start).Seconds())
+	}
+
+	return &pbm.GpPidProcInfoResponse{
+		PidProcData:   pagedRows,
+		NextPageToken: nextPageToken,
+	}, nil
+}
+
+// sortProcInfoRows sorts process rows by the requested fields, defaulting to CPU descending.
+func sortProcInfoRows(rows []*pbc.GpPidProcInfo, fields []*pbm.ProcInfoFieldWrapper) {
+	if len(fields) == 0 {
+		// Default: CPU descending
+		sort.Slice(rows, func(i, j int) bool {
+			cpuI := procInfoCPU(rows[i])
+			cpuJ := procInfoCPU(rows[j])
+			if cpuI != cpuJ {
+				return cpuI > cpuJ
+			}
+			return procInfoTieBreak(rows[i], rows[j])
+		})
+		return
+	}
+
+	sort.Slice(rows, func(i, j int) bool {
+		for _, f := range fields {
+			field := f.GetField()
+			asc := f.GetOrder() == pbm.SortOrder_SORT_ASC
+			less := procInfoFieldLess(rows[i], rows[j], field)
+			if less {
+				return asc
+			}
+			if !procInfoFieldEqual(rows[i], rows[j], field) {
+				return !asc
+			}
+		}
+		return procInfoTieBreak(rows[i], rows[j])
+	})
+}
+
+func procInfoCPU(row *pbc.GpPidProcInfo) int64 {
+	if row == nil || row.ProcStat == nil {
+		return 0
+	}
+	return row.ProcStat.Utime + row.ProcStat.Stime
+}
+
+func procInfoTieBreak(a, b *pbc.GpPidProcInfo) bool {
+	if a.GpSegmentId != b.GpSegmentId {
+		return a.GpSegmentId < b.GpSegmentId
+	}
+	if a.SliceId != b.SliceId {
+		return a.SliceId < b.SliceId
+	}
+	return a.Pid < b.Pid
+}
+
+func procInfoFieldLess(a, b *pbc.GpPidProcInfo, field pbm.ProcInfoFieldEnum) bool {
+	switch field {
+	case pbm.ProcInfoFieldEnum_PROC_INFO_FIELD_CPU:
+		return procInfoCPU(a) < procInfoCPU(b)
+	case pbm.ProcInfoFieldEnum_PROC_INFO_FIELD_MEMORY_RSS:
+		rssA := int64(0)
+		rssB := int64(0)
+		if a != nil && a.ProcStatus != nil {
+			rssA = a.ProcStatus.VmRss
+		}
+		if b != nil && b.ProcStatus != nil {
+			rssB = b.ProcStatus.VmRss
+		}
+		return rssA < rssB
+	case pbm.ProcInfoFieldEnum_PROC_INFO_FIELD_READ_BYTES:
+		readA := int64(0)
+		readB := int64(0)
+		if a != nil && a.ProcIo != nil {
+			readA = a.ProcIo.ReadBytes
+		}
+		if b != nil && b.ProcIo != nil {
+			readB = b.ProcIo.ReadBytes
+		}
+		return readA < readB
+	case pbm.ProcInfoFieldEnum_PROC_INFO_FIELD_WRITE_BYTES:
+		writeA := int64(0)
+		writeB := int64(0)
+		if a != nil && a.ProcIo != nil {
+			writeA = a.ProcIo.WriteBytes
+		}
+		if b != nil && b.ProcIo != nil {
+			writeB = b.ProcIo.WriteBytes
+		}
+		return writeA < writeB
+	case pbm.ProcInfoFieldEnum_PROC_INFO_FIELD_SPILL_BYTES:
+		spillA := int64(0)
+		spillB := int64(0)
+		if a != nil && a.ProcSpill != nil {
+			spillA = a.ProcSpill.Size
+		}
+		if b != nil && b.ProcSpill != nil {
+			spillB = b.ProcSpill.Size
+		}
+		return spillA < spillB
+	case pbm.ProcInfoFieldEnum_PROC_INFO_FIELD_SEGINDEX:
+		return a.GpSegmentId < b.GpSegmentId
+	case pbm.ProcInfoFieldEnum_PROC_INFO_FIELD_SLICE_ID:
+		return a.SliceId < b.SliceId
+	case pbm.ProcInfoFieldEnum_PROC_INFO_FIELD_PID:
+		return a.Pid < b.Pid
+	case pbm.ProcInfoFieldEnum_PROC_INFO_FIELD_STATE:
+		return a.State < b.State
+	default:
+		return false
+	}
+}
+
+func procInfoFieldEqual(a, b *pbc.GpPidProcInfo, field pbm.ProcInfoFieldEnum) bool {
+	switch field {
+	case pbm.ProcInfoFieldEnum_PROC_INFO_FIELD_CPU:
+		return procInfoCPU(a) == procInfoCPU(b)
+	case pbm.ProcInfoFieldEnum_PROC_INFO_FIELD_MEMORY_RSS:
+		rssA := int64(0)
+		rssB := int64(0)
+		if a != nil && a.ProcStatus != nil {
+			rssA = a.ProcStatus.VmRss
+		}
+		if b != nil && b.ProcStatus != nil {
+			rssB = b.ProcStatus.VmRss
+		}
+		return rssA == rssB
+	case pbm.ProcInfoFieldEnum_PROC_INFO_FIELD_READ_BYTES:
+		readA := int64(0)
+		readB := int64(0)
+		if a != nil && a.ProcIo != nil {
+			readA = a.ProcIo.ReadBytes
+		}
+		if b != nil && b.ProcIo != nil {
+			readB = b.ProcIo.ReadBytes
+		}
+		return readA == readB
+	case pbm.ProcInfoFieldEnum_PROC_INFO_FIELD_WRITE_BYTES:
+		writeA := int64(0)
+		writeB := int64(0)
+		if a != nil && a.ProcIo != nil {
+			writeA = a.ProcIo.WriteBytes
+		}
+		if b != nil && b.ProcIo != nil {
+			writeB = b.ProcIo.WriteBytes
+		}
+		return writeA == writeB
+	case pbm.ProcInfoFieldEnum_PROC_INFO_FIELD_SPILL_BYTES:
+		spillA := int64(0)
+		spillB := int64(0)
+		if a != nil && a.ProcSpill != nil {
+			spillA = a.ProcSpill.Size
+		}
+		if b != nil && b.ProcSpill != nil {
+			spillB = b.ProcSpill.Size
+		}
+		return spillA == spillB
+	case pbm.ProcInfoFieldEnum_PROC_INFO_FIELD_SEGINDEX:
+		return a.GpSegmentId == b.GpSegmentId
+	case pbm.ProcInfoFieldEnum_PROC_INFO_FIELD_SLICE_ID:
+		return a.SliceId == b.SliceId
+	case pbm.ProcInfoFieldEnum_PROC_INFO_FIELD_PID:
+		return a.Pid == b.Pid
+	case pbm.ProcInfoFieldEnum_PROC_INFO_FIELD_STATE:
+		return a.State == b.State
+	default:
+		return true
+	}
+}
+
 func (s *GetMasterInfoServer) GetGPExtensions(ctx context.Context, in *pbm.GetGPExtensionsReq) (*pbm.GetGPExtensionsResponse, error) {
 	s.logger.Debugf("got get extensions request")
 	start := time.Now()

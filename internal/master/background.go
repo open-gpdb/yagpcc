@@ -527,6 +527,14 @@ func findMasterQueryData(queries storage.QueryMap) (*storage.QueryData, bool) {
 	return nil, false
 }
 
+// GetGpPidProcInfo scans procfs storage for process rows matching the given filter.
+func (bs *BackgroundStorage) GetGpPidProcInfo(filter storage.ProcInfoFilter) ([]*pbc.GpPidProcInfo, error) {
+	if bs.procfsStorage == nil {
+		return nil, fmt.Errorf("procfs storage is nil")
+	}
+	return bs.procfsStorage.GetGpPidProcInfoRows(filter)
+}
+
 func (bs *BackgroundStorage) TryRefreshSessionsFromGP(
 	ctx context.Context,
 	clearDeletedSessions bool,
@@ -767,6 +775,9 @@ func (bs *BackgroundStorage) RefreshProcfs(ctx context.Context, procfsRefreshInt
 			if err != nil {
 				// just log error, do not fail the whole service
 				bs.l.Errorf("fail to get procfs data %v", err)
+				if metrics.YagpccMetrics != nil {
+					metrics.YagpccMetrics.ProcfsRefreshErrors.Inc()
+				}
 				continue
 			}
 

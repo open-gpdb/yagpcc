@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { Table, Card, Typography, Button, Space, Tag, Tooltip } from "antd";
 import { ReloadOutlined } from "@ant-design/icons";
 import { useApi } from "../hooks/useApi";
@@ -68,6 +68,7 @@ function CpuUsageBadge({ value }: { value: number }) {
 }
 
 function HostQueriesExpandedRow({ hostName }: { hostName: string }) {
+  const navigate = useNavigate();
   const [data, setData] = useState<HostRunningQueriesResponse | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<Error | null>(null);
@@ -112,7 +113,11 @@ function HostQueriesExpandedRow({ hostName }: { hostName: string }) {
       dataIndex: ["queryKey", "ssid"],
       width: 110,
       render: (v: number | undefined) =>
-        v !== undefined ? <Link to={`/session/${v}`}>{v}</Link> : "—",
+        v !== undefined ? (
+          <Link to={`/session/${v}`} onClick={(e) => e.stopPropagation()}>
+            {v}
+          </Link>
+        ) : "—",
     },
     {
       title: "CCNT",
@@ -123,7 +128,11 @@ function HostQueriesExpandedRow({ hostName }: { hostName: string }) {
         const ccnt = row.queryKey?.ccnt;
         if (ccnt === undefined || ccnt < 0) return <Tag>Unset</Tag>;
         if (ssid === undefined) return ccnt;
-        return <Link to={`/query/${ssid}/${ccnt}`}>{ccnt}</Link>;
+        return (
+          <Link to={`/query/${ssid}/${ccnt}`} onClick={(e) => e.stopPropagation()}>
+            {ccnt}
+          </Link>
+        );
       },
     },
     {
@@ -223,6 +232,17 @@ function HostQueriesExpandedRow({ hostName }: { hostName: string }) {
         size="small"
         pagination={false}
         scroll={{ x: 1500 }}
+        onRow={(row) => ({
+          onClick: () => {
+            const ssid = row.queryKey?.ssid;
+            if (ssid === undefined) return;
+            const params = new URLSearchParams({ hostname: hostName, ssid: String(ssid) });
+            const ccnt = row.queryKey?.ccnt;
+            if (ccnt !== undefined && ccnt >= 0) params.set("ccnt", String(ccnt));
+            navigate(`/procfs/pid-proc-info?${params.toString()}`);
+          },
+          style: { cursor: row.queryKey?.ssid !== undefined ? "pointer" : "default" },
+        })}
       />
       <Space style={{ marginTop: 12 }}>
         <Button

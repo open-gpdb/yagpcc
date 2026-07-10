@@ -36,13 +36,40 @@ service GetGPInfo {
     rpc GetGPQueryRunningMatrics (GetGPQueryRunningMatricsReq) returns (GetGPQueryRunningMatricsResponse) {}
     rpc GetGPHostsRunningQueries (GetGPHostsRunningQueriesReq) returns (GetGPHostsRunningQueriesResponse) {}
     rpc GetGPHostRunningQueries (GetGPHostRunningQueriesReq) returns (GetGPHostRunningQueriesResponse) {}
-    rpc GetGpPidProcInfo (GetGpPidProcInfoReq) returns (GpPidProcInfo) {}
+    rpc GetGpPidProcInfo (GetGpPidProcInfoReq) returns (GpPidProcInfoResponse) {}
+}
+
+enum ProcInfoFieldEnum {
+    PROC_INFO_FIELD_UNSPECIFIED = 0;
+    PROC_INFO_FIELD_CPU         = 1;
+    PROC_INFO_FIELD_MEMORY_RSS  = 2;
+    PROC_INFO_FIELD_READ_BYTES  = 3;
+    PROC_INFO_FIELD_WRITE_BYTES = 4;
+    PROC_INFO_FIELD_SPILL_BYTES = 5;
+    PROC_INFO_FIELD_SEGINDEX    = 6;
+    PROC_INFO_FIELD_SLICE_ID    = 7;
+    PROC_INFO_FIELD_PID         = 8;
+    PROC_INFO_FIELD_STATE       = 9;
+}
+
+message ProcInfoFieldWrapper {
+    ProcInfoFieldEnum field = 1;
+    SortOrder order         = 2;
 }
 
 message GetGpPidProcInfoReq {
-    QueryKey query_key  = 1;
-    int32 segindex      = 2;
-    int64 slice_id      = 3;
+    QueryKey query_key           = 1;
+    optional int32 segindex      = 2;
+    optional int64 slice_id      = 3;
+    string hostname              = 4;
+    int64 page_size              = 5;
+    string page_token            = 6;
+    repeated ProcInfoFieldWrapper field = 7;
+}
+
+message GpPidProcInfoResponse {
+    repeated GpPidProcInfo pid_proc_data = 1;
+    string next_page_token               = 2;
 }
 
 message GetGPQueryRunningMatricsReq {

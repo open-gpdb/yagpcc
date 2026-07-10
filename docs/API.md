@@ -37,7 +37,7 @@ Service for querying Greenplum sessions, queries, and aggregate statistics.
 | **GetGPQueryRunningMatrics** | `GetGPQueryRunningMatricsReq` | `GetGPQueryRunningMatricsResponse` | Get procfs runtime metrics matrix (slice × segment) for a running query. |
 | **GetGPHostsRunningQueries** | `GetGPHostsRunningQueriesReq` | `GetGPHostsRunningQueriesResponse` | Get aggregated host-level statistics for all hosts with running queries. |
 | **GetGPHostRunningQueries** | `GetGPHostRunningQueriesReq` | `GetGPHostRunningQueriesResponse` | Get per-query details for a single host. |
-| **GetGpPidProcInfo** | `GetGpPidProcInfoReq` | `GpPidProcInfo` | Get procfs process info for a specific segment/slice of a query. |
+| **GetGpPidProcInfo** | `GetGpPidProcInfoReq` | `GpPidProcInfoResponse` | Get paginated procfs process rows for a query/session filtered by host or segment, optionally by slice. |
 
 ### Request/response types
 
@@ -158,9 +158,15 @@ Service for querying Greenplum sessions, queries, and aggregate statistics.
 | `state` | `string` | Full procfs process state. The UI shows only the first word with the full state in a tooltip. |
 | `is_idle` | `bool` | True when the row represents idle session processes grouped by session ID. |
 
-#### GetGpPidProcInfoReq / GpPidProcInfo
+#### GetGpPidProcInfoReq / GpPidProcInfoResponse
 
-- **GetGpPidProcInfoReq**: `query_key` (`QueryKey`), `segindex` (`int32`), `slice_id` (`int64`).
+- **GetGpPidProcInfoReq**:
+  - `query_key` (`QueryKey`): `ssid` is required; `ccnt` is optional. If only `ssid` is set, all process rows for that session are considered.
+  - `hostname` (`string`) or `segindex` (`optional int32`): at least one must be set. `segindex` is optional so segment 0 can be filtered explicitly.
+  - `slice_id` (`optional int64`): additional optional slice filter.
+  - `page_size` (`int64`), `page_token` (`string`): offset-token pagination, default page size 50.
+  - `field` (`repeated ProcInfoFieldWrapper`): optional sort fields. Default sort is CPU (`proc_stat.utime + proc_stat.stime`) descending.
+- **GpPidProcInfoResponse**: `pid_proc_data` (`repeated GpPidProcInfo`), `next_page_token` (`string`).
 - **GpPidProcInfo** (see "Common types" section below for full field list).
 
 ### Enums used by GetGPInfo
@@ -742,7 +748,8 @@ serialized using `protojson` with camelCase field names and zero-value fields in
 | `GET` | `/api/query/{ssid}/{ccnt}` | Get a single query by SSID and CCNT |
 | `GET` | `/api/query/{ssid}/{ccnt}/running-metrics` | Get procfs runtime metrics matrix cells for a query. Returns `cellMetrics[]` with `sliceId`, `segindex`, and `runtimeMetrics` (`utime`, `stime`, `vmPeak`, `vmRss`, `state`, `procIo`, `procSpill`), plus `skew` and `dataQuality`. Idle cells can be rendered separately using `runtimeMetrics.state == "idle"`. |
 | `GET` | `/api/hosts/running-queries` | Get aggregated host-level statistics for all hosts with running queries. Returns `hosts[]` with `hostName`, `segindex[]`, `activeQueries`, `activeSlices`, `cpuUsage`, `memoryUsage`, `diskUsage`, `spillBytes`, `skew`, `dataQuality`, `avg5`, `diskReads`, `diskWrites`, `totalSessions`. |
-| `GET` | `/api/hosts/{host_name}/running-queries` | Get paginated per-host process/query details. Query params: `page_size` (default 50), `page_token`. Idle session processes are grouped by session ID and returned with `isIdle=true`, unset `queryKey.ccnt`, empty `dbName`/`queryText`, and runtime metrics. |
+| `GET` | `/api/hosts/{host_name}/running-queries` | Get paginated per-host process/query details. Query params: `page_size` (default 50), `page_token`. Idle session processes are grouped by session ID and returned with `isIdle=true`, parsed `queryKey.ccnt` when available, `dbName`/`queryText` from master query metadata when available, and runtime metrics. |
+| `GET` | `/api/procfs/pid-proc-info` | Get paginated procfs process rows for a query/session. Query params: `ssid` (required), `hostname` or `segindex` (at least one required), optional `ccnt`, optional `slice_id`, `page_size` (default 50), `page_token`. Returns `pidProcData[]` and `nextPageToken`. Default sort is CPU descending. |
 | `GET` | `/api/stats/sessions` | Get session state statistics (counts by state) |
 | `GET` | `/api/extensions` | List extensions (optional `database_name` param) |
 | `GET` | `/api/databases` | List available databases |
