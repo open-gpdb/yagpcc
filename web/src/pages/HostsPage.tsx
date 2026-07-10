@@ -126,7 +126,7 @@ function HostQueriesExpandedRow({ hostName }: { hostName: string }) {
       render: (_: unknown, row: HostRunningQueryInfo) => {
         const ssid = row.queryKey?.ssid;
         const ccnt = row.queryKey?.ccnt;
-        if (ccnt === undefined || ccnt < 0) return <Tag>Unset</Tag>;
+        if (ccnt === undefined || ccnt <= 0) return <Tag>Unset</Tag>;
         if (ssid === undefined) return ccnt;
         return (
           <Link to={`/query/${ssid}/${ccnt}`} onClick={(e) => e.stopPropagation()}>
