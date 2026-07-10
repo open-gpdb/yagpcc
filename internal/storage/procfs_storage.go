@@ -1087,7 +1087,7 @@ func matchesProcInfoFilter(key ProcKey, lastProc *ProcStat, filter ProcInfoFilte
 		}
 	}
 
-	if filter.Segindex != nil && int64(key.GpSegmentId) != int64(*filter.Segindex) {
+	if filter.Segindex != nil && key.GpSegmentId != int64(*filter.Segindex) {
 		return false
 	}
 

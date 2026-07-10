@@ -51,16 +51,16 @@ func (s *Server) handleGetPidProcInfo(w http.ResponseWriter, r *http.Request) {
 		Hostname: q.Get("hostname"),
 	}
 	if raw := q.Get("ccnt"); raw != "" {
-		ccnt, err := strconv.ParseInt(raw, 10, 32)
-		if err != nil {
+		ccnt, parseErr := strconv.ParseInt(raw, 10, 32)
+		if parseErr != nil {
 			writeJSONError(w, http.StatusBadRequest, "invalid ccnt")
 			return
 		}
 		req.QueryKey.Ccnt = int32(ccnt)
 	}
 	if raw := q.Get("segindex"); raw != "" {
-		segindex, err := strconv.ParseInt(raw, 10, 32)
-		if err != nil {
+		segindex, parseErr := strconv.ParseInt(raw, 10, 32)
+		if parseErr != nil {
 			writeJSONError(w, http.StatusBadRequest, "invalid segindex")
 			return
 		}
@@ -68,16 +68,16 @@ func (s *Server) handleGetPidProcInfo(w http.ResponseWriter, r *http.Request) {
 		req.Segindex = &value
 	}
 	if raw := q.Get("slice_id"); raw != "" {
-		sliceID, err := strconv.ParseInt(raw, 10, 64)
-		if err != nil {
+		sliceID, parseErr := strconv.ParseInt(raw, 10, 64)
+		if parseErr != nil {
 			writeJSONError(w, http.StatusBadRequest, "invalid slice_id")
 			return
 		}
 		req.SliceId = &sliceID
 	}
 	if raw := q.Get("page_size"); raw != "" {
-		pageSize, err := strconv.ParseInt(raw, 10, 64)
-		if err != nil || pageSize <= 0 {
+		pageSize, parseErr := strconv.ParseInt(raw, 10, 64)
+		if parseErr != nil || pageSize <= 0 {
 			writeJSONError(w, http.StatusBadRequest, "invalid page_size")
 			return
 		}
