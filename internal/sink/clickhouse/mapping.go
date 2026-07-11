@@ -92,6 +92,14 @@ type tableMapping struct {
 	columns []column
 }
 
+// Mapping is the exported alias for a table's JSON→column mapping. It lets
+// callers in other packages (the master ClickHouse writer) hold the *Mapping
+// values returned by SessionsMapping/StatementsMapping/SegmentsMapping.
+type Mapping = tableMapping
+
+// Table returns the destination table name (without the database qualifier).
+func (tm *tableMapping) Table() string { return tm.table }
+
 // ColumnNames returns the full column list, in insert order: the four CDC
 // columns, then the JSON-mapped columns, then _rest. It matches the order in
 // which BuildRow emits values, so callers can build an explicit-column INSERT.
