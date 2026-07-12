@@ -83,6 +83,36 @@ type WriterTarget struct {
 	QueriesFile  string `config:"queries_file" yaml:"queries_file"`
 	SegmentsFile string `config:"segments_file" yaml:"segments_file"`
 	MaxFileSize  int64  `config:"max_file_size" yaml:"max_file_size"`
+
+	// ClickHouse-based writer settings (Type == "clickhouse"). Password may be
+	// left empty here and supplied through the YAGPCC_CH_PASSWORD env var.
+	Addrs    []string            `config:"addrs" yaml:"addrs"`
+	Database string              `config:"database" yaml:"database"`
+	User     string              `config:"user" yaml:"user"`
+	Password string              `config:"password" yaml:"password"`
+	TLS      ClickhouseTLSConfig `config:"tls" yaml:"tls"`
+}
+
+// ClickhouseConfig builds a ClickhouseConfig for a Type=="clickhouse" target,
+// filling connection defaults and applying the password env override. Direct
+// batch inserts run synchronously, so async_insert is disabled.
+func (t *WriterTarget) ClickhouseConfig() ClickhouseConfig {
+	cfg := DefaultClickhouseConfig()
+	cfg.Enabled = true
+	cfg.Addrs = t.Addrs
+	if t.Database != "" {
+		cfg.Database = t.Database
+	}
+	if t.User != "" {
+		cfg.User = t.User
+	}
+	if t.Password != "" {
+		cfg.Password = t.Password
+	}
+	cfg.TLS = t.TLS
+	cfg.AsyncInsert = false
+	cfg.ApplyEnvOverrides()
+	return cfg
 }
 
 // Config contains all yagpcc configuration
@@ -342,6 +372,18 @@ func (cfg *Config) Validate() error {
 	}
 	if fileTarget.MaxFileSize <= 0 {
 		return fmt.Errorf("writers.targets[0].max_file_size must be > 0, got %v", fileTarget.MaxFileSize)
+	}
+	for i := range cfg.Writers.Targets {
+		target := &cfg.Writers.Targets[i]
+		switch target.Type {
+		case "file":
+		case "clickhouse":
+			if target.Enabled && len(target.Addrs) == 0 {
+				return fmt.Errorf("writers.targets[%d]: clickhouse target requires addrs when enabled", i)
+			}
+		default:
+			return fmt.Errorf("writers.targets[%d]: unknown target type %q", i, target.Type)
+		}
 	}
 	if cfg.Role == "master" {
 		if err := cfg.Clickhouse.Validate(); err != nil {

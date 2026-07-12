@@ -277,25 +277,25 @@ func InitMetrics() {
 		WriterProcessedMessages: promauto.NewCounterVec(prometheus.CounterOpts{
 			Name: "writer_processed_messages_total",
 			Help: "Total number of messages successfully processed by writer pipeline",
-		}, []string{"stream"}),
+		}, []string{"stream", "target"}),
 		WriterDroppedMessages: promauto.NewCounterVec(prometheus.CounterOpts{
 			Name: "writer_dropped_messages_total",
 			Help: "Total number of messages dropped by writer pipeline",
-		}, []string{"stream"}),
+		}, []string{"stream", "target"}),
 		WriterDuration: promauto.NewHistogramVec(prometheus.HistogramOpts{
 			Name:    "writer_duration_seconds",
 			Help:    "Duration of writer batch operations",
 			Buckets: prometheus.DefBuckets,
-		}, []string{"stream"}),
+		}, []string{"stream", "target"}),
 		WriterBatchSize: promauto.NewHistogramVec(prometheus.HistogramOpts{
 			Name:    "writer_batch_size",
 			Help:    "Size of batches processed by writer pipeline",
 			Buckets: []float64{1, 5, 10, 25, 50, 100, 250, 500, 1000},
-		}, []string{"stream"}),
+		}, []string{"stream", "target"}),
 		WriterQueuedBatches: promauto.NewGaugeVec(prometheus.GaugeOpts{
 			Name: "writer_queued_batches",
 			Help: "Number of batches currently queued in writer pipeline",
-		}, []string{"stream"}),
+		}, []string{"stream", "target"}),
 	}
 }
 

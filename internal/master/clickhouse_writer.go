@@ -20,15 +20,32 @@ import (
 	"context"
 	"fmt"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/ClickHouse/clickhouse-go/v2/lib/driver"
+	"github.com/prometheus/client_golang/prometheus"
 
 	pbm "github.com/open-gpdb/yagpcc/api/proto/agent_master"
 	"github.com/open-gpdb/yagpcc/internal/gp"
 	"github.com/open-gpdb/yagpcc/internal/sink/clickhouse"
 	"go.uber.org/zap"
 )
+
+var (
+	chMetricsOnce sync.Once
+	chMetricsInst *clickhouse.Metrics
+)
+
+// clickHouseMetrics lazily builds the ClickHouse writer metrics, registering
+// them on the default registry exactly once so repeated wiring does not panic
+// on duplicate collectors.
+func clickHouseMetrics() *clickhouse.Metrics {
+	chMetricsOnce.Do(func() {
+		chMetricsInst = clickhouse.NewMetrics(prometheus.DefaultRegisterer)
+	})
+	return chMetricsInst
+}
 
 // chConn is the slice of clickhouse-go/v2 driver.Conn the writer needs. It is an
 // interface so tests can supply a fake without a real ClickHouse connection;
