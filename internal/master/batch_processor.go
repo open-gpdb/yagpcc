@@ -400,10 +400,8 @@ func processBatch[T any](
 			metrics.YagpccMetrics.WriterDroppedMessages.WithLabelValues(stream).Add(float64(len(batch)))
 		}
 		logger.Warnf("write failed for stream %s, dropping batch of %d messages: %v", stream, len(batch), err)
-	} else {
-		if metrics.YagpccMetrics != nil {
-			metrics.YagpccMetrics.WriterProcessedMessages.WithLabelValues(stream).Add(float64(len(batch)))
-		}
+	} else if metrics.YagpccMetrics != nil {
+		metrics.YagpccMetrics.WriterProcessedMessages.WithLabelValues(stream).Add(float64(len(batch)))
 	}
 
 	if metrics.YagpccMetrics != nil {
