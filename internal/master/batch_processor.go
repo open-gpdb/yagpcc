@@ -21,30 +21,18 @@ import (
 	"time"
 
 	pbm "github.com/open-gpdb/yagpcc/api/proto/agent_master"
+	"github.com/open-gpdb/yagpcc/internal/config"
 	"github.com/open-gpdb/yagpcc/internal/gp"
 	"github.com/open-gpdb/yagpcc/internal/metrics"
 	"go.uber.org/zap"
 )
 
 // BatchProcessorConfig holds configuration for the batch processor.
-type BatchProcessorConfig struct {
-	// BatchInterval is the interval at which batches are collected from the source channel.
-	BatchInterval time.Duration
-
-	// WriteTimeout is the maximum time allowed to write a batch.
-	WriteTimeout time.Duration
-
-	// BatchQueueSize is the capacity of the pipe channel (number of batches).
-	BatchQueueSize int
-}
+type BatchProcessorConfig = config.BatchProcessorConfig
 
 // DefaultBatchProcessorConfig returns the default configuration for batch processors.
 func DefaultBatchProcessorConfig() BatchProcessorConfig {
-	return BatchProcessorConfig{
-		BatchInterval:  time.Second,
-		WriteTimeout:   time.Second,
-		BatchQueueSize: 60,
-	}
+	return config.DefaultBatchProcessorConfig()
 }
 
 // SessionStoreFunc is the function signature for storing a batch of sessions.

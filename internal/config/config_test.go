@@ -76,17 +76,21 @@ func TestValidate_NegativeProcfsRefreshInterval(t *testing.T) {
 
 func TestValidate_WriterConfigDefaults(t *testing.T) {
 	cfg := defaultValidConfig()
-	// Writers config is optional, nil is valid
-	assert.Nil(t, cfg.Writers)
+	require.NotNil(t, cfg.Writers)
+	assert.Equal(t, time.Second, cfg.Writers.BatchInterval)
+	assert.Equal(t, time.Second, cfg.Writers.WriteTimeout)
+	assert.Equal(t, 60, cfg.Writers.BatchQueueSize)
 	require.NoError(t, cfg.Validate())
 }
 
 func TestValidate_WriterConfigWithValues(t *testing.T) {
 	cfg := defaultValidConfig()
 	cfg.Writers = &WriterConfig{
-		BatchInterval:  "1s",
-		WriteTimeout:   "1s",
-		BatchQueueSize: 60,
+		BatchProcessorConfig: BatchProcessorConfig{
+			BatchInterval:  time.Second,
+			WriteTimeout:   time.Second,
+			BatchQueueSize: 60,
+		},
 		Targets: []WriterTarget{
 			{
 				Type:         "file",

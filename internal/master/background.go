@@ -279,21 +279,24 @@ func (bs *BackgroundStorage) launchSegmentPullers(ctx context.Context, nPullers 
 }
 
 func (bs *BackgroundStorage) launchArchiveWriters(ctx context.Context,
-	archConfig config.ArchiverConfigType,
+	writerConfig *config.WriterConfig,
 	queryChan chan *pbm.QueryStatWrite,
 	sessChan chan *gp.SessionDataWrite,
 	segChan chan *pbm.SegmentMetricsWrite,
-	maxFileSize int64,
 ) error {
+	fileTarget := writerConfig.Targets[0]
+	batchConfig := BatchProcessorConfig{
+		BatchInterval:  writerConfig.BatchInterval,
+		WriteTimeout:   writerConfig.WriteTimeout,
+		BatchQueueSize: writerConfig.BatchQueueSize,
+	}
+
 	// Create file writers
-	fileWriters, err := NewFileWriters(bs.l, archConfig.SessionsFile, archConfig.QueriesFile, archConfig.SegmentsFile, maxFileSize)
+	fileWriters, err := NewFileWriters(bs.l, fileTarget.SessionsFile, fileTarget.QueriesFile, fileTarget.SegmentsFile, fileTarget.MaxFileSize)
 	if err != nil {
 		bs.l.Errorf("could not create file writers with error %v", err)
 		return err
 	}
-
-	// Get batch processor config from writers config or use defaults
-	batchConfig := DefaultBatchProcessorConfig()
 
 	// Start batch processors for each stream
 	go RunSessionBatchProcessor(ctx, bs.l, batchConfig, sessChan, fileWriters.StoreSessions)
@@ -871,7 +874,7 @@ func InitBG(
 	)
 	backgroundStorage.launchSegmentPullers(ctxI, cfg.SegmentPullThreads, cfg.SegmentConnectTimeoutSec, cfg.SegmentGetTimeoutSec, int(cfg.MaxMessageSize))
 	backgroundStorage.launchArchivers(ctxI, cfg.MinimumQueryDurationSec, cfg.ArchiverConfig.ArciverProcesses, cfg.ClusterID, archChan, queryChan, segMetricsChan, hostname)
-	err = backgroundStorage.launchArchiveWriters(ctxI, cfg.ArchiverConfig, queryChan, sessChan, segMetricsChan, cfg.ArchiverConfig.MaxFileSize)
+	err = backgroundStorage.launchArchiveWriters(ctxI, cfg.Writers, queryChan, sessChan, segMetricsChan)
 	if err != nil {
 		return err
 	}
