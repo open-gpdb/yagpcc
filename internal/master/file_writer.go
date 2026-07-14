@@ -30,7 +30,7 @@ import (
 	"go.uber.org/zap"
 )
 
-// FileWriter implements ArchiveWriter interface using rotating JSONL files.
+// FileWriters implements ArchiveWriter interface using rotating JSONL files.
 type FileWriters struct {
 	logger        *zap.SugaredLogger
 	sessionWriter io.Writer
