@@ -285,24 +285,21 @@ func (bs *BackgroundStorage) launchArchiveWriters(ctx context.Context,
 	segChan chan *pbm.SegmentMetricsWrite,
 	maxFileSize int64,
 ) error {
-	fileSession, err := NewRotateWriter(archConfig.SessionsFile, maxFileSize)
+	// Create file writers
+	fileWriters, err := NewFileWriters(bs.l, archConfig.SessionsFile, archConfig.QueriesFile, archConfig.SegmentsFile, maxFileSize)
 	if err != nil {
-		bs.l.Errorf("could not create output file %v with error %v", archConfig.SessionsFile, err)
+		bs.l.Errorf("could not create file writers with error %v", err)
 		return err
 	}
-	fileQuery, err := NewRotateWriter(archConfig.QueriesFile, maxFileSize)
-	if err != nil {
-		bs.l.Errorf("could not create output file %v with error %v", archConfig.QueriesFile, err)
-		return err
-	}
-	fileSegments, err := NewRotateWriter(archConfig.SegmentsFile, maxFileSize)
-	if err != nil {
-		bs.l.Errorf("could not create output file %v with error %v", archConfig.SegmentsFile, err)
-		return err
-	}
-	go StoreQuery(ctx, bs.l, queryChan, fileQuery)
-	go StoreSessions(ctx, bs.l, sessChan, fileSession)
-	go StoreSegmensMetrics(ctx, bs.l, segChan, fileSegments)
+
+	// Get batch processor config from writers config or use defaults
+	batchConfig := DefaultBatchProcessorConfig()
+
+	// Start batch processors for each stream
+	go RunSessionBatchProcessor(ctx, bs.l, batchConfig, sessChan, fileWriters.StoreSessions)
+	go RunQueryBatchProcessor(ctx, bs.l, batchConfig, queryChan, fileWriters.StoreQuery)
+	go RunSegmentBatchProcessor(ctx, bs.l, batchConfig, segChan, fileWriters.StoreSegmensMetrics)
+
 	return nil
 }
 

@@ -34,6 +34,8 @@ type SegmentDescription struct {
 
 type SegmentList []SegmentDescription
 
+// ArchiverConfigType holds the legacy archiver configuration.
+// Kept for backward compatibility.
 type ArchiverConfigType struct {
 	ArciverProcesses   uint32 `config:"archiver_processes" yaml:"archiver_processes"`
 	ArchiverQueueSize  uint32 `config:"archiver_queue_size" yaml:"archiver_queue_size"`
@@ -46,6 +48,36 @@ type ArchiverConfigType struct {
 	PlanDetailFile     string `config:"plan_detail_file" yaml:"plan_detail_file"`
 	PlanDetaiQueueSize uint32 `config:"plan_detail_queue_size" yaml:"plan_detail_queue_size"`
 	MaxFileSize        int64  `config:"max_file_size" yaml:"max_file_size"`
+}
+
+// WriterConfig holds configuration for the writer pipeline.
+type WriterConfig struct {
+	// BatchInterval is the interval at which batches are collected.
+	BatchInterval string `config:"batch_interval" yaml:"batch_interval"`
+
+	// WriteTimeout is the maximum time allowed to write a batch.
+	WriteTimeout string `config:"write_timeout" yaml:"write_timeout"`
+
+	// BatchQueueSize is the capacity of the pipe channel (number of batches).
+	BatchQueueSize int `config:"batch_queue_size" yaml:"batch_queue_size"`
+
+	// Targets is the list of writer targets.
+	Targets []WriterTarget `config:"targets" yaml:"targets"`
+}
+
+// WriterTarget describes a single writer target.
+type WriterTarget struct {
+	// Type is the writer type (e.g., "file", "clickhouse", "greenplum").
+	Type string `config:"type" yaml:"type"`
+
+	// Enabled indicates whether this target is enabled.
+	Enabled bool `config:"enabled" yaml:"enabled"`
+
+	// File-based writer settings
+	SessionsFile string `config:"sessions_file" yaml:"sessions_file"`
+	QueriesFile  string `config:"queries_file" yaml:"queries_file"`
+	SegmentsFile string `config:"segments_file" yaml:"segments_file"`
+	MaxFileSize  int64  `config:"max_file_size" yaml:"max_file_size"`
 }
 
 // Config contains all yagpcc configuration
@@ -86,6 +118,7 @@ type Config struct {
 	StatActivityDurabilitySec  float64            `config:"stat_activity_durability_sec" yaml:"stat_activity_durability_sec"`
 	ExtensionsCacheTTL         float64            `config:"extensions_cache_ttl_sec" yaml:"extensions_cache_ttl_sec"`
 	ArchiverConfig             ArchiverConfigType `json:"arch_config" yaml:"arch_config"`
+	Writers                    *WriterConfig      `json:"writers" yaml:"writers"`
 	ClusterID                  string             `config:"cluster_id" yaml:"cluster_id"`
 	ConnectorEnabled           bool               `config:"connector_enabled" yaml:"connector_enabled"`
 	MaxMessageSize             int64              `config:"max_message_size" yaml:"max_message_size"`
