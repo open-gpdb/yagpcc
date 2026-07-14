@@ -37,7 +37,7 @@ func TestFanOut_DeliversToAllTargets(t *testing.T) {
 	source := make(chan int, 10)
 	a := make(chan int, 10)
 	b := make(chan int, 10)
-	go fanOut(ctx, source, []chan int{a, b}, "test", []string{"a", "b"})
+	go fanOut(ctx, source, []chan int{a, b}, "test", []string{"a", "b"}, nil)
 
 	for i := 0; i < 5; i++ {
 		source <- i
@@ -67,7 +67,7 @@ func TestFanOut_SlowTargetDoesNotBlockFast(t *testing.T) {
 	fast := make(chan int, 100)
 	slow := make(chan int, 1) // tiny buffer: fills up and drops the rest
 
-	go fanOut(ctx, source, []chan int{fast, slow}, "test", []string{"fast", "slow"})
+	go fanOut(ctx, source, []chan int{fast, slow}, "test", []string{"fast", "slow"}, nil)
 
 	const n = 50
 	for i := 0; i < n; i++ {

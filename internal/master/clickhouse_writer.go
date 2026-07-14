@@ -89,9 +89,6 @@ func NewClickHouseWriters(logger *zap.SugaredLogger, conn chConn, database strin
 func (w *ClickHouseWriters) StoreSessions(ctx context.Context, sessions []*gp.SessionDataWrite) error {
 	jsons := make([][]byte, 0, len(sessions))
 	for _, val := range sessions {
-		val.GpStatInfo.TmID = int(gp.DiscoveredTmID)
-		val.RunningQuery.Tmid = int32(gp.DiscoveredTmID)
-
 		js, err := val.ToJSON()
 		if err != nil {
 			w.logger.Errorf("fail to convert sessions data %v with error %v", val, err)
@@ -107,8 +104,6 @@ func (w *ClickHouseWriters) StoreSessions(ctx context.Context, sessions []*gp.Se
 func (w *ClickHouseWriters) StoreQuery(ctx context.Context, queries []*pbm.QueryStatWrite) error {
 	jsons := make([][]byte, 0, len(queries))
 	for _, val := range queries {
-		val.QueryKey.Tmid = int32(gp.DiscoveredTmID)
-
 		serializable := &QueryStatWriteSerializable{v: val}
 		js, err := serializable.ToJSON()
 		if err != nil {
@@ -126,8 +121,6 @@ func (w *ClickHouseWriters) StoreQuery(ctx context.Context, queries []*pbm.Query
 func (w *ClickHouseWriters) StoreSegmensMetrics(ctx context.Context, metrics []*pbm.SegmentMetricsWrite) error {
 	jsons := make([][]byte, 0, len(metrics))
 	for _, val := range metrics {
-		val.QueryKey.Tmid = int32(gp.DiscoveredTmID)
-
 		serializable := &SegmentMetricsWriteSerializable{v: val}
 		js, err := serializable.ToJSON()
 		if err != nil {

@@ -19,15 +19,24 @@ package master
 import (
 	"context"
 
+	pbm "github.com/open-gpdb/yagpcc/api/proto/agent_master"
+	"github.com/open-gpdb/yagpcc/internal/gp"
 	"github.com/open-gpdb/yagpcc/internal/metrics"
 )
 
 // fanOut reads messages from source and forwards each one to every target
-// channel. Sends are non-blocking: when a target channel is full the message is
-// dropped for that target alone (accounted as a WriterDroppedMessages with the
-// target's label), so a slow or stalled target cannot back up the others.
-// names[i] labels targets[i] and must have the same length as targets.
-func fanOut[T any](ctx context.Context, source <-chan T, targets []chan T, stream string, names []string) {
+// channel. stamp, when non-nil, is applied once per message before it is
+// distributed; because it runs in this single goroutine and downstream writers
+// only read the message, per-message normalisation stays race-free even when
+// the same pointer is teed to several targets.
+//
+// With a single target the send blocks, so the source keeps its original
+// backpressure. With several targets the sends are non-blocking: a full target
+// channel drops the message for that target alone (accounted as a
+// WriterDroppedMessages with the target's label), so a slow or stalled target
+// cannot back up the others. names[i] labels targets[i] and must have the same
+// length as targets.
+func fanOut[T any](ctx context.Context, source <-chan T, targets []chan T, stream string, names []string, stamp func(T)) {
 	for {
 		select {
 		case <-ctx.Done():
@@ -35,6 +44,17 @@ func fanOut[T any](ctx context.Context, source <-chan T, targets []chan T, strea
 		case msg, ok := <-source:
 			if !ok {
 				return
+			}
+			if stamp != nil {
+				stamp(msg)
+			}
+			if len(targets) == 1 {
+				select {
+				case targets[0] <- msg:
+				case <-ctx.Done():
+					return
+				}
+				continue
 			}
 			for i, tc := range targets {
 				select {
@@ -46,5 +66,33 @@ func fanOut[T any](ctx context.Context, source <-chan T, targets []chan T, strea
 				}
 			}
 		}
+	}
+}
+
+// DiscoveredTmID normalisation. The transport master fills TmID from the
+// discovered value on every archived message; doing it here — once, before the
+// message fans out — keeps the writers read-only so a teed pointer is never
+// mutated concurrently.
+func stampSessionTmID(s *gp.SessionDataWrite) {
+	if s == nil {
+		return
+	}
+	if s.GpStatInfo != nil {
+		s.GpStatInfo.TmID = int(gp.DiscoveredTmID)
+	}
+	if s.RunningQuery != nil {
+		s.RunningQuery.Tmid = int32(gp.DiscoveredTmID)
+	}
+}
+
+func stampQueryTmID(q *pbm.QueryStatWrite) {
+	if q != nil && q.QueryKey != nil {
+		q.QueryKey.Tmid = int32(gp.DiscoveredTmID)
+	}
+}
+
+func stampSegmentTmID(m *pbm.SegmentMetricsWrite) {
+	if m != nil && m.QueryKey != nil {
+		m.QueryKey.Tmid = int32(gp.DiscoveredTmID)
 	}
 }

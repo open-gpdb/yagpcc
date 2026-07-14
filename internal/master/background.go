@@ -304,19 +304,13 @@ func (bs *BackgroundStorage) launchArchiveWriters(ctx context.Context,
 		return err
 	}
 
-	// A single enabled target is wired straight to the source channels, so the
-	// common file-only deployment behaves exactly as before with no extra
-	// fan-out buffer or drop point.
-	if len(writers) == 1 {
-		bs.startBatchProcessors(ctx, batchConfig, writers[0], queryChan, sessChan, segChan)
-		return nil
-	}
-
-	// Multiple enabled targets: tee every source stream onto independent
-	// per-target channels, each drained by its own batch-processor pipeline
-	// (independent bounded queue / write timeout / drops). A slow target only
-	// backs up its own channel; the fan-out drops for it and keeps the others
-	// running.
+	// Every source stream is teed onto independent per-target channels, each
+	// drained by its own batch-processor pipeline (independent bounded queue /
+	// write timeout / drops). The fan-out stamps the discovered TmID once, before
+	// distribution, so the writers stay read-only and a teed pointer is never
+	// mutated by two pipelines at once. With a single enabled target the fan-out
+	// send blocks, preserving the source backpressure of the file-only path; with
+	// several, a slow target only backs up its own channel.
 	names := make([]string, len(writers))
 	sessTargets := make([]chan *gp.SessionDataWrite, len(writers))
 	queryTargets := make([]chan *pbm.QueryStatWrite, len(writers))
@@ -328,9 +322,9 @@ func (bs *BackgroundStorage) launchArchiveWriters(ctx context.Context,
 		segTargets[i] = make(chan *pbm.SegmentMetricsWrite, fanoutBufferSize(cap(segChan)))
 		bs.startBatchProcessors(ctx, batchConfig, w, queryTargets[i], sessTargets[i], segTargets[i])
 	}
-	go fanOut(ctx, sessChan, sessTargets, "sessions", names)
-	go fanOut(ctx, queryChan, queryTargets, "queries", names)
-	go fanOut(ctx, segChan, segTargets, "segments", names)
+	go fanOut(ctx, sessChan, sessTargets, "sessions", names, stampSessionTmID)
+	go fanOut(ctx, queryChan, queryTargets, "queries", names, stampQueryTmID)
+	go fanOut(ctx, segChan, segTargets, "segments", names, stampSegmentTmID)
 
 	return nil
 }

@@ -69,9 +69,6 @@ func (fw *FileWriters) StoreSessions(ctx context.Context, sessions []*gp.Session
 
 	writeJS := make([]byte, 0)
 	for _, val := range sessions {
-		val.GpStatInfo.TmID = int(gp.DiscoveredTmID)
-		val.RunningQuery.Tmid = int32(gp.DiscoveredTmID)
-
 		myJS, err := val.ToJSON()
 		if err != nil {
 			fw.logger.Errorf("fail to convert sessions data %v with error %v", val, err)
@@ -96,8 +93,6 @@ func (fw *FileWriters) StoreQuery(ctx context.Context, queries []*pbm.QueryStatW
 
 	writeJS := make([]byte, 0)
 	for _, val := range queries {
-		val.QueryKey.Tmid = int32(gp.DiscoveredTmID)
-
 		serializable := &QueryStatWriteSerializable{v: val}
 		myJS, err := serializable.ToJSON()
 		if err != nil {
@@ -124,8 +119,6 @@ func (fw *FileWriters) StoreSegmensMetrics(ctx context.Context, metrics []*pbm.S
 
 	writeJS := make([]byte, 0)
 	for _, val := range metrics {
-		val.QueryKey.Tmid = int32(gp.DiscoveredTmID)
-
 		serializable := &SegmentMetricsWriteSerializable{v: val}
 		myJS, err := serializable.ToJSON()
 		if err != nil {
