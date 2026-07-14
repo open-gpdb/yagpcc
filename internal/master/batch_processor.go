@@ -140,11 +140,7 @@ func collectSessionBatches(
 			}
 		}
 
-		select {
-		case <-ctx.Done():
-			return
-		case <-ticker.C:
-		}
+		// BatchInterval is enforced inside collectSessionBatch (it consumes ticker.C).
 	}
 }
 
