@@ -8,6 +8,7 @@
 - Aggregates it across Master and Segment hosts.
 - Exposes it over gRPC for real-time and historical use.
 - Provides an HTTP CSV export API mirroring the gRPC GetGPInfo service for easy scripting and spreadsheet integration.
+- Optionally archives telemetry (sessions, statements, segments) to **ClickHouse** via native batch inserts, running as a fan-out target alongside the file archive writer.
 - **Web UI** — a browser-based Command Center for monitoring sessions, queries, cluster health, and managing resources (terminate sessions/queries, move queries between resource groups).
 
 ## Documentation
@@ -19,6 +20,7 @@
 | [API description](docs/API.md) | gRPC API reference (GetGPInfo, ActionService), CSV HTTP API, messages, and metrics. |
 | [Per-process resource statistics](docs/proc-stats-flow.md) | Procfs (`GetPidProcStat`) data flow per running query and proposed master-only 5/15/30-minute top-style averages (per-session and cluster-wide rollup). |
 | [**Performance tuning**](docs/performance-tuning.md) | Memory limits (`GOMEMLIMIT`), config knobs (procfs, segment pull, stored queries, aggregation), Prometheus metrics reference, and pprof profiling guide. |
+| [Historical stats flow](docs/historical-stats-flow.md) | Archive writer pipeline: file and ClickHouse fan-out targets, `writers.targets` config, and the ClickHouse schema/DDL. |
 
 ## Building
 
@@ -117,6 +119,21 @@ ui_port: 1441
 ```
 
 The UI is disabled by default (`ui_port: 0`). When enabled, the web UI is available at `http://[::1]:1441/`.
+
+### ClickHouse archiving
+
+The master can archive telemetry to ClickHouse in addition to (or alongside) the file writer. Add a `clickhouse` entry to `writers.targets` and the top-level `clickhouse:` block for schema management. The ClickHouse password may be supplied out of the config file via the `YAGPCC_CH_PASSWORD` environment variable. See [Historical stats flow](docs/historical-stats-flow.md) for a full example and the schema layout.
+
+The binary exposes schema-management subcommands (they exit after running, and are intended for operator scripts/CI):
+
+| Flag | Effect |
+|------|--------|
+| `--dump-schema` | Print the cumulative ClickHouse DDL to stdout and exit (no connection required). Add `--replicated` for the clustered `ReplicatedReplacingMergeTree` + `ON CLUSTER` + `Distributed` variant. |
+| `--dump-migration --from N --to M` | Print the SQL to migrate the schema between versions and exit (no connection required). |
+| `--migrate-only` | Load the config, connect to ClickHouse, apply pending migrations, and exit. |
+| `--verify-schema` | Load the config, connect to ClickHouse, verify the schema version, and exit. |
+
+Exit codes: `0` on success, `2` on failure. The `--migrate-only`/`--verify-schema` commands always render the standalone (non-clustered) DDL; the clustered variant is bootstrapped out of band.
 
 ## Running
 

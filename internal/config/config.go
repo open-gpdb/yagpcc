@@ -322,6 +322,10 @@ func ReadFromFile(configFile string) (*Config, error) {
 		return nil, err
 	}
 	config.normalizeWriters()
+	// Apply the password env override before validating so a deployment that
+	// keeps the ClickHouse secret out of the YAML (YAGPCC_CH_PASSWORD) does not
+	// trip the "password is required when enabled" check at startup.
+	config.Clickhouse.ApplyEnvOverrides()
 	err = config.Validate()
 	if err != nil {
 		return nil, err

@@ -18,6 +18,7 @@ package master
 
 import (
 	"context"
+	"sync/atomic"
 
 	pbm "github.com/open-gpdb/yagpcc/api/proto/agent_master"
 	"github.com/open-gpdb/yagpcc/internal/gp"
@@ -77,22 +78,23 @@ func stampSessionTmID(s *gp.SessionDataWrite) {
 	if s == nil {
 		return
 	}
+	tmID := atomic.LoadInt64(&gp.DiscoveredTmID)
 	if s.GpStatInfo != nil {
-		s.GpStatInfo.TmID = int(gp.DiscoveredTmID)
+		s.GpStatInfo.TmID = int(tmID)
 	}
 	if s.RunningQuery != nil {
-		s.RunningQuery.Tmid = int32(gp.DiscoveredTmID)
+		s.RunningQuery.Tmid = int32(tmID)
 	}
 }
 
 func stampQueryTmID(q *pbm.QueryStatWrite) {
 	if q != nil && q.QueryKey != nil {
-		q.QueryKey.Tmid = int32(gp.DiscoveredTmID)
+		q.QueryKey.Tmid = int32(atomic.LoadInt64(&gp.DiscoveredTmID))
 	}
 }
 
 func stampSegmentTmID(m *pbm.SegmentMetricsWrite) {
 	if m != nil && m.QueryKey != nil {
-		m.QueryKey.Tmid = int32(gp.DiscoveredTmID)
+		m.QueryKey.Tmid = int32(atomic.LoadInt64(&gp.DiscoveredTmID))
 	}
 }
