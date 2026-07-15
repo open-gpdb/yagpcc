@@ -34,6 +34,8 @@ type SegmentDescription struct {
 
 type SegmentList []SegmentDescription
 
+// ArchiverConfigType holds the legacy archiver configuration.
+// Kept for backward compatibility.
 type ArchiverConfigType struct {
 	ArciverProcesses   uint32 `config:"archiver_processes" yaml:"archiver_processes"`
 	ArchiverQueueSize  uint32 `config:"archiver_queue_size" yaml:"archiver_queue_size"`
@@ -46,6 +48,41 @@ type ArchiverConfigType struct {
 	PlanDetailFile     string `config:"plan_detail_file" yaml:"plan_detail_file"`
 	PlanDetaiQueueSize uint32 `config:"plan_detail_queue_size" yaml:"plan_detail_queue_size"`
 	MaxFileSize        int64  `config:"max_file_size" yaml:"max_file_size"`
+}
+
+// BatchProcessorConfig holds configuration for archive writer batching.
+type BatchProcessorConfig struct {
+	// BatchInterval is the interval at which batches are collected.
+	BatchInterval time.Duration `config:"batch_interval" yaml:"batch_interval"`
+
+	// WriteTimeout is the maximum time allowed to write a batch.
+	WriteTimeout time.Duration `config:"write_timeout" yaml:"write_timeout"`
+
+	// BatchQueueSize is the capacity of the pipe channel (number of batches).
+	BatchQueueSize int `config:"batch_queue_size" yaml:"batch_queue_size"`
+}
+
+// WriterConfig holds configuration for the writer pipeline.
+type WriterConfig struct {
+	BatchProcessorConfig
+
+	// Targets is the list of writer targets.
+	Targets []WriterTarget `config:"targets" yaml:"targets"`
+}
+
+// WriterTarget describes a single writer target.
+type WriterTarget struct {
+	// Type is the writer type (e.g., "file", "clickhouse", "greenplum").
+	Type string `config:"type" yaml:"type"`
+
+	// Enabled indicates whether this target is enabled.
+	Enabled bool `config:"enabled" yaml:"enabled"`
+
+	// File-based writer settings
+	SessionsFile string `config:"sessions_file" yaml:"sessions_file"`
+	QueriesFile  string `config:"queries_file" yaml:"queries_file"`
+	SegmentsFile string `config:"segments_file" yaml:"segments_file"`
+	MaxFileSize  int64  `config:"max_file_size" yaml:"max_file_size"`
 }
 
 // Config contains all yagpcc configuration
@@ -86,6 +123,7 @@ type Config struct {
 	StatActivityDurabilitySec  float64            `config:"stat_activity_durability_sec" yaml:"stat_activity_durability_sec"`
 	ExtensionsCacheTTL         float64            `config:"extensions_cache_ttl_sec" yaml:"extensions_cache_ttl_sec"`
 	ArchiverConfig             ArchiverConfigType `json:"arch_config" yaml:"arch_config"`
+	Writers                    *WriterConfig      `json:"writers" yaml:"writers"`
 	ClusterID                  string             `config:"cluster_id" yaml:"cluster_id"`
 	ConnectorEnabled           bool               `config:"connector_enabled" yaml:"connector_enabled"`
 	MaxMessageSize             int64              `config:"max_message_size" yaml:"max_message_size"`
@@ -111,6 +149,78 @@ func DefaultArchiverConfig() ArchiverConfigType {
 	}
 }
 
+func DefaultBatchProcessorConfig() BatchProcessorConfig {
+	return BatchProcessorConfig{
+		BatchInterval:  time.Second,
+		WriteTimeout:   time.Second,
+		BatchQueueSize: 60,
+	}
+}
+
+func DefaultWriterConfig() *WriterConfig {
+	return &WriterConfig{
+		BatchProcessorConfig: DefaultBatchProcessorConfig(),
+		Targets: []WriterTarget{
+			{
+				Type:    "file",
+				Enabled: true,
+			},
+		},
+	}
+}
+
+func (cfg *Config) normalizeWriters() {
+	if cfg.Writers == nil {
+		cfg.Writers = DefaultWriterConfig()
+	}
+	if len(cfg.Writers.Targets) == 0 {
+		cfg.Writers.Targets = []WriterTarget{{Type: "file", Enabled: true}}
+	}
+
+	fileTargetIndex := -1
+	for i := range cfg.Writers.Targets {
+		target := &cfg.Writers.Targets[i]
+		if target.Type == "" {
+			target.Type = "file"
+		}
+		if target.Type != "file" {
+			continue
+		}
+		if !target.Enabled {
+			target.Enabled = true
+		}
+		if target.SessionsFile == "" {
+			target.SessionsFile = cfg.ArchiverConfig.SessionsFile
+		}
+		if target.QueriesFile == "" {
+			target.QueriesFile = cfg.ArchiverConfig.QueriesFile
+		}
+		if target.SegmentsFile == "" {
+			target.SegmentsFile = cfg.ArchiverConfig.SegmentsFile
+		}
+		if target.MaxFileSize == 0 {
+			target.MaxFileSize = cfg.ArchiverConfig.MaxFileSize
+		}
+		if fileTargetIndex == -1 {
+			fileTargetIndex = i
+		}
+	}
+
+	if fileTargetIndex == -1 {
+		cfg.Writers.Targets = append([]WriterTarget{{
+			Type:         "file",
+			Enabled:      true,
+			SessionsFile: cfg.ArchiverConfig.SessionsFile,
+			QueriesFile:  cfg.ArchiverConfig.QueriesFile,
+			SegmentsFile: cfg.ArchiverConfig.SegmentsFile,
+			MaxFileSize:  cfg.ArchiverConfig.MaxFileSize,
+		}}, cfg.Writers.Targets...)
+		return
+	}
+
+	cfg.Writers.Targets[0], cfg.Writers.Targets[fileTargetIndex] = cfg.Writers.Targets[fileTargetIndex], cfg.Writers.Targets[0]
+}
+
 // DefaultConfig returns default configuration for Agent
 func DefaultConfig() (*Config, error) {
 	masterConnection := PGConfig{
@@ -118,6 +228,7 @@ func DefaultConfig() (*Config, error) {
 		DB:    "postgres",
 		User:  "gpadmin",
 	}
+	archiverConfig := DefaultArchiverConfig()
 	config := Config{
 		App:                        DefaultBaseConfig(),
 		SocketFile:                 "/tmp/yagpcc_agent.sock",
@@ -151,13 +262,15 @@ func DefaultConfig() (*Config, error) {
 		ConfigCacheDurabilitySec:   60,
 		StatActivityDurabilitySec:  1,
 		ExtensionsCacheTTL:         900, // 15 minutes
-		ArchiverConfig:             DefaultArchiverConfig(),
+		ArchiverConfig:             archiverConfig,
+		Writers:                    DefaultWriterConfig(),
 		ClusterID:                  "unknown",
 		ConnectorEnabled:           false,
 		MaxMessageSize:             12 * 1024 * 1024,
 		MaxOuterMessageSize:        4 * 1024 * 1024,
 		MaximumStoredQueries:       50 * 1000,
 	}
+	config.normalizeWriters()
 	return &config, nil
 }
 
@@ -176,6 +289,7 @@ func ReadFromFile(configFile string) (*Config, error) {
 		err = fmt.Errorf("failed to load config from %s: %s", configFile, err.Error())
 		return nil, err
 	}
+	config.normalizeWriters()
 	err = config.Validate()
 	if err != nil {
 		return nil, err
@@ -195,6 +309,37 @@ func (cfg *Config) Validate() error {
 	}
 	if cfg.SessionSendMetricInterval <= 0 {
 		return fmt.Errorf("session_send_metric_interval must be > 0, got %v", cfg.SessionSendMetricInterval)
+	}
+	if cfg.Writers == nil {
+		return fmt.Errorf("writers config must be initialized")
+	}
+	if cfg.Writers.BatchInterval <= 0 {
+		return fmt.Errorf("writers.batch_interval must be > 0, got %v", cfg.Writers.BatchInterval)
+	}
+	if cfg.Writers.WriteTimeout <= 0 {
+		return fmt.Errorf("writers.write_timeout must be > 0, got %v", cfg.Writers.WriteTimeout)
+	}
+	if cfg.Writers.BatchQueueSize <= 0 {
+		return fmt.Errorf("writers.batch_queue_size must be > 0, got %v", cfg.Writers.BatchQueueSize)
+	}
+	if len(cfg.Writers.Targets) == 0 {
+		return fmt.Errorf("writers.targets must contain at least one target")
+	}
+	fileTarget := cfg.Writers.Targets[0]
+	if fileTarget.Type != "file" || !fileTarget.Enabled {
+		return fmt.Errorf("writers.targets must start with an enabled file target")
+	}
+	if fileTarget.SessionsFile == "" {
+		return fmt.Errorf("writers.targets[0].sessions_file must not be empty")
+	}
+	if fileTarget.QueriesFile == "" {
+		return fmt.Errorf("writers.targets[0].queries_file must not be empty")
+	}
+	if fileTarget.SegmentsFile == "" {
+		return fmt.Errorf("writers.targets[0].segments_file must not be empty")
+	}
+	if fileTarget.MaxFileSize <= 0 {
+		return fmt.Errorf("writers.targets[0].max_file_size must be > 0, got %v", fileTarget.MaxFileSize)
 	}
 	return nil
 }

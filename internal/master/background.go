@@ -279,30 +279,30 @@ func (bs *BackgroundStorage) launchSegmentPullers(ctx context.Context, nPullers 
 }
 
 func (bs *BackgroundStorage) launchArchiveWriters(ctx context.Context,
-	archConfig config.ArchiverConfigType,
+	writerConfig *config.WriterConfig,
 	queryChan chan *pbm.QueryStatWrite,
 	sessChan chan *gp.SessionDataWrite,
 	segChan chan *pbm.SegmentMetricsWrite,
-	maxFileSize int64,
 ) error {
-	fileSession, err := NewRotateWriter(archConfig.SessionsFile, maxFileSize)
+	fileTarget := writerConfig.Targets[0]
+	batchConfig := BatchProcessorConfig{
+		BatchInterval:  writerConfig.BatchInterval,
+		WriteTimeout:   writerConfig.WriteTimeout,
+		BatchQueueSize: writerConfig.BatchQueueSize,
+	}
+
+	// Create file writers
+	fileWriters, err := NewFileWriters(bs.l, fileTarget.SessionsFile, fileTarget.QueriesFile, fileTarget.SegmentsFile, fileTarget.MaxFileSize)
 	if err != nil {
-		bs.l.Errorf("could not create output file %v with error %v", archConfig.SessionsFile, err)
+		bs.l.Errorf("could not create file writers with error %v", err)
 		return err
 	}
-	fileQuery, err := NewRotateWriter(archConfig.QueriesFile, maxFileSize)
-	if err != nil {
-		bs.l.Errorf("could not create output file %v with error %v", archConfig.QueriesFile, err)
-		return err
-	}
-	fileSegments, err := NewRotateWriter(archConfig.SegmentsFile, maxFileSize)
-	if err != nil {
-		bs.l.Errorf("could not create output file %v with error %v", archConfig.SegmentsFile, err)
-		return err
-	}
-	go StoreQuery(ctx, bs.l, queryChan, fileQuery)
-	go StoreSessions(ctx, bs.l, sessChan, fileSession)
-	go StoreSegmensMetrics(ctx, bs.l, segChan, fileSegments)
+
+	// Start batch processors for each stream
+	go RunSessionBatchProcessor(ctx, bs.l, batchConfig, sessChan, fileWriters.StoreSessions)
+	go RunQueryBatchProcessor(ctx, bs.l, batchConfig, queryChan, fileWriters.StoreQuery)
+	go RunSegmentBatchProcessor(ctx, bs.l, batchConfig, segChan, fileWriters.StoreSegmensMetrics)
+
 	return nil
 }
 
@@ -874,7 +874,7 @@ func InitBG(
 	)
 	backgroundStorage.launchSegmentPullers(ctxI, cfg.SegmentPullThreads, cfg.SegmentConnectTimeoutSec, cfg.SegmentGetTimeoutSec, int(cfg.MaxMessageSize))
 	backgroundStorage.launchArchivers(ctxI, cfg.MinimumQueryDurationSec, cfg.ArchiverConfig.ArciverProcesses, cfg.ClusterID, archChan, queryChan, segMetricsChan, hostname)
-	err = backgroundStorage.launchArchiveWriters(ctxI, cfg.ArchiverConfig, queryChan, sessChan, segMetricsChan, cfg.ArchiverConfig.MaxFileSize)
+	err = backgroundStorage.launchArchiveWriters(ctxI, cfg.Writers, queryChan, sessChan, segMetricsChan)
 	if err != nil {
 		return err
 	}

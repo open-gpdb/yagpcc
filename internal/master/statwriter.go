@@ -19,124 +19,36 @@ package master
 import (
 	"context"
 	"io"
-	"os"
-	"sync"
 	"time"
-
-	"google.golang.org/protobuf/encoding/protojson"
 
 	pbm "github.com/open-gpdb/yagpcc/api/proto/agent_master"
 	"github.com/open-gpdb/yagpcc/internal/gp"
-	"github.com/open-gpdb/yagpcc/internal/interfaces"
 	"go.uber.org/zap"
 )
 
-type (
-	SerializableChan chan interfaces.DataSerialization
+// BatchSize is the number of items to collect before flushing a batch.
+const BatchSize = 1000
 
-	SessionChanRead     <-chan *gp.SessionDataWrite
-	QueryStatChanRead   <-chan *pbm.QueryStatWrite
-	SegmentStatChanRead <-chan *pbm.SegmentMetricsWrite
+// batchTimeout is the maximum time to wait for a batch before flushing.
+const batchTimeout = time.Second * 1 / 2
 
-	SessionChanWrite     chan<- *gp.SessionDataWrite
-	QueryStatChanWrite   chan<- *pbm.QueryStatWrite
-	SegmentStatChanWrite chan<- *pbm.SegmentMetricsWrite
-)
+// SessionChanRead is a read-only channel for session data.
+type SessionChanRead <-chan *gp.SessionDataWrite
 
-const (
-	BatchSize    = 1000
-	batchTimeout = time.Second * 1 / 2
-)
+// QueryStatChanRead is a read-only channel for query statistics.
+type QueryStatChanRead <-chan *pbm.QueryStatWrite
 
-type RotateWriter struct {
-	lock     sync.Mutex
-	filename string
-	maxSize  int64
-	fp       *os.File
-	counter  int
-}
+// SegmentStatChanRead is a read-only channel for segment metrics.
+type SegmentStatChanRead <-chan *pbm.SegmentMetricsWrite
 
-type QueryStatWriteSerializable struct {
-	v *pbm.QueryStatWrite
-}
+// SessionChanWrite is a write-only channel for session data.
+type SessionChanWrite chan<- *gp.SessionDataWrite
 
-type SegmentMetricsWriteSerializable struct {
-	v *pbm.SegmentMetricsWrite
-}
+// QueryStatChanWrite is a write-only channel for query statistics.
+type QueryStatChanWrite chan<- *pbm.QueryStatWrite
 
-func (p *QueryStatWriteSerializable) ToJSON() ([]byte, error) {
-	marshaler := protojson.MarshalOptions{
-		EmitUnpopulated: true,
-	}
-	return marshaler.Marshal(p.v)
-}
-
-func (p *SegmentMetricsWriteSerializable) ToJSON() ([]byte, error) {
-	marshaler := protojson.MarshalOptions{
-		EmitUnpopulated: true,
-	}
-	return marshaler.Marshal(p.v)
-}
-
-// Make a new RotateWriter. Return nil if error occurs during setup.
-func NewRotateWriter(filename string, maxSize int64) (*RotateWriter, error) {
-	var err error
-	w := &RotateWriter{filename: filename, maxSize: maxSize, counter: 0}
-
-	w.fp, err = os.OpenFile(w.filename, os.O_RDWR|os.O_CREATE|os.O_APPEND, 0666)
-	if err != nil {
-		return nil, err
-	}
-	return w, nil
-}
-
-// Write satisfies the io.Writer interface.
-func (w *RotateWriter) Write(output []byte) (int, error) {
-	w.lock.Lock()
-	defer w.lock.Unlock()
-	if w.counter%10 == 0 || w.fp == nil {
-		err := w.Rotate()
-		if err != nil {
-			return 0, err
-		}
-	}
-	w.counter += 1
-	cnt, err := w.fp.Write(output)
-	if err == nil {
-		// fsync data each time
-		err = w.fp.Sync()
-	}
-	return cnt, err
-}
-
-// Perform the actual act of rotating and reopening file.
-func (w *RotateWriter) Rotate() (err error) {
-	// Rename dest file if exceeded file size
-	fi, err := os.Stat(w.filename)
-	if err == nil {
-		if fi.Size() > w.maxSize {
-			err = os.Rename(w.filename, w.filename+".1")
-			if err != nil {
-				return err
-			}
-			// Close existing file if open
-			if w.fp != nil {
-				err = w.fp.Close()
-				w.fp = nil
-				if err != nil {
-					return err
-				}
-			}
-			// Create a file.
-			w.fp, err = os.OpenFile(w.filename, os.O_RDWR|os.O_CREATE|os.O_TRUNC, 0666)
-			if err != nil {
-				return err
-			}
-		}
-	}
-
-	return nil
-}
+// SegmentStatChanWrite is a write-only channel for segment metrics.
+type SegmentStatChanWrite chan<- *pbm.SegmentMetricsWrite
 
 func StoreSerializableData(ctx context.Context, l *zap.SugaredLogger, sChan SerializableChan, writer io.Writer) {
 	cachedItems := 0

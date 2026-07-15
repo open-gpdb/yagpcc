@@ -63,6 +63,13 @@ type YagpccMetricsType struct {
 	QueriesArchivedComplete      prometheus.Counter
 	QueriesArchivedTimeout       prometheus.Counter
 	QueriesArchivedSessionFailed prometheus.Counter
+
+	// Writer pipeline metrics
+	WriterProcessedMessages *prometheus.CounterVec
+	WriterDroppedMessages   *prometheus.CounterVec
+	WriterDuration          *prometheus.HistogramVec
+	WriterBatchSize         *prometheus.HistogramVec
+	WriterQueuedBatches     *prometheus.GaugeVec
 }
 
 var YagpccMetrics *YagpccMetricsType

@@ -74,6 +74,37 @@ func TestValidate_NegativeProcfsRefreshInterval(t *testing.T) {
 	assert.Contains(t, err.Error(), "procfs_refresh_interval")
 }
 
+func TestValidate_WriterConfigDefaults(t *testing.T) {
+	cfg := defaultValidConfig()
+	require.NotNil(t, cfg.Writers)
+	assert.Equal(t, time.Second, cfg.Writers.BatchInterval)
+	assert.Equal(t, time.Second, cfg.Writers.WriteTimeout)
+	assert.Equal(t, 60, cfg.Writers.BatchQueueSize)
+	require.NoError(t, cfg.Validate())
+}
+
+func TestValidate_WriterConfigWithValues(t *testing.T) {
+	cfg := defaultValidConfig()
+	cfg.Writers = &WriterConfig{
+		BatchProcessorConfig: BatchProcessorConfig{
+			BatchInterval:  time.Second,
+			WriteTimeout:   time.Second,
+			BatchQueueSize: 60,
+		},
+		Targets: []WriterTarget{
+			{
+				Type:         "file",
+				Enabled:      true,
+				SessionsFile: "sessions.json",
+				QueriesFile:  "queries.json",
+				SegmentsFile: "segments.json",
+				MaxFileSize:  419430400,
+			},
+		},
+	}
+	require.NoError(t, cfg.Validate())
+}
+
 func TestValidate_ProcfsDisabled_ZeroIntervalOK(t *testing.T) {
 	cfg := defaultValidConfig()
 	cfg.ProcfsEnabled = false
