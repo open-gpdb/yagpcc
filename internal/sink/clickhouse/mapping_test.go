@@ -298,6 +298,17 @@ func TestMapping_EmptyMessage(t *testing.T) {
 	assert.Nil(t, row[colRest])
 }
 
+func TestMapping_LargeUint64PreservesPrecision(t *testing.T) {
+	// GPDB query/plan ids are 64-bit hashes that routinely exceed 2^53. The
+	// session stream serialises them via encoding/json as bare JSON numbers, so
+	// the mapper must decode them without float64 rounding.
+	const bigID uint64 = 18446744073709551615 // math.MaxUint64
+	doc := `{"RunningQueryInfo":{"QueryID":18446744073709551615,"PlanID":9007199254740993}}`
+	row := rowMap(t, SessionsMapping(), []byte(doc))
+	assert.Equal(t, bigID, row["query_id"])
+	assert.Equal(t, uint64(9007199254740993), row["plan_id"])
+}
+
 func TestMapping_UnknownFieldGoesToRest(t *testing.T) {
 	row := rowMap(t, SessionsMapping(), []byte(`{"ClusterID":"z","SomethingNew":42}`))
 	assert.Equal(t, "z", row["cluster_id"])

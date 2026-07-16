@@ -17,6 +17,7 @@
 package clickhouse
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"strconv"
@@ -149,7 +150,11 @@ func (tm *tableMapping) BuildRow(root map[string]any, meta CDCMeta) ([]any, erro
 // point used by the ClickHouse writer per row.
 func MapRow(tm *tableMapping, data []byte, meta CDCMeta) ([]any, error) {
 	var root map[string]any
-	if err := json.Unmarshal(data, &root); err != nil {
+	dec := json.NewDecoder(bytes.NewReader(data))
+	// UseNumber keeps integers as json.Number so 64-bit ids (query_id/plan_id)
+	// from the encoding/json session stream survive without float64 rounding.
+	dec.UseNumber()
+	if err := dec.Decode(&root); err != nil {
 		return nil, fmt.Errorf("unmarshal source json: %w", err)
 	}
 	return tm.BuildRow(root, meta)
@@ -302,6 +307,8 @@ func toString(raw any) (string, error) {
 		return v, nil
 	case bool:
 		return strconv.FormatBool(v), nil
+	case json.Number:
+		return v.String(), nil
 	case float64:
 		return strconv.FormatFloat(v, 'f', -1, 64), nil
 	default:
@@ -324,48 +331,62 @@ func toUint64(raw any) (uint64, error) {
 	switch v := raw.(type) {
 	case float64:
 		return uint64(v), nil
+	case json.Number:
+		return uint64FromString(v.String())
 	case string:
-		if v == "" {
-			return 0, nil
-		}
-		if n, err := strconv.ParseUint(v, 10, 64); err == nil {
-			return n, nil
-		}
-		f, err := strconv.ParseFloat(v, 64)
-		if err != nil {
-			return 0, fmt.Errorf("cannot convert %q to uint64", v)
-		}
-		return uint64(f), nil
+		return uint64FromString(v)
 	default:
 		return 0, fmt.Errorf("cannot convert %T to uint64", raw)
 	}
+}
+
+func uint64FromString(v string) (uint64, error) {
+	if v == "" {
+		return 0, nil
+	}
+	if n, err := strconv.ParseUint(v, 10, 64); err == nil {
+		return n, nil
+	}
+	f, err := strconv.ParseFloat(v, 64)
+	if err != nil {
+		return 0, fmt.Errorf("cannot convert %q to uint64", v)
+	}
+	return uint64(f), nil
 }
 
 func toInt64(raw any) (int64, error) {
 	switch v := raw.(type) {
 	case float64:
 		return int64(v), nil
+	case json.Number:
+		return int64FromString(v.String())
 	case string:
-		if v == "" {
-			return 0, nil
-		}
-		if n, err := strconv.ParseInt(v, 10, 64); err == nil {
-			return n, nil
-		}
-		f, err := strconv.ParseFloat(v, 64)
-		if err != nil {
-			return 0, fmt.Errorf("cannot convert %q to int64", v)
-		}
-		return int64(f), nil
+		return int64FromString(v)
 	default:
 		return 0, fmt.Errorf("cannot convert %T to int64", raw)
 	}
+}
+
+func int64FromString(v string) (int64, error) {
+	if v == "" {
+		return 0, nil
+	}
+	if n, err := strconv.ParseInt(v, 10, 64); err == nil {
+		return n, nil
+	}
+	f, err := strconv.ParseFloat(v, 64)
+	if err != nil {
+		return 0, fmt.Errorf("cannot convert %q to int64", v)
+	}
+	return int64(f), nil
 }
 
 func toFloat64(raw any) (float64, error) {
 	switch v := raw.(type) {
 	case float64:
 		return v, nil
+	case json.Number:
+		return v.Float64()
 	case string:
 		if v == "" {
 			return 0, nil
