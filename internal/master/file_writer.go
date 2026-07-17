@@ -61,6 +61,20 @@ func NewFileWriters(logger *zap.SugaredLogger, sessionsFile, queriesFile, segmen
 	}, nil
 }
 
+// Close closes any underlying file handles. The rotating writers satisfy
+// io.Closer; the first close error is returned after attempting all three.
+func (fw *FileWriters) Close() error {
+	var firstErr error
+	for _, wr := range []io.Writer{fw.sessionWriter, fw.queryWriter, fw.segmentWriter} {
+		if c, ok := wr.(io.Closer); ok {
+			if err := c.Close(); err != nil && firstErr == nil {
+				firstErr = err
+			}
+		}
+	}
+	return firstErr
+}
+
 // StoreSessions writes a batch of session data to the archive file.
 func (fw *FileWriters) StoreSessions(ctx context.Context, sessions []*gp.SessionDataWrite) error {
 	if len(sessions) == 0 {
@@ -203,6 +217,19 @@ func (w *RotateWriter) Write(output []byte) (int, error) {
 		err = w.fp.Sync()
 	}
 	return cnt, err
+}
+
+// Close closes the underlying file handle so a master restart does not leak
+// descriptors. Safe to call when the file is already closed.
+func (w *RotateWriter) Close() error {
+	w.lock.Lock()
+	defer w.lock.Unlock()
+	if w.fp == nil {
+		return nil
+	}
+	err := w.fp.Close()
+	w.fp = nil
+	return err
 }
 
 // Rotate performs the actual act of rotating and reopening file.

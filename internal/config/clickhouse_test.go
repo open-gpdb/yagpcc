@@ -97,6 +97,19 @@ func TestClickhouseConfigValidate_HappyPath(t *testing.T) {
 	}
 }
 
+func TestClickhouseConfigValidate_UnsupportedDatabase(t *testing.T) {
+	c := validClickhouseConfig()
+	c.Database = "otherdb"
+	err := c.Validate()
+	if err == nil || !strings.Contains(err.Error(), "database") {
+		t.Errorf("expected database error, got %v", err)
+	}
+	c.Database = SupportedClickhouseDatabase
+	if err := c.Validate(); err != nil {
+		t.Errorf("expected nil err for supported database, got %v", err)
+	}
+}
+
 func TestClickhouseConfigValidate_MissingAddrs(t *testing.T) {
 	c := validClickhouseConfig()
 	c.Addrs = nil

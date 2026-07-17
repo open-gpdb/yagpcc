@@ -31,6 +31,13 @@ const (
 	OnBufferOverflowBlock      = "block"
 
 	ClickhousePasswordEnv = "YAGPCC_CH_PASSWORD"
+
+	// SupportedClickhouseDatabase is the only ClickHouse database the embedded
+	// DDL/migrations create tables in. The runtime writer qualifies its INSERTs
+	// with the configured database, so a value other than this would insert into
+	// a database whose tables were never created — every batch would fail and be
+	// dropped silently. Reject such configs up front instead.
+	SupportedClickhouseDatabase = "yagpcc"
 )
 
 type ClickhouseTLSConfig struct {
@@ -113,6 +120,9 @@ func (c *ClickhouseConfig) Validate() error {
 
 	if len(c.Addrs) == 0 {
 		return fmt.Errorf("clickhouse: addrs must not be empty when enabled")
+	}
+	if c.Database != "" && c.Database != SupportedClickhouseDatabase {
+		return fmt.Errorf("clickhouse: database must be %q, got %q (the embedded schema only creates tables in that database)", SupportedClickhouseDatabase, c.Database)
 	}
 	for i, a := range c.Addrs {
 		if a == "" {

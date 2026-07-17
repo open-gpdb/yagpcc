@@ -385,6 +385,9 @@ func (cfg *Config) Validate() error {
 			if target.Enabled && len(target.Addrs) == 0 {
 				return fmt.Errorf("writers.targets[%d]: clickhouse target requires addrs when enabled", i)
 			}
+			if target.Database != "" && target.Database != SupportedClickhouseDatabase {
+				return fmt.Errorf("writers.targets[%d]: clickhouse target database must be %q, got %q (the embedded schema only creates tables in that database)", i, SupportedClickhouseDatabase, target.Database)
+			}
 		default:
 			return fmt.Errorf("writers.targets[%d]: unknown target type %q", i, target.Type)
 		}

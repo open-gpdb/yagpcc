@@ -135,6 +135,19 @@ func TestValidate_ClickhouseTarget_DisabledNoAddrsOK(t *testing.T) {
 	require.NoError(t, cfg.Validate())
 }
 
+func TestValidate_ClickhouseTarget_UnsupportedDatabase(t *testing.T) {
+	cfg := defaultValidConfig()
+	cfg.Writers.Targets = append(cfg.Writers.Targets, WriterTarget{
+		Type:     "clickhouse",
+		Enabled:  true,
+		Addrs:    []string{"ch-1:9000"},
+		Database: "otherdb",
+	})
+	err := cfg.Validate()
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "database must be")
+}
+
 func TestValidate_UnknownTargetType(t *testing.T) {
 	cfg := defaultValidConfig()
 	cfg.Writers.Targets = append(cfg.Writers.Targets, WriterTarget{

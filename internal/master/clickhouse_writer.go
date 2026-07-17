@@ -19,6 +19,7 @@ package master
 import (
 	"context"
 	"fmt"
+	"io"
 	"strings"
 	"sync"
 	"time"
@@ -83,6 +84,15 @@ func NewClickHouseWriters(logger *zap.SugaredLogger, conn chConn, database strin
 		statements: clickhouse.StatementsMapping(),
 		segments:   clickhouse.SegmentsMapping(),
 	}
+}
+
+// Close releases the underlying ClickHouse connection pool. The driver.Conn
+// supplied in production satisfies io.Closer; test fakes that do not are a no-op.
+func (w *ClickHouseWriters) Close() error {
+	if c, ok := w.conn.(io.Closer); ok {
+		return c.Close()
+	}
+	return nil
 }
 
 // StoreSessions inserts a batch of session data into sessions_part.

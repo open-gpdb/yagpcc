@@ -310,7 +310,8 @@ func (bs *BackgroundStorage) launchArchiveWriters(ctx context.Context,
 	// distribution, so the writers stay read-only and a teed pointer is never
 	// mutated by two pipelines at once. With a single enabled target the fan-out
 	// send blocks, preserving the source backpressure of the file-only path; with
-	// several, a slow target only backs up its own channel.
+	// several, sends are non-blocking and a full target channel drops the message
+	// for that target alone (accounted as WriterDroppedMessages).
 	names := make([]string, len(writers))
 	sessTargets := make([]chan *gp.SessionDataWrite, len(writers))
 	queryTargets := make([]chan *pbm.QueryStatWrite, len(writers))
@@ -325,6 +326,18 @@ func (bs *BackgroundStorage) launchArchiveWriters(ctx context.Context,
 	go fanOut(ctx, sessChan, sessTargets, "sessions", names, stampSessionTmID)
 	go fanOut(ctx, queryChan, queryTargets, "queries", names, stampQueryTmID)
 	go fanOut(ctx, segChan, segTargets, "segments", names, stampSegmentTmID)
+
+	// Release writer-held resources (ClickHouse connection pools, file handles)
+	// when the master context is cancelled so a restart or leadership change does
+	// not orphan them.
+	go func() {
+		<-ctx.Done()
+		for _, w := range writers {
+			if err := w.writer.Close(); err != nil {
+				bs.l.Warnf("archive writer %q close error: %v", w.name, err)
+			}
+		}
+	}()
 
 	return nil
 }
@@ -365,6 +378,13 @@ func (bs *BackgroundStorage) buildArchiveWriters(targets []config.WriterTarget) 
 		}
 		w, err := bs.newArchiveWriter(target)
 		if err != nil {
+			// Close writers already built so a later target's failure does not
+			// orphan the connections/handles opened for earlier targets.
+			for _, nw := range writers {
+				if cerr := nw.writer.Close(); cerr != nil {
+					bs.l.Warnf("archive writer %q close error during cleanup: %v", nw.name, cerr)
+				}
+			}
 			return nil, err
 		}
 		typ := target.Type
