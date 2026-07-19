@@ -83,6 +83,11 @@ jobs:
     services:
       clickhouse:
         image: clickhouse/clickhouse-server:24.3
+        # Without this the image entrypoint disables network access for the
+        # `default` user, so connections from the runner through the mapped
+        # port fail with AUTHENTICATION_FAILED.
+        env:
+          CLICKHOUSE_SKIP_USER_SETUP: 1
         ports:
           - 9000:9000
         options: >-
