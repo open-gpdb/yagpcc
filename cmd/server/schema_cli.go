@@ -245,6 +245,7 @@ func loadCHConfig(f schemaFlags, deps schemaCLIDeps) (*config.ClickhouseConfig, 
 	if err := chCopy.Validate(); err != nil {
 		return nil, fmt.Errorf("validate clickhouse config: %w", err)
 	}
+	chCopy.Database = "default"
 	return &chCopy, nil
 }
 

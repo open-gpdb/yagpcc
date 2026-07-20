@@ -169,6 +169,23 @@ func TestSchemaCLI_MigrateOnly_OK(t *testing.T) {
 	}
 }
 
+func TestSchemaCLI_MigrateOnly_ConnectsViaDefaultDatabase(t *testing.T) {
+	deps, _, stderr := newCapturingDeps(enabledConfig())
+	var connDB string
+	inner := deps.openConn
+	deps.openConn = func(ctx context.Context, cfg *config.ClickhouseConfig) (clickhouse.MigrationConn, func() error, error) {
+		connDB = cfg.Database
+		return inner(ctx, cfg)
+	}
+	rc := runSchemaCLI(context.Background(), schemaFlags{migrateOnly: true, configPath: "/tmp/cfg.yaml"}, deps)
+	if rc != schemaCLIExitOK {
+		t.Fatalf("rc=%d stderr=%q", rc, stderr.String())
+	}
+	if connDB != "default" {
+		t.Fatalf("expected connection database %q, got %q", "default", connDB)
+	}
+}
+
 func TestSchemaCLI_MigrateOnly_NoConfig(t *testing.T) {
 	deps, _, stderr := newCapturingDeps(nil)
 	rc := runSchemaCLI(context.Background(), schemaFlags{migrateOnly: true}, deps)
