@@ -88,7 +88,13 @@ func (s *GetQueryInfoServer) GetPidProcStat(ctx context.Context, in *pb.GetPidPr
 
 	if in != nil && in.SegmentProcess != nil {
 		for _, segProcess := range in.SegmentProcess {
-			pidStat, err := utils.GetPidProcInfo(s.Logger, segProcess.Pid, segProcess.GpSegmentId, segProcess.SessId)
+			var pidStat *pbc.GpPidProcInfo
+			var err error
+			if in.GetRuntimeMetricsOnly() {
+				pidStat, err = utils.GetPidProcRuntimeMetricsInfo(s.Logger, segProcess.Pid, segProcess.GpSegmentId, segProcess.SessId)
+			} else {
+				pidStat, err = utils.GetPidProcInfo(s.Logger, segProcess.Pid, segProcess.GpSegmentId, segProcess.SessId)
+			}
 			if err != nil {
 				if errors.Is(err, utils.ErrProcessNotFound) {
 					s.Logger.Debugf("pid %d not found: %v", segProcess.Pid, err)

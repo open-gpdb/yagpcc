@@ -87,4 +87,9 @@ message SegmentProcess {
 
 message GetPidProcInfoReq {
     repeated SegmentProcess segment_process = 1;
+
+    // runtime_metrics_only asks segment agents to return compact procfs rows
+    // containing only fields required to build RuntimeMetrics on master.
+    // Default false keeps backward-compatible full rows for direct callers.
+    bool runtime_metrics_only = 2;
 }

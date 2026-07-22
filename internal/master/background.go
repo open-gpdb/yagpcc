@@ -749,7 +749,7 @@ func enrichWithWorkfileUsage(procInfos []*pbc.GpPidProcInfo, usageEntries []work
 	}
 }
 
-func (bs *BackgroundStorage) RefreshProcfs(ctx context.Context, procfsRefreshInterval time.Duration, nPullers int, portn uint32, msgSize int) error {
+func (bs *BackgroundStorage) RefreshProcfs(ctx context.Context, procfsRefreshInterval time.Duration, nPullers int, portn uint32, msgSize int, extendedProcfsStat bool) error {
 	if procfsRefreshInterval <= 0 {
 		return fmt.Errorf("procfsRefreshInterval must be > 0, got %v", procfsRefreshInterval)
 	}
@@ -770,7 +770,7 @@ func (bs *BackgroundStorage) RefreshProcfs(ctx context.Context, procfsRefreshInt
 			go func() {
 				hostStatsCh <- procfsGatherer.GatherHostStatForHosts(ctx, nPullers, portn, procfsRefreshInterval, msgSize, storage.GetConfiguredHostnames())
 			}()
-			result, err := procfsGatherer.GatherProcfsStat(ctx, nPullers, portn, procfsRefreshInterval, msgSize)
+			result, err := procfsGatherer.GatherProcfsStat(ctx, nPullers, portn, procfsRefreshInterval, msgSize, !extendedProcfsStat)
 			hostStats := <-hostStatsCh
 			if err != nil {
 				// just log error, do not fail the whole service
@@ -904,7 +904,7 @@ func InitBG(
 	)
 	if cfg.ProcfsEnabled {
 		errG.Go(func() error {
-			bgErr := backgroundStorage.RefreshProcfs(ctxI, cfg.ProcfsRefreshInterval, int(cfg.SegmentPullThreads), cfg.ListenPort, int(cfg.MaxMessageSize))
+			bgErr := backgroundStorage.RefreshProcfs(ctxI, cfg.ProcfsRefreshInterval, int(cfg.SegmentPullThreads), cfg.ListenPort, int(cfg.MaxMessageSize), cfg.ExtendedProcfsStat)
 			l.Errorf("got %v in RefreshProcfs", bgErr)
 			return bgErr
 		},

@@ -111,6 +111,7 @@ type Config struct {
 	QueriesRefreshInterval     time.Duration      `config:"session_refresh_interval" yaml:"queries_refresh_interval"`
 	ProcfsEnabled              bool               `config:"procfs_enabled" yaml:"procfs_enabled"`
 	ProcfsRefreshInterval      time.Duration      `config:"procfs_refresh_interval" yaml:"procfs_refresh_interval"`
+	ExtendedProcfsStat         bool               `config:"extended_procfs_stat" yaml:"extended_procfs_stat"`
 	SessionSendMetricInterval  time.Duration      `config:"session_send_metric_interval" yaml:"session_send_metric_interval"`
 	MinFreePercent             uint32             `config:"min_free_percent" yaml:"min_free_percent"`
 	CustomSegmentList          *SegmentList       `config:"custom_segment_list" yaml:"custom_segment_list"`
@@ -252,6 +253,7 @@ func DefaultConfig() (*Config, error) {
 		QueriesRefreshInterval:     time.Second * 1,
 		ProcfsEnabled:              true,
 		ProcfsRefreshInterval:      time.Second * 60,
+		ExtendedProcfsStat:         false,
 		SessionSendMetricInterval:  time.Second * 60,
 		MinFreePercent:             10,
 		CustomSegmentList:          nil,

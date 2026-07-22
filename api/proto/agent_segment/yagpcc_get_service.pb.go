@@ -560,8 +560,12 @@ func (x *SegmentProcess) GetPid() int64 {
 type GetPidProcInfoReq struct {
 	state          protoimpl.MessageState `protogen:"open.v1"`
 	SegmentProcess []*SegmentProcess      `protobuf:"bytes,1,rep,name=segment_process,json=segmentProcess,proto3" json:"segment_process,omitempty"`
-	unknownFields  protoimpl.UnknownFields
-	sizeCache      protoimpl.SizeCache
+	// runtime_metrics_only asks segment agents to return compact procfs rows
+	// containing only fields required to build RuntimeMetrics on master.
+	// Default false keeps backward-compatible full rows for direct callers.
+	RuntimeMetricsOnly bool `protobuf:"varint,2,opt,name=runtime_metrics_only,json=runtimeMetricsOnly,proto3" json:"runtime_metrics_only,omitempty"`
+	unknownFields      protoimpl.UnknownFields
+	sizeCache          protoimpl.SizeCache
 }
 
 func (x *GetPidProcInfoReq) Reset() {
@@ -599,6 +603,13 @@ func (x *GetPidProcInfoReq) GetSegmentProcess() []*SegmentProcess {
 		return x.SegmentProcess
 	}
 	return nil
+}
+
+func (x *GetPidProcInfoReq) GetRuntimeMetricsOnly() bool {
+	if x != nil {
+		return x.RuntimeMetricsOnly
+	}
+	return false
 }
 
 var File_api_proto_agent_segment_yagpcc_get_service_proto protoreflect.FileDescriptor
@@ -643,9 +654,10 @@ const file_api_proto_agent_segment_yagpcc_get_service_proto_rawDesc = "" +
 	"\x0eSegmentProcess\x12\"\n" +
 	"\rgp_segment_id\x18\x01 \x01(\x03R\vgpSegmentId\x12\x17\n" +
 	"\asess_id\x18\x02 \x01(\x03R\x06sessId\x12\x10\n" +
-	"\x03pid\x18\x03 \x01(\x03R\x03pid\"T\n" +
+	"\x03pid\x18\x03 \x01(\x03R\x03pid\"\x86\x01\n" +
 	"\x11GetPidProcInfoReq\x12?\n" +
-	"\x0fsegment_process\x18\x01 \x03(\v2\x16.yagpcc.SegmentProcessR\x0esegmentProcess2\xf4\x01\n" +
+	"\x0fsegment_process\x18\x01 \x03(\v2\x16.yagpcc.SegmentProcessR\x0esegmentProcess\x120\n" +
+	"\x14runtime_metrics_only\x18\x02 \x01(\bR\x12runtimeMetricsOnly2\xf4\x01\n" +
 	"\fGetQueryInfo\x12O\n" +
 	"\x10GetMetricQueries\x12\x19.yagpcc.GetQueriesInfoReq\x1a\x1e.yagpcc.GetQueriesInfoResponse\"\x00\x12M\n" +
 	"\x0eGetPidProcStat\x12\x19.yagpcc.GetPidProcInfoReq\x1a\x1e.yagpcc.GetPidProcInfoResponse\"\x00\x12D\n" +

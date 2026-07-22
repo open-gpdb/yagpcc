@@ -41,15 +41,17 @@ type GetMasterInfoServer struct {
 	maxMessageSize     int
 	backgroundStorage  *master.BackgroundStorage
 	extensionsCacheTTL time.Duration
+	extendedProcfsStat bool
 }
 
-func NewGetMasterInfoServer(clusterID string, logger *zap.SugaredLogger, maxMessageSize int, backgroundStorage *master.BackgroundStorage, extensionsCacheTTL time.Duration) *GetMasterInfoServer {
+func NewGetMasterInfoServer(clusterID string, logger *zap.SugaredLogger, maxMessageSize int, backgroundStorage *master.BackgroundStorage, extensionsCacheTTL time.Duration, extendedProcfsStat bool) *GetMasterInfoServer {
 	return &GetMasterInfoServer{
 		clusterID:          clusterID,
 		logger:             logger,
 		maxMessageSize:     maxMessageSize,
 		backgroundStorage:  backgroundStorage,
 		extensionsCacheTTL: extensionsCacheTTL,
+		extendedProcfsStat: extendedProcfsStat,
 	}
 }
 
@@ -492,6 +494,9 @@ func (s *GetMasterInfoServer) GetGpPidProcInfo(ctx context.Context, in *pbm.GetG
 	if err != nil {
 		return nil, err
 	}
+	if !s.extendedProcfsStat {
+		pagedRows = compactProcInfoRows(pagedRows)
+	}
 
 	if metrics.YagpccMetrics != nil {
 		metrics.YagpccMetrics.HandleLatencies.With(map[string]string{"method": "GetGpPidProcInfo"}).Observe(time.Since(start).Seconds())
@@ -501,6 +506,56 @@ func (s *GetMasterInfoServer) GetGpPidProcInfo(ctx context.Context, in *pbm.GetG
 		PidProcData:   pagedRows,
 		NextPageToken: nextPageToken,
 	}, nil
+}
+
+func compactProcInfoRows(rows []*pbc.GpPidProcInfo) []*pbc.GpPidProcInfo {
+	result := make([]*pbc.GpPidProcInfo, 0, len(rows))
+	for _, row := range rows {
+		if row == nil {
+			result = append(result, nil)
+			continue
+		}
+		compact := &pbc.GpPidProcInfo{
+			GpSegmentId: row.GpSegmentId,
+			SessId:      row.SessId,
+			Pid:         row.Pid,
+			Cmdline:     row.Cmdline,
+			State:       row.State,
+			Ccnt:        row.Ccnt,
+			SliceId:     row.SliceId,
+		}
+		if row.ProcStat != nil {
+			compact.ProcStat = &pbc.ProcStat{
+				Pid:   row.ProcStat.Pid,
+				State: row.ProcStat.State,
+				Utime: row.ProcStat.Utime,
+				Stime: row.ProcStat.Stime,
+			}
+		}
+		if row.ProcStatus != nil {
+			compact.ProcStatus = &pbc.ProcStatus{
+				Pid:    row.ProcStatus.Pid,
+				VmPeak: row.ProcStatus.VmPeak,
+				VmRss:  row.ProcStatus.VmRss,
+			}
+		}
+		if row.ProcIo != nil {
+			compact.ProcIo = &pbc.ProcIO{
+				Rchar:               row.ProcIo.Rchar,
+				Wchar:               row.ProcIo.Wchar,
+				Syscr:               row.ProcIo.Syscr,
+				Syscw:               row.ProcIo.Syscw,
+				ReadBytes:           row.ProcIo.ReadBytes,
+				WriteBytes:          row.ProcIo.WriteBytes,
+				CancelledWriteBytes: row.ProcIo.CancelledWriteBytes,
+			}
+		}
+		if row.ProcSpill != nil {
+			compact.ProcSpill = &pbc.ProcSpill{Size: row.ProcSpill.Size, Files: row.ProcSpill.Files}
+		}
+		result = append(result, compact)
+	}
+	return result
 }
 
 // sortProcInfoRows sorts process rows by the requested fields, defaulting to CPU descending.

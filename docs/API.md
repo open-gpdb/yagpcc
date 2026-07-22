@@ -167,7 +167,7 @@ Service for querying Greenplum sessions, queries, and aggregate statistics.
   - `page_size` (`int64`), `page_token` (`string`): offset-token pagination, default page size 50.
   - `field` (`repeated ProcInfoFieldWrapper`): optional sort fields. Default sort is CPU (`proc_stat.utime + proc_stat.stime`) descending.
 - **GpPidProcInfoResponse**: `pid_proc_data` (`repeated GpPidProcInfo`), `next_page_token` (`string`).
-- **GpPidProcInfo** (see "Common types" section below for full field list).
+- **GpPidProcInfo** (see "Common types" section below for full field list). By default, rows are compact and contain only fields required for runtime metrics (`utime`, `stime`, `vm_peak`, `vm_rss`, `proc_io`, `proc_spill`, process identity, command count, slice, command line, and state). Set `extended_procfs_stat: true` in `yagpcc.yaml` to collect and return full detailed `proc_stat` and `proc_status` fields.
 
 ### Enums used by GetGPInfo
 
@@ -727,6 +727,12 @@ The `extensions_cache_ttl_sec` parameter controls how long extension information
 extensions_cache_ttl_sec: 900   # default
 ```
 
+Procfs storage uses compact rows by default to reduce memory usage on clusters with large numbers of process points. Runtime metrics endpoints are unaffected. Detailed `GpPidProcInfo` fields outside runtime metrics require `extended_procfs_stat: true`:
+
+```yaml
+extended_procfs_stat: false   # default; set true for full detailed procfs rows
+```
+
 ---
 
 ## JSON HTTP API (Web UI)
@@ -749,7 +755,7 @@ serialized using `protojson` with camelCase field names and zero-value fields in
 | `GET` | `/api/query/{ssid}/{ccnt}/running-metrics` | Get procfs runtime metrics matrix cells for a query. Returns `cellMetrics[]` with `sliceId`, `segindex`, and `runtimeMetrics` (`utime`, `stime`, `vmPeak`, `vmRss`, `state`, `procIo`, `procSpill`), plus `skew` and `dataQuality`. Idle cells can be rendered separately using `runtimeMetrics.state == "idle"`. |
 | `GET` | `/api/hosts/running-queries` | Get aggregated host-level statistics for all hosts with running queries. Returns `hosts[]` with `hostName`, `segindex[]`, `activeQueries`, `activeSlices`, `cpuUsage`, `memoryUsage`, `diskUsage`, `spillBytes`, `skew`, `dataQuality`, `avg5`, `diskReads`, `diskWrites`, `totalSessions`. |
 | `GET` | `/api/hosts/{host_name}/running-queries` | Get paginated per-host process/query details. Query params: `page_size` (default 50), `page_token`. Idle session processes are grouped by session ID and returned with `isIdle=true`, parsed `queryKey.ccnt` when available, `dbName`/`queryText` from master query metadata when available, and runtime metrics. |
-| `GET` | `/api/procfs/pid-proc-info` | Get paginated procfs process rows for a query/session. Query params: `ssid` (required), `hostname` or `segindex` (at least one required), optional `ccnt`, optional `slice_id`, `page_size` (default 50), `page_token`. Returns `pidProcData[]` and `nextPageToken`. Default sort is CPU descending. |
+| `GET` | `/api/procfs/pid-proc-info` | Get paginated procfs process rows for a query/session. Query params: `ssid` (required), `hostname` or `segindex` (at least one required), optional `ccnt`, optional `slice_id`, `page_size` (default 50), `page_token`. Returns `pidProcData[]` and `nextPageToken`. Default sort is CPU descending. Rows are compact by default; full detailed procfs fields require `extended_procfs_stat: true`. |
 | `GET` | `/api/stats/sessions` | Get session state statistics (counts by state) |
 | `GET` | `/api/extensions` | List extensions (optional `database_name` param) |
 | `GET` | `/api/databases` | List available databases |

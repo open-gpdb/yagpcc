@@ -474,6 +474,34 @@ func TestRegisterProcfsStat_TriggersCleanup(t *testing.T) {
 	assert.Equal(t, base.Add(4*time.Minute), ps.procfsStat[2].statTime)
 }
 
+func TestRegisterProcfsStatWithHostStat_TriggersCleanup(t *testing.T) {
+	ps := NewProcfsStorage(WithMaximumStoredPoints(2))
+	base := time.Now()
+
+	for i := 0; i < 4; i++ {
+		hostname := fmt.Sprintf("host-%d", i)
+		ps.RegisterProcfsStatWithHostStat(
+			base.Add(time.Duration(i)*time.Minute),
+			[]*pbc.GpPidProcInfo{{GpSegmentId: int64(i), SessId: int64(i), Pid: int64(i), Cmdline: fmt.Sprintf("cmd-%d", i)}},
+			HostStatMap{hostname: {CPUUsage: float64(i)}},
+			4,
+			int64(i),
+		)
+	}
+
+	ps.mx.RLock()
+	defer ps.mx.RUnlock()
+	require.Len(t, ps.procfsStat, 2)
+	assert.Equal(t, base.Add(2*time.Minute), ps.procfsStat[0].statTime)
+	assert.Equal(t, base.Add(3*time.Minute), ps.procfsStat[1].statTime)
+	assert.NotContains(t, ps.procfsStat[0].pidProcData, ProcKey{GpSegmentId: 0, SessId: 0, Pid: 0})
+	assert.NotContains(t, ps.procfsStat[0].hostStat, "host-0")
+	assert.Contains(t, ps.procfsStat[0].pidProcData, ProcKey{GpSegmentId: 2, SessId: 2, Pid: 2})
+	assert.Contains(t, ps.procfsStat[0].hostStat, "host-2")
+	assert.Contains(t, ps.procfsStat[1].pidProcData, ProcKey{GpSegmentId: 3, SessId: 3, Pid: 3})
+	assert.Contains(t, ps.procfsStat[1].hostStat, "host-3")
+}
+
 func TestTidyUpProcfsStat_EmptySlice(t *testing.T) {
 	ps := NewProcfsStorage()
 	ps.TidyUpProcfsStat()
