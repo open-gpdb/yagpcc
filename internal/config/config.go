@@ -286,6 +286,11 @@ func ReadFromFile(configFile string) (*Config, error) {
 	if err != nil {
 		return nil, err
 	}
+	// DefaultConfig returns a fully normalized config for in-memory callers.
+	// For file loading, keep writer targets unexpanded until after YAML values
+	// are loaded so legacy arch_config file paths can populate the default file
+	// writer target instead of being shadowed by sessions.json/queries.json/etc.
+	config.Writers = DefaultWriterConfig()
 	loader := confita.NewLoader(file.NewBackend(configFile))
 	if err = loader.Load(context.Background(), config); err != nil {
 		err = fmt.Errorf("failed to load config from %s: %s", configFile, err.Error())

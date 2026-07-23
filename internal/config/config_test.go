@@ -135,6 +135,25 @@ func TestReadFromFile_ExtendedProcfsStat(t *testing.T) {
 	assert.True(t, cfg.ExtendedProcfsStat)
 }
 
+func TestReadFromFile_LegacyArchiverFilePathsPopulateDefaultWriter(t *testing.T) {
+	configPath := filepath.Join(t.TempDir(), "yagpcc.yaml")
+	content := []byte(`arch_config:
+  sessions_file: /var/lib/greenplum/yandex/yagpcc/sessions.json
+  queries_file: /var/lib/greenplum/yandex/yagpcc/queries.json
+  segments_file: /var/lib/greenplum/yandex/yagpcc/segments.json
+`)
+	require.NoError(t, os.WriteFile(configPath, content, 0o600))
+
+	cfg, err := ReadFromFile(configPath)
+	require.NoError(t, err)
+	require.NotNil(t, cfg.Writers)
+	require.NotEmpty(t, cfg.Writers.Targets)
+	fileTarget := cfg.Writers.Targets[0]
+	assert.Equal(t, "/var/lib/greenplum/yandex/yagpcc/sessions.json", fileTarget.SessionsFile)
+	assert.Equal(t, "/var/lib/greenplum/yandex/yagpcc/queries.json", fileTarget.QueriesFile)
+	assert.Equal(t, "/var/lib/greenplum/yandex/yagpcc/segments.json", fileTarget.SegmentsFile)
+}
+
 func TestValidate_ZeroSessionSendMetricInterval(t *testing.T) {
 	cfg := defaultValidConfig()
 	cfg.SessionSendMetricInterval = 0
