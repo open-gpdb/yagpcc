@@ -515,7 +515,7 @@ func TestGetGpPidProcInfo(t *testing.T) {
 	})
 	clientSet.procfsStorage.RegisterProcfsStat(base.Add(time.Second), []*pbc.GpPidProcInfo{
 		{GpSegmentId: 0, SessId: 501, Pid: 10, Ccnt: 1, SliceId: 1, State: "SELECT", ProcStat: &pbc.ProcStat{Utime: 10, Stime: 1}, ProcStatus: &pbc.ProcStatus{VmRss: 100}, ProcIo: &pbc.ProcIO{ReadBytes: 100}},
-		{GpSegmentId: 0, SessId: 501, Pid: 11, Ccnt: 1, SliceId: 2, State: "SELECT", ProcStat: &pbc.ProcStat{Utime: 20, Stime: 1}, ProcStatus: &pbc.ProcStatus{VmRss: 200}, ProcIo: &pbc.ProcIO{ReadBytes: 200}},
+		{GpSegmentId: 0, SessId: 501, Pid: 11, Ccnt: 1, SliceId: 2, State: "SELECT", ProcStat: &pbc.ProcStat{Comm: "postgres", Ppid: 123, Utime: 20, Stime: 1}, ProcStatus: &pbc.ProcStatus{Name: "postgres", VmSize: 999, VmRss: 200}, ProcIo: &pbc.ProcIO{ReadBytes: 200}},
 		{GpSegmentId: 0, SessId: 999, Pid: 12, Ccnt: 1, SliceId: 1, State: "SELECT", ProcStat: &pbc.ProcStat{Utime: 30, Stime: 1}},
 	})
 
@@ -529,6 +529,10 @@ func TestGetGpPidProcInfo(t *testing.T) {
 	require.Len(t, response.PidProcData, 1)
 	assert.Equal(t, int64(11), response.PidProcData[0].Pid)
 	assert.Equal(t, int64(21), response.PidProcData[0].ProcStat.Utime+response.PidProcData[0].ProcStat.Stime)
+	assert.Empty(t, response.PidProcData[0].ProcStat.Comm, "detailed proc_stat fields are compacted by default")
+	assert.Zero(t, response.PidProcData[0].ProcStat.Ppid, "detailed proc_stat fields are compacted by default")
+	assert.Empty(t, response.PidProcData[0].ProcStatus.Name, "detailed proc_status fields are compacted by default")
+	assert.Zero(t, response.PidProcData[0].ProcStatus.VmSize, "detailed proc_status fields are compacted by default")
 	assert.Equal(t, "1", response.NextPageToken)
 
 	segindex := int32(0)

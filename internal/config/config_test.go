@@ -17,6 +17,8 @@
 package config
 
 import (
+	"os"
+	"path/filepath"
 	"testing"
 	"time"
 
@@ -115,6 +117,22 @@ func TestValidate_ProcfsDisabled_ZeroIntervalOK(t *testing.T) {
 func TestValidate_ProcfsEnabledByDefault(t *testing.T) {
 	cfg := defaultValidConfig()
 	assert.True(t, cfg.ProcfsEnabled)
+}
+
+func TestValidate_ExtendedProcfsStatDisabledByDefault(t *testing.T) {
+	cfg := defaultValidConfig()
+	assert.False(t, cfg.ExtendedProcfsStat)
+}
+
+func TestReadFromFile_ExtendedProcfsStat(t *testing.T) {
+	configPath := filepath.Join(t.TempDir(), "yagpcc.yaml")
+	content := []byte(`extended_procfs_stat: true
+`)
+	require.NoError(t, os.WriteFile(configPath, content, 0o600))
+
+	cfg, err := ReadFromFile(configPath)
+	require.NoError(t, err)
+	assert.True(t, cfg.ExtendedProcfsStat)
 }
 
 func TestValidate_ZeroSessionSendMetricInterval(t *testing.T) {

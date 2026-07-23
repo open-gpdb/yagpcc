@@ -94,7 +94,7 @@ func (ps *ProcfsGatherStorage) getJobsMap(sessions []stat_activity.SessionPid) h
 	return hostJobs
 }
 
-func (ps *ProcfsGatherStorage) processProcfsRequests(ctx context.Context, hostname string, portn uint32, gatherTimeout time.Duration, maxMsgSize int, reqs []stat_activity.SessionPid) ([]*pbc.GpPidProcInfo, error) {
+func (ps *ProcfsGatherStorage) processProcfsRequests(ctx context.Context, hostname string, portn uint32, gatherTimeout time.Duration, maxMsgSize int, reqs []stat_activity.SessionPid, runtimeMetricsOnly bool) ([]*pbc.GpPidProcInfo, error) {
 	grpcConn, err := getGrpcClientConnection(ctx, hostname, portn, gatherTimeout.Seconds())
 	if err != nil {
 		return nil, fmt.Errorf("grpc client connection error: %w", err)
@@ -104,7 +104,8 @@ func (ps *ProcfsGatherStorage) processProcfsRequests(ctx context.Context, hostna
 	defer ctxCancel()
 	maxSizeOption := grpc.MaxCallRecvMsgSize(maxMsgSize)
 	msgReq := &pb.GetPidProcInfoReq{
-		SegmentProcess: make([]*pb.SegmentProcess, 0, 10),
+		SegmentProcess:     make([]*pb.SegmentProcess, 0, 10),
+		RuntimeMetricsOnly: runtimeMetricsOnly,
 	}
 	var result []*pbc.GpPidProcInfo
 	for _, req := range reqs {
@@ -124,6 +125,7 @@ func (ps *ProcfsGatherStorage) processProcfsRequests(ctx context.Context, hostna
 				}
 				result = append(result, segResponse.GetPidProcData()...)
 				msgReq.SegmentProcess = make([]*pb.SegmentProcess, 0, 10)
+				msgReq.RuntimeMetricsOnly = runtimeMetricsOnly
 			}
 		}
 	}
@@ -190,7 +192,7 @@ func (ps *ProcfsGatherStorage) GatherHostStatForHosts(ctx context.Context, nPull
 	return result
 }
 
-func (ps *ProcfsGatherStorage) GatherProcfsStat(ctx context.Context, nPullers int, portn uint32, gatherTimeout time.Duration, maxMsgSize int) ([]*pbc.GpPidProcInfo, error) {
+func (ps *ProcfsGatherStorage) GatherProcfsStat(ctx context.Context, nPullers int, portn uint32, gatherTimeout time.Duration, maxMsgSize int, runtimeMetricsOnly bool) ([]*pbc.GpPidProcInfo, error) {
 	if nPullers <= 0 {
 		return nil, fmt.Errorf("nPullers must be greater than 0, got %d", nPullers)
 	}
@@ -225,7 +227,7 @@ func (ps *ProcfsGatherStorage) GatherProcfsStat(ctx context.Context, nPullers in
 			sem <- struct{}{}
 			defer func() { <-sem }()
 
-			result, errR := ps.processProcfsRequests(ctxT, hostname, portn, gatherTimeout, maxMsgSize, procfsProcesses)
+			result, errR := ps.processProcfsRequests(ctxT, hostname, portn, gatherTimeout, maxMsgSize, procfsProcesses, runtimeMetricsOnly)
 			mu.Lock()
 			defer mu.Unlock()
 			if errR != nil {

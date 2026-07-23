@@ -16,6 +16,9 @@
 
 role: master
 listen_port: 1432
+# Keep false to store compact procfs rows with only RuntimeMetrics fields.
+# Set true to keep full detailed GpPidProcInfo procfs fields.
+extended_procfs_stat: false
 segment_pull_rate_sec: 3
 segment_pull_threads: 2
 extensions_cache_ttl_sec: 900

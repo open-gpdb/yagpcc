@@ -159,7 +159,11 @@ type (
 type ProcfsOption = func(*ProcfsStorage)
 
 const (
-	defaultStoredPoints       = 30
+	// defaultStoredPoints keeps ~6 minutes of history at the default 60s
+	// ProcfsRefreshInterval. All production consumers (GetHostsRunningQueries,
+	// GetQueryRunningMetrics, GetGpPidProcInfoRows, GetProcfsSessions) use
+	// get5Min, so 6 points provide a comfortable safety margin.
+	defaultStoredPoints       = 6
 	procfsQueryMasterSliceID  = int64(0)
 	procfsQuerySegmentSliceID = utils.ProcfsQuerySegmentSliceID
 )

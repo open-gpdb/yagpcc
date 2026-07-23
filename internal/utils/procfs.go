@@ -128,6 +128,17 @@ func ParseCmdLineSessionStatus(cmdline string) string {
 // errors.Is(err, ErrProcessNotFound) to distinguish vanished PIDs from
 // unexpected failures.
 func GetPidProcInfo(logger *zap.SugaredLogger, pid int64, gpSegmentID, sessID int64) (*pb.GpPidProcInfo, error) {
+	return getPidProcInfo(logger, pid, gpSegmentID, sessID, false)
+}
+
+// GetPidProcRuntimeMetricsInfo reads procfs data required to build RuntimeMetrics
+// and returns a compact GpPidProcInfo. Full detailed ProcStat and ProcStatus
+// fields are intentionally not populated to reduce gRPC payload and storage size.
+func GetPidProcRuntimeMetricsInfo(logger *zap.SugaredLogger, pid int64, gpSegmentID, sessID int64) (*pb.GpPidProcInfo, error) {
+	return getPidProcInfo(logger, pid, gpSegmentID, sessID, true)
+}
+
+func getPidProcInfo(logger *zap.SugaredLogger, pid int64, gpSegmentID, sessID int64, runtimeMetricsOnly bool) (*pb.GpPidProcInfo, error) {
 	// Guard against int64 values that cannot be represented as a platform-native
 	// int (required by procfs.NewProc). On 32-bit systems int is 32 bits wide, so
 	// an int64 PID larger than math.MaxInt would overflow on conversion. PIDs
@@ -144,7 +155,7 @@ func GetPidProcInfo(logger *zap.SugaredLogger, pid int64, gpSegmentID, sessID in
 		return nil, err
 	}
 
-	return getProcInfo(logger, proc, pid, gpSegmentID, sessID)
+	return getProcInfoWithMode(logger, proc, pid, gpSegmentID, sessID, runtimeMetricsOnly)
 }
 
 // getProcInfo reads /proc/<pid>/{stat,status,cmdline,io} from the given
@@ -152,6 +163,10 @@ func GetPidProcInfo(logger *zap.SugaredLogger, pid int64, gpSegmentID, sessID in
 // It is separated from GetPidProcInfo to allow testing with a fake procfs
 // directory.
 func getProcInfo(logger *zap.SugaredLogger, proc procfs.Proc, pid, gpSegmentID, sessID int64) (*pb.GpPidProcInfo, error) {
+	return getProcInfoWithMode(logger, proc, pid, gpSegmentID, sessID, false)
+}
+
+func getProcInfoWithMode(logger *zap.SugaredLogger, proc procfs.Proc, pid, gpSegmentID, sessID int64, runtimeMetricsOnly bool) (*pb.GpPidProcInfo, error) {
 	info := &pb.GpPidProcInfo{
 		GpSegmentId: gpSegmentID,
 		SessId:      sessID,
@@ -177,14 +192,22 @@ func getProcInfo(logger *zap.SugaredLogger, proc procfs.Proc, pid, gpSegmentID, 
 
 	// /proc/<pid>/stat
 	if stat, err := proc.Stat(); err == nil {
-		info.ProcStat = convertProcStat(&stat)
+		if runtimeMetricsOnly {
+			info.ProcStat = convertProcStatRuntimeMetrics(&stat)
+		} else {
+			info.ProcStat = convertProcStat(&stat)
+		}
 	} else if !isProcessGone(err) {
 		return nil, err
 	}
 
 	// /proc/<pid>/status
 	if status, err := proc.NewStatus(); err == nil {
-		info.ProcStatus = convertProcStatus(&status)
+		if runtimeMetricsOnly {
+			info.ProcStatus = convertProcStatusRuntimeMetrics(&status)
+		} else {
+			info.ProcStatus = convertProcStatus(&status)
+		}
 	} else if !isProcessGone(err) {
 		return nil, err
 	}
@@ -266,6 +289,15 @@ func convertProcStat(s *procfs.ProcStat) *pb.ProcStat {
 	}
 }
 
+func convertProcStatRuntimeMetrics(s *procfs.ProcStat) *pb.ProcStat {
+	return &pb.ProcStat{
+		Pid:   int64(s.PID),
+		State: s.State,
+		Utime: int64(s.UTime),
+		Stime: int64(s.STime),
+	}
+}
+
 // convertProcStatus maps prometheus/procfs.ProcStatus → protobuf ProcStatus.
 func convertProcStatus(s *procfs.ProcStatus) *pb.ProcStatus {
 	return &pb.ProcStatus{
@@ -295,6 +327,14 @@ func convertProcStatus(s *procfs.ProcStatus) *pb.ProcStatus {
 		Uids:                     uint64SliceToInt64(s.UIDs[:]),
 		Gids:                     uint64SliceToInt64(s.GIDs[:]),
 		CpusAllowedList:          uint64SliceToInt64(s.CpusAllowedList),
+	}
+}
+
+func convertProcStatusRuntimeMetrics(s *procfs.ProcStatus) *pb.ProcStatus {
+	return &pb.ProcStatus{
+		Pid:    int64(s.PID),
+		VmPeak: int64(s.VmPeak),
+		VmRss:  int64(s.VmRSS),
 	}
 }
 
