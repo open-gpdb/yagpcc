@@ -629,24 +629,24 @@ func Run(ctx context.Context, configFile string) error {
 		}
 	}
 
-	for {
-		if cfg.Role == "master" {
-			logger.Infof("Starting master background tasks")
-			ctxC, ctxF := context.WithCancel(ctx)
-			defer ctxF()
-			err = master.InitBG(ctxC, logger, masterSentinel, cfg, backgroundStorage)
-			if err != nil {
-				logger.Fatal(err.Error())
-				return err
-			}
-			// check if we could connect to GP
-			connErr := master.InitConnection(ctx, logger, cfg, false)
-			if connErr != nil {
-				logger.Fatal(connErr.Error())
-				return connErr
-			}
+	// InitBG spawns long-lived goroutines and the listers; it must run once, not
+	// on every iteration of the heartbeat loop below.
+	if cfg.Role == "master" {
+		logger.Infof("Starting master background tasks")
+		ctxC, ctxF := context.WithCancel(ctx)
+		defer ctxF()
+		if err = master.InitBG(ctxC, logger, masterSentinel, cfg, backgroundStorage); err != nil {
+			logger.Fatal(err.Error())
+			return err
 		}
 
+		if connErr := master.InitConnection(ctx, logger, cfg, false); connErr != nil {
+			logger.Fatal(connErr.Error())
+			return connErr
+		}
+	}
+
+	for {
 		select {
 		case <-ctx.Done():
 			return ctx.Err()
