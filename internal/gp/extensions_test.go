@@ -84,21 +84,17 @@ func TestGetExtensions_DBNotInitialized(t *testing.T) {
 	oldDB := db
 	db = nil
 	dbMutex.Unlock()
-	cacheMutex.Lock()
-	oldCachedItem, hadCachedItem := CachedItems[ExtensionsConfig]
-	delete(CachedItems, ExtensionsConfig)
-	cacheMutex.Unlock()
+	oldCachedItem, hadCachedItem := GetCachedItem(ExtensionsConfig)
+	DeleteCachedItem(ExtensionsConfig)
 	t.Cleanup(func() {
 		dbMutex.Lock()
 		db = oldDB
 		dbMutex.Unlock()
-		cacheMutex.Lock()
 		if hadCachedItem {
-			CachedItems[ExtensionsConfig] = oldCachedItem
+			SetCachedItem(ExtensionsConfig, oldCachedItem)
 		} else {
-			delete(CachedItems, ExtensionsConfig)
+			DeleteCachedItem(ExtensionsConfig)
 		}
-		cacheMutex.Unlock()
 	})
 
 	_, err := GetAllExtensions(context.Background(), 0)
@@ -290,7 +286,7 @@ func TestGetDatabaseExtensions(t *testing.T) {
 
 // TestGetAllExtensions_ConcurrentCacheAccess reproduces the production scenario
 // where concurrent HTTP/gRPC handlers hit GetAllExtensions while the cache is
-// being refreshed. Before CachedItems was guarded by cacheMutex this crashed
+// being refreshed. Before the cache was guarded by cacheMutex this crashed
 // with "fatal error: concurrent map writes"; run with -race to verify the fix.
 func TestGetAllExtensions_ConcurrentCacheAccess(t *testing.T) {
 	const (
@@ -310,18 +306,14 @@ func TestGetAllExtensions_ConcurrentCacheAccess(t *testing.T) {
 		}
 	}
 
-	cacheMutex.Lock()
-	oldCachedItem, hadCachedItem := CachedItems[ExtensionsConfig]
-	CachedItems[ExtensionsConfig] = newCacheItem()
-	cacheMutex.Unlock()
+	oldCachedItem, hadCachedItem := GetCachedItem(ExtensionsConfig)
+	SetCachedItem(ExtensionsConfig, newCacheItem())
 	t.Cleanup(func() {
-		cacheMutex.Lock()
 		if hadCachedItem {
-			CachedItems[ExtensionsConfig] = oldCachedItem
+			SetCachedItem(ExtensionsConfig, oldCachedItem)
 		} else {
-			delete(CachedItems, ExtensionsConfig)
+			DeleteCachedItem(ExtensionsConfig)
 		}
-		cacheMutex.Unlock()
 	})
 
 	// A long durability keeps readers on the cache-hit path, so no DB is needed.
@@ -352,7 +344,7 @@ func TestGetAllExtensions_ConcurrentCacheAccess(t *testing.T) {
 		go func() {
 			defer wg.Done()
 			for j := 0; j < iterations; j++ {
-				setCachedItem(ExtensionsConfig, newCacheItem())
+				SetCachedItem(ExtensionsConfig, newCacheItem())
 			}
 		}()
 	}

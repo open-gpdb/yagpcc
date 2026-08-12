@@ -107,7 +107,7 @@ var (
 	db          *Connection
 	dbMutex     sync.Mutex
 	cacheMutex  sync.RWMutex
-	CachedItems Cache = make(Cache, 0)
+	cachedItems Cache = make(Cache, 0)
 )
 
 func checkCacheItem(cacheItem *CacheItem, durability time.Duration) bool {
@@ -127,19 +127,26 @@ func checkCacheItem(cacheItem *CacheItem, durability time.Duration) bool {
 	return true
 }
 
-// getCachedItem returns the cache item for the given key, safe for concurrent use.
-func getCachedItem(key string) (*CacheItem, bool) {
+// GetCachedItem returns the cache item for the given key, safe for concurrent use.
+func GetCachedItem(key string) (*CacheItem, bool) {
 	cacheMutex.RLock()
 	defer cacheMutex.RUnlock()
-	cachedItem, ok := CachedItems[key]
+	cachedItem, ok := cachedItems[key]
 	return cachedItem, ok
 }
 
-// setCachedItem stores the cache item under the given key, safe for concurrent use.
-func setCachedItem(key string, cachedItem *CacheItem) {
+// SetCachedItem stores the cache item under the given key, safe for concurrent use.
+func SetCachedItem(key string, cachedItem *CacheItem) {
 	cacheMutex.Lock()
 	defer cacheMutex.Unlock()
-	CachedItems[key] = cachedItem
+	cachedItems[key] = cachedItem
+}
+
+// DeleteCachedItem removes the cache item for the given key, safe for concurrent use.
+func DeleteCachedItem(key string) {
+	cacheMutex.Lock()
+	defer cacheMutex.Unlock()
+	delete(cachedItems, key)
 }
 
 func Init(ctx context.Context, log *zap.SugaredLogger, config *config.PGConfig, maxRetries int) error {
@@ -178,7 +185,7 @@ func populateHostnameMap(segmentConfig GpSegmentsConfiguration) {
 }
 
 func GetSegmentConfig(ctx context.Context, durability time.Duration) (GpSegmentsConfiguration, error) {
-	cachedItem, ok := getCachedItem(SegmentConfig)
+	cachedItem, ok := GetCachedItem(SegmentConfig)
 	if ok && checkCacheItem(cachedItem, durability) {
 		return cachedItem.ItemValue.(GpSegmentsConfiguration), nil
 	}
@@ -190,7 +197,7 @@ func GetSegmentConfig(ctx context.Context, durability time.Duration) (GpSegments
 	if err != nil {
 		return nil, err
 	}
-	setCachedItem(SegmentConfig, &CacheItem{
+	SetCachedItem(SegmentConfig, &CacheItem{
 		ItemValue:   segmentConfig,
 		Status:      CacheOk,
 		RefreshDate: time.Now(),
@@ -200,7 +207,7 @@ func GetSegmentConfig(ctx context.Context, durability time.Duration) (GpSegments
 }
 
 func GetVersion(ctx context.Context) (VersionConfiguration, error) {
-	cachedItem, ok := getCachedItem(VersionConfig)
+	cachedItem, ok := GetCachedItem(VersionConfig)
 	if ok {
 		return cachedItem.ItemValue.(VersionConfiguration), nil
 	}
@@ -215,7 +222,7 @@ func GetVersion(ctx context.Context) (VersionConfiguration, error) {
 	if len(versionConfig) == 0 {
 		return VersionConfiguration{}, fmt.Errorf("internal - empty version query result")
 	}
-	setCachedItem(VersionConfig, &CacheItem{
+	SetCachedItem(VersionConfig, &CacheItem{
 		ItemValue:   versionConfig[0],
 		Status:      CacheOk,
 		RefreshDate: time.Now(),
