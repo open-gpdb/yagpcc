@@ -106,6 +106,7 @@ const (
 var (
 	db          *Connection
 	dbMutex     sync.Mutex
+	cacheMutex  sync.RWMutex
 	CachedItems Cache = make(Cache, 0)
 )
 
@@ -124,6 +125,21 @@ func checkCacheItem(cacheItem *CacheItem, durability time.Duration) bool {
 		return false
 	}
 	return true
+}
+
+// getCachedItem returns the cache item for the given key, safe for concurrent use.
+func getCachedItem(key string) (*CacheItem, bool) {
+	cacheMutex.RLock()
+	defer cacheMutex.RUnlock()
+	cachedItem, ok := CachedItems[key]
+	return cachedItem, ok
+}
+
+// setCachedItem stores the cache item under the given key, safe for concurrent use.
+func setCachedItem(key string, cachedItem *CacheItem) {
+	cacheMutex.Lock()
+	defer cacheMutex.Unlock()
+	CachedItems[key] = cachedItem
 }
 
 func Init(ctx context.Context, log *zap.SugaredLogger, config *config.PGConfig, maxRetries int) error {
@@ -162,7 +178,7 @@ func populateHostnameMap(segmentConfig GpSegmentsConfiguration) {
 }
 
 func GetSegmentConfig(ctx context.Context, durability time.Duration) (GpSegmentsConfiguration, error) {
-	cachedItem, ok := CachedItems[SegmentConfig]
+	cachedItem, ok := getCachedItem(SegmentConfig)
 	if ok && checkCacheItem(cachedItem, durability) {
 		return cachedItem.ItemValue.(GpSegmentsConfiguration), nil
 	}
@@ -174,17 +190,17 @@ func GetSegmentConfig(ctx context.Context, durability time.Duration) (GpSegments
 	if err != nil {
 		return nil, err
 	}
-	CachedItems[SegmentConfig] = &CacheItem{
+	setCachedItem(SegmentConfig, &CacheItem{
 		ItemValue:   segmentConfig,
 		Status:      CacheOk,
 		RefreshDate: time.Now(),
-	}
+	})
 	populateHostnameMap(segmentConfig)
 	return segmentConfig, nil
 }
 
 func GetVersion(ctx context.Context) (VersionConfiguration, error) {
-	cachedItem, ok := CachedItems[VersionConfig]
+	cachedItem, ok := getCachedItem(VersionConfig)
 	if ok {
 		return cachedItem.ItemValue.(VersionConfiguration), nil
 	}
@@ -199,10 +215,10 @@ func GetVersion(ctx context.Context) (VersionConfiguration, error) {
 	if len(versionConfig) == 0 {
 		return VersionConfiguration{}, fmt.Errorf("internal - empty version query result")
 	}
-	CachedItems[VersionConfig] = &CacheItem{
+	setCachedItem(VersionConfig, &CacheItem{
 		ItemValue:   versionConfig[0],
 		Status:      CacheOk,
 		RefreshDate: time.Now(),
-	}
+	})
 	return versionConfig[0], nil
 }

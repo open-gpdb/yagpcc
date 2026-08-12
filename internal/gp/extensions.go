@@ -143,7 +143,7 @@ func execQueryOnCurrentDB(ctx context.Context, conn *Connection, query string, d
 // GetAllExtensions retrieves extension information from all user databases
 func GetAllExtensions(ctx context.Context, durability time.Duration) (AllDatabaseExtensions, error) {
 	// Check cache first
-	cachedItem, ok := CachedItems[ExtensionsConfig]
+	cachedItem, ok := getCachedItem(ExtensionsConfig)
 	if ok && checkCacheItem(cachedItem, durability) {
 		return cachedItem.ItemValue.(AllDatabaseExtensions), nil
 	}
@@ -199,11 +199,11 @@ func GetAllExtensions(ctx context.Context, durability time.Duration) (AllDatabas
 	}
 
 	// Cache the result
-	CachedItems[ExtensionsConfig] = &CacheItem{
+	setCachedItem(ExtensionsConfig, &CacheItem{
 		ItemValue:   allExtensions,
 		Status:      CacheOk,
 		RefreshDate: time.Now(),
-	}
+	})
 
 	return allExtensions, nil
 }
