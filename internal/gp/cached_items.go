@@ -106,7 +106,8 @@ const (
 var (
 	db          *Connection
 	dbMutex     sync.Mutex
-	CachedItems Cache = make(Cache, 0)
+	cacheMutex  sync.RWMutex
+	cachedItems Cache = make(Cache, 0)
 )
 
 func checkCacheItem(cacheItem *CacheItem, durability time.Duration) bool {
@@ -124,6 +125,28 @@ func checkCacheItem(cacheItem *CacheItem, durability time.Duration) bool {
 		return false
 	}
 	return true
+}
+
+// GetCachedItem returns the cache item for the given key, safe for concurrent use.
+func GetCachedItem(key string) (*CacheItem, bool) {
+	cacheMutex.RLock()
+	defer cacheMutex.RUnlock()
+	cachedItem, ok := cachedItems[key]
+	return cachedItem, ok
+}
+
+// SetCachedItem stores the cache item under the given key, safe for concurrent use.
+func SetCachedItem(key string, cachedItem *CacheItem) {
+	cacheMutex.Lock()
+	defer cacheMutex.Unlock()
+	cachedItems[key] = cachedItem
+}
+
+// DeleteCachedItem removes the cache item for the given key, safe for concurrent use.
+func DeleteCachedItem(key string) {
+	cacheMutex.Lock()
+	defer cacheMutex.Unlock()
+	delete(cachedItems, key)
 }
 
 func Init(ctx context.Context, log *zap.SugaredLogger, config *config.PGConfig, maxRetries int) error {
@@ -162,7 +185,7 @@ func populateHostnameMap(segmentConfig GpSegmentsConfiguration) {
 }
 
 func GetSegmentConfig(ctx context.Context, durability time.Duration) (GpSegmentsConfiguration, error) {
-	cachedItem, ok := CachedItems[SegmentConfig]
+	cachedItem, ok := GetCachedItem(SegmentConfig)
 	if ok && checkCacheItem(cachedItem, durability) {
 		return cachedItem.ItemValue.(GpSegmentsConfiguration), nil
 	}
@@ -174,17 +197,17 @@ func GetSegmentConfig(ctx context.Context, durability time.Duration) (GpSegments
 	if err != nil {
 		return nil, err
 	}
-	CachedItems[SegmentConfig] = &CacheItem{
+	SetCachedItem(SegmentConfig, &CacheItem{
 		ItemValue:   segmentConfig,
 		Status:      CacheOk,
 		RefreshDate: time.Now(),
-	}
+	})
 	populateHostnameMap(segmentConfig)
 	return segmentConfig, nil
 }
 
 func GetVersion(ctx context.Context) (VersionConfiguration, error) {
-	cachedItem, ok := CachedItems[VersionConfig]
+	cachedItem, ok := GetCachedItem(VersionConfig)
 	if ok {
 		return cachedItem.ItemValue.(VersionConfiguration), nil
 	}
@@ -199,10 +222,10 @@ func GetVersion(ctx context.Context) (VersionConfiguration, error) {
 	if len(versionConfig) == 0 {
 		return VersionConfiguration{}, fmt.Errorf("internal - empty version query result")
 	}
-	CachedItems[VersionConfig] = &CacheItem{
+	SetCachedItem(VersionConfig, &CacheItem{
 		ItemValue:   versionConfig[0],
 		Status:      CacheOk,
 		RefreshDate: time.Now(),
-	}
+	})
 	return versionConfig[0], nil
 }

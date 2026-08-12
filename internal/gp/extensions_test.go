@@ -18,7 +18,9 @@ package gp
 
 import (
 	"context"
+	"sync"
 	"testing"
+	"time"
 
 	"github.com/open-gpdb/yagpcc/internal/config"
 	"github.com/stretchr/testify/require"
@@ -81,18 +83,18 @@ func TestGetExtensions_DBNotInitialized(t *testing.T) {
 	dbMutex.Lock()
 	oldDB := db
 	db = nil
-	oldCachedItem, hadCachedItem := CachedItems[ExtensionsConfig]
-	delete(CachedItems, ExtensionsConfig)
 	dbMutex.Unlock()
+	oldCachedItem, hadCachedItem := GetCachedItem(ExtensionsConfig)
+	DeleteCachedItem(ExtensionsConfig)
 	t.Cleanup(func() {
 		dbMutex.Lock()
 		db = oldDB
-		if hadCachedItem {
-			CachedItems[ExtensionsConfig] = oldCachedItem
-		} else {
-			delete(CachedItems, ExtensionsConfig)
-		}
 		dbMutex.Unlock()
+		if hadCachedItem {
+			SetCachedItem(ExtensionsConfig, oldCachedItem)
+		} else {
+			DeleteCachedItem(ExtensionsConfig)
+		}
 	})
 
 	_, err := GetAllExtensions(context.Background(), 0)
@@ -280,4 +282,71 @@ func TestGetDatabaseExtensions(t *testing.T) {
 	require.NoError(t, err)
 	require.Len(t, dbExt3.Extensions, 0)
 	require.Equal(t, "database nonexistent not found", dbExt3.Error)
+}
+
+// TestGetAllExtensions_ConcurrentCacheAccess reproduces the production scenario
+// where concurrent HTTP/gRPC handlers hit GetAllExtensions while the cache is
+// being refreshed. Before the cache was guarded by cacheMutex this crashed
+// with "fatal error: concurrent map writes"; run with -race to verify the fix.
+func TestGetAllExtensions_ConcurrentCacheAccess(t *testing.T) {
+	const (
+		workers    = 8
+		iterations = 200
+	)
+
+	newCacheItem := func() *CacheItem {
+		return &CacheItem{
+			ItemValue: AllDatabaseExtensions{
+				"testdb": DatabaseExtensions{
+					Extensions: []PgExtension{{ExtName: "ext1", ExtVersion: "1.0"}},
+				},
+			},
+			Status:      CacheOk,
+			RefreshDate: time.Now(),
+		}
+	}
+
+	oldCachedItem, hadCachedItem := GetCachedItem(ExtensionsConfig)
+	SetCachedItem(ExtensionsConfig, newCacheItem())
+	t.Cleanup(func() {
+		if hadCachedItem {
+			SetCachedItem(ExtensionsConfig, oldCachedItem)
+		} else {
+			DeleteCachedItem(ExtensionsConfig)
+		}
+	})
+
+	// A long durability keeps readers on the cache-hit path, so no DB is needed.
+	durability := time.Hour
+
+	var wg sync.WaitGroup
+	// Readers: same entry points the HTTP/gRPC handlers use.
+	for i := 0; i < workers; i++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			for j := 0; j < iterations; j++ {
+				res, err := GetAllExtensions(context.Background(), durability)
+				if err != nil || len(res) == 0 {
+					t.Errorf("unexpected GetAllExtensions result: res=%v err=%v", res, err)
+					return
+				}
+				if _, err := GetDatabaseExtensions(context.Background(), durability, "testdb"); err != nil {
+					t.Errorf("unexpected GetDatabaseExtensions error: %v", err)
+					return
+				}
+			}
+		}()
+	}
+	// Writers: simulate a concurrent cache refresh storing a fresh result.
+	for i := 0; i < workers; i++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			for j := 0; j < iterations; j++ {
+				SetCachedItem(ExtensionsConfig, newCacheItem())
+			}
+		}()
+	}
+	wg.Wait()
 }

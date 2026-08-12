@@ -97,8 +97,8 @@ func TestGetGPExtensionsWithoutDatabaseName(t *testing.T) {
 	clientSet, cleanup := setupGRPCClientSet(t, sessionMocker)
 	defer cleanup()
 
-	oldCachedItem, hadCachedItem := gp.CachedItems[gp.ExtensionsConfig]
-	gp.CachedItems[gp.ExtensionsConfig] = &gp.CacheItem{
+	oldCachedItem, hadCachedItem := gp.GetCachedItem(gp.ExtensionsConfig)
+	gp.SetCachedItem(gp.ExtensionsConfig, &gp.CacheItem{
 		ItemValue: gp.AllDatabaseExtensions{
 			"db1": {
 				Extensions: []gp.PgExtension{
@@ -125,12 +125,12 @@ func TestGetGPExtensionsWithoutDatabaseName(t *testing.T) {
 		},
 		Status:      gp.CacheOk,
 		RefreshDate: time.Now(),
-	}
+	})
 	t.Cleanup(func() {
 		if hadCachedItem {
-			gp.CachedItems[gp.ExtensionsConfig] = oldCachedItem
+			gp.SetCachedItem(gp.ExtensionsConfig, oldCachedItem)
 		} else {
-			delete(gp.CachedItems, gp.ExtensionsConfig)
+			gp.DeleteCachedItem(gp.ExtensionsConfig)
 		}
 	})
 

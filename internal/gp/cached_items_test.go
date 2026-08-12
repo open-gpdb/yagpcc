@@ -17,10 +17,13 @@
 package gp
 
 import (
+	"sync"
 	"testing"
+	"time"
 
 	"github.com/open-gpdb/yagpcc/internal/storage"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func clearSegmentMap() {
@@ -139,4 +142,95 @@ func TestPopulateHostnameMapUpdatesOnRefresh(t *testing.T) {
 	}
 	populateHostnameMap(segConfig2)
 	assert.Equal(t, "new-primary.db.yandex.net", storage.GetHostnameForSegindex(0))
+}
+
+// testCacheKey is a dedicated key for cache accessor tests, so they never
+// interfere with the real cache keys used by other tests.
+const testCacheKey = "TestCachedItemsAccessors"
+
+func newTestCacheItem(version string) *CacheItem {
+	return &CacheItem{
+		ItemValue:   VersionConfiguration{Version: version},
+		Status:      CacheOk,
+		RefreshDate: time.Now(),
+	}
+}
+
+func TestSetAndGetCachedItem(t *testing.T) {
+	t.Cleanup(func() { DeleteCachedItem(testCacheKey) })
+
+	item := newTestCacheItem("1.0")
+	SetCachedItem(testCacheKey, item)
+
+	got, ok := GetCachedItem(testCacheKey)
+	require.True(t, ok)
+	assert.Equal(t, item, got)
+	assert.Equal(t, "1.0", got.ItemValue.(VersionConfiguration).Version)
+}
+
+func TestGetCachedItemMissingKey(t *testing.T) {
+	got, ok := GetCachedItem("TestCachedItemsAccessorsMissing")
+
+	assert.False(t, ok)
+	assert.Nil(t, got)
+}
+
+func TestSetCachedItemOverwrites(t *testing.T) {
+	t.Cleanup(func() { DeleteCachedItem(testCacheKey) })
+
+	SetCachedItem(testCacheKey, newTestCacheItem("1.0"))
+	SetCachedItem(testCacheKey, newTestCacheItem("2.0"))
+
+	got, ok := GetCachedItem(testCacheKey)
+	require.True(t, ok)
+	assert.Equal(t, "2.0", got.ItemValue.(VersionConfiguration).Version)
+}
+
+func TestDeleteCachedItem(t *testing.T) {
+	SetCachedItem(testCacheKey, newTestCacheItem("1.0"))
+
+	DeleteCachedItem(testCacheKey)
+
+	_, ok := GetCachedItem(testCacheKey)
+	assert.False(t, ok)
+}
+
+func TestDeleteCachedItemMissingKey(t *testing.T) {
+	// Deleting a key that does not exist must not panic.
+	DeleteCachedItem("TestCachedItemsAccessorsMissing")
+}
+
+// TestCachedItemsAccessorsConcurrent hammers all three accessors from
+// concurrent goroutines; run with -race to verify the internal locking.
+func TestCachedItemsAccessorsConcurrent(t *testing.T) {
+	t.Cleanup(func() { DeleteCachedItem(testCacheKey) })
+
+	const (
+		workers    = 8
+		iterations = 200
+	)
+
+	var wg sync.WaitGroup
+	for i := 0; i < workers; i++ {
+		wg.Add(3)
+		go func() {
+			defer wg.Done()
+			for j := 0; j < iterations; j++ {
+				SetCachedItem(testCacheKey, newTestCacheItem("1.0"))
+			}
+		}()
+		go func() {
+			defer wg.Done()
+			for j := 0; j < iterations; j++ {
+				_, _ = GetCachedItem(testCacheKey)
+			}
+		}()
+		go func() {
+			defer wg.Done()
+			for j := 0; j < iterations; j++ {
+				DeleteCachedItem(testCacheKey)
+			}
+		}()
+	}
+	wg.Wait()
 }
