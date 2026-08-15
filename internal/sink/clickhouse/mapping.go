@@ -20,6 +20,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"math"
 	"strconv"
 	"time"
 
@@ -231,9 +232,9 @@ func pruneEmpty(m map[string]any) {
 
 // coerce converts a raw JSON value into the Go type ClickHouse expects for the
 // column. Absent (or JSON null) yields NULL for nullable columns and the zero
-// value otherwise. Numbers arrive as float64 (encoding/json) or as decimal
-// strings (protojson emits 64-bit ints as strings), so every numeric branch
-// accepts both.
+// value otherwise. Numbers arrive as json.Number (UseNumber) or as decimal
+// strings (protojson emits 64-bit ints as strings); a non-integer or
+// out-of-range value for an integer column is a mapping error.
 func coerce(raw any, present bool, c *column) (any, error) {
 	if !present || raw == nil {
 		return zeroFor(c), nil
@@ -242,23 +243,36 @@ func coerce(raw any, present bool, c *column) (any, error) {
 	case kindString:
 		return toString(raw)
 	case kindStatusEnum:
-		n, err := toInt64(raw)
+		n, err := toInt32(raw)
 		if err != nil {
 			return nil, err
 		}
-		return pbc.QueryStatus(int32(n)).String(), nil
+		return pbc.QueryStatus(n).String(), nil
 	case kindBool:
 		return toBool(raw)
 	case kindU64:
-		return toUint64(raw)
-	case kindU32:
 		n, err := toUint64(raw)
-		return uint32(n), err
+		if err != nil {
+			// A negative value in a nullable unsigned column (e.g. ClientPort=-1) means "absent".
+			if c.nullable && isNegativeInt(raw) {
+				return nil, nil
+			}
+			return nil, err
+		}
+		return n, nil
+	case kindU32:
+		n, err := toUint32(raw)
+		if err != nil {
+			if c.nullable && isNegativeInt(raw) {
+				return nil, nil
+			}
+			return nil, err
+		}
+		return n, nil
 	case kindI64:
 		return toInt64(raw)
 	case kindI32:
-		n, err := toInt64(raw)
-		return int32(n), err
+		return toInt32(raw)
 	case kindF64:
 		return toFloat64(raw)
 	case kindDateTime:
@@ -330,6 +344,10 @@ func toBool(raw any) (bool, error) {
 func toUint64(raw any) (uint64, error) {
 	switch v := raw.(type) {
 	case float64:
+		// Defensive: MapRow decodes with UseNumber, so floats should not reach here.
+		if v < 0 || v != math.Trunc(v) || v >= 1<<64 {
+			return 0, fmt.Errorf("cannot convert %v to uint64", v)
+		}
 		return uint64(v), nil
 	case json.Number:
 		return uint64FromString(v.String())
@@ -340,23 +358,37 @@ func toUint64(raw any) (uint64, error) {
 	}
 }
 
+// Producers emit integers as digit strings (protojson) or integer literals
+// (encoding/json), so anything ParseUint rejects is corrupt data.
 func uint64FromString(v string) (uint64, error) {
 	if v == "" {
 		return 0, nil
 	}
-	if n, err := strconv.ParseUint(v, 10, 64); err == nil {
-		return n, nil
-	}
-	f, err := strconv.ParseFloat(v, 64)
+	n, err := strconv.ParseUint(v, 10, 64)
 	if err != nil {
 		return 0, fmt.Errorf("cannot convert %q to uint64", v)
 	}
-	return uint64(f), nil
+	return n, nil
+}
+
+func toUint32(raw any) (uint32, error) {
+	n, err := toUint64(raw)
+	if err != nil {
+		return 0, err
+	}
+	if n > math.MaxUint32 {
+		return 0, fmt.Errorf("value %d overflows uint32", n)
+	}
+	return uint32(n), nil
 }
 
 func toInt64(raw any) (int64, error) {
 	switch v := raw.(type) {
 	case float64:
+		// Defensive: MapRow decodes with UseNumber, so floats should not reach here.
+		if v != math.Trunc(v) || v < math.MinInt64 || v >= 1<<63 {
+			return 0, fmt.Errorf("cannot convert %v to int64", v)
+		}
 		return int64(v), nil
 	case json.Number:
 		return int64FromString(v.String())
@@ -371,14 +403,27 @@ func int64FromString(v string) (int64, error) {
 	if v == "" {
 		return 0, nil
 	}
-	if n, err := strconv.ParseInt(v, 10, 64); err == nil {
-		return n, nil
-	}
-	f, err := strconv.ParseFloat(v, 64)
+	n, err := strconv.ParseInt(v, 10, 64)
 	if err != nil {
 		return 0, fmt.Errorf("cannot convert %q to int64", v)
 	}
-	return int64(f), nil
+	return n, nil
+}
+
+func isNegativeInt(raw any) bool {
+	n, err := toInt64(raw)
+	return err == nil && n < 0
+}
+
+func toInt32(raw any) (int32, error) {
+	n, err := toInt64(raw)
+	if err != nil {
+		return 0, err
+	}
+	if n < math.MinInt32 || n > math.MaxInt32 {
+		return 0, fmt.Errorf("value %d overflows int32", n)
+	}
+	return int32(n), nil
 }
 
 func toFloat64(raw any) (float64, error) {

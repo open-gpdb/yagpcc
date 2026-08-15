@@ -309,6 +309,34 @@ func TestMapping_LargeUint64PreservesPrecision(t *testing.T) {
 	assert.Equal(t, uint64(9007199254740993), row["plan_id"])
 }
 
+// mapErr asserts that mapping the document fails with a coercion error.
+func mapErr(t *testing.T, tm *tableMapping, data string) {
+	t.Helper()
+	_, err := MapRow(tm, []byte(data), testMeta)
+	require.Error(t, err)
+}
+
+func TestMapping_StrictNumericCoercions(t *testing.T) {
+	// Negative and fractional values must fail instead of silently wrapping.
+	mapErr(t, SessionsMapping(), `{"GpStatInfo":{"SessID": -1}}`)
+	mapErr(t, SessionsMapping(), `{"RunningQueryInfo":{"QueryID": 1.9}}`)
+	// 32-bit columns must reject out-of-range values.
+	mapErr(t, SessionsMapping(), `{"GpStatInfo":{"Pid": 4294967296}}`)
+	mapErr(t, SegmentsMapping(), `{"segmentKey":{"dbid": 2147483648}}`)
+	mapErr(t, SessionsMapping(), `{"RunningQueryStatus": 3000000000}`)
+	// Fractional value in a protojson-style string must fail too.
+	mapErr(t, SegmentsMapping(), `{"segmentKey":{"dbid": "1.9"}}`)
+	// Empty string still maps to zero.
+	row := rowMap(t, SegmentsMapping(), []byte(`{"segmentKey":{"dbid": ""}}`))
+	assert.Equal(t, int32(0), row["dbid"])
+	// In-range values keep working.
+	row = rowMap(t, SessionsMapping(), []byte(`{"GpStatInfo":{"Pid": 4294967295}}`))
+	assert.Equal(t, uint32(4294967295), row["pid"])
+	// Negative in a nullable unsigned column means "absent" (live JSONL has ClientPort=-1).
+	row = rowMap(t, SessionsMapping(), []byte(`{"GpStatInfo":{"ClientPort": -1}}`))
+	assert.Nil(t, row["client_port"])
+}
+
 func TestMapping_UnknownFieldGoesToRest(t *testing.T) {
 	row := rowMap(t, SessionsMapping(), []byte(`{"ClusterID":"z","SomethingNew":42}`))
 	assert.Equal(t, "z", row["cluster_id"])

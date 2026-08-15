@@ -156,7 +156,8 @@ func (w *ClickHouseWriters) insertBatch(ctx context.Context, tm *clickhouse.Mapp
 	}
 	table := tm.Table()
 
-	ts := time.Now()
+	// UTC keeps the CDC _timestamp consistent across hosts with different local zones.
+	ts := time.Now().UTC()
 	rows := make([][]any, 0, len(jsons))
 	for i, js := range jsons {
 		meta := clickhouse.CDCMeta{
