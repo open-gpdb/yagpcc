@@ -58,7 +58,7 @@ arch_config:
   max_file_size: 419430400
 ```
 
-A forward-compatible writer configuration section is available through [`WriterConfig`](../internal/config/config.go:54) and [`WriterTarget`](../internal/config/config.go:71). It is intended for future writer implementations such as ClickHouse or Greenplum database sinks:
+A writer configuration section is available through [`WriterConfig`](../internal/config/config.go:54) and [`WriterTarget`](../internal/config/config.go:71). The list under `targets` is fanned out: each enabled target gets its own independent batch-processor pipeline (bounded queue, write timeout, drops), so a slow target never stalls or drops writes for the others. `targets[0]` must be an enabled `file` target.
 
 ```yaml
 writers:
@@ -74,7 +74,31 @@ writers:
       max_file_size: 419430400
 ```
 
-At the moment only the file writer is implemented and wired at startup.
+### ClickHouse target
+
+A `type: clickhouse` target streams the same three JSONL streams directly into the production schema tables `yagpcc.sessions_part`, `yagpcc.statements_part` and `yagpcc.segments_part` using native batch inserts (one `PrepareBatch`/`Send` per pipe batch). Column values come from the same JSON the file writer emits, so file and ClickHouse stay consistent. It can run alongside the file target:
+
+```yaml
+writers:
+  targets:
+    - type: file
+      enabled: true
+      sessions_file: sessions.json
+      queries_file: queries.json
+      segments_file: segments.json
+      max_file_size: 419430400
+    - type: clickhouse
+      enabled: true
+      addrs: ["clickhouse-1:9000", "clickhouse-2:9000"]
+      database: yagpcc
+      user: yagpcc_writer
+      # password: leave empty here and supply via YAGPCC_CH_PASSWORD
+      tls:
+        enabled: true
+        ca_file: /etc/yagpcc/ch-ca.pem
+```
+
+An enabled `clickhouse` target requires a non-empty `addrs`; the password is read from the `YAGPCC_CH_PASSWORD` env var when omitted from the file. Connections are opened lazily, so an unreachable server at startup does not crash the process or affect the file target — its batches are dropped per-batch until it recovers. Apply the schema out of band with `yagpcc --dump-schema` / `--migrate-only` (add `--replicated` for the clustered `ReplicatedReplacingMergeTree` + `Distributed` variant). Greenplum (`type: greenplum`) is a follow-up that reuses the same fan-out and `ArchiveWriter` interface.
 
 ## Metrics
 

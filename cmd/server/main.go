@@ -57,7 +57,17 @@ func main() {
 	}()
 
 	registerConfigPathFlag(pflag.CommandLine)
+	var schema schemaFlags
+	registerSchemaCLIFlags(pflag.CommandLine, &schema)
 	pflag.Parse()
+
+	schema.configPath = filepath.Join(*configPathValue, configFile)
+	if schema.schemaCommandRequested() {
+		os.Exit(runSchemaCLI(ctxC, schema, productionSchemaCLIDeps()))
+	}
+	if exit, ok := maybeRunDumpOnlyFromConfig(schema, productionSchemaCLIDeps()); ok {
+		os.Exit(exit)
+	}
 
 	for {
 		configPath := filepath.Join(*configPathValue, configFile)

@@ -69,3 +69,41 @@ jobs:
           version: v2.6
       - name: Unit tests (all packages)
         run: make unittest
+
+  clickhouse-integration:
+    # Heavier than the unit-test job: runs the JSON→column mapping and the
+    # standalone production DDL against a real ClickHouse via the `integration`
+    # build tag. The server is provided as a service container and its native
+    # port is handed to the test through YAGPCC_CH_ADDR.
+    runs-on: ubuntu-latest
+    needs: tests
+    strategy:
+      matrix:
+        go-version: ['1.25']
+    services:
+      clickhouse:
+        image: clickhouse/clickhouse-server:24.3
+        # Without this the image entrypoint disables network access for the
+        # `default` user, so connections from the runner through the mapped
+        # port fail with AUTHENTICATION_FAILED.
+        env:
+          CLICKHOUSE_SKIP_USER_SETUP: 1
+        ports:
+          - 9000:9000
+        options: >-
+          --health-cmd "clickhouse-client --query 'SELECT 1'"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 10
+    steps:
+      - uses: actions/checkout@v5
+      - name: Setup Go
+        uses: actions/setup-go@v6
+        with:
+          go-version: ${{ matrix.go-version }}
+      - name: Download modules
+        run: go mod download
+      - name: ClickHouse sink integration tests
+        env:
+          YAGPCC_CH_ADDR: 127.0.0.1:9000
+        run: go test -tags=integration -v -count=1 -timeout=10m ./internal/sink/clickhouse/...

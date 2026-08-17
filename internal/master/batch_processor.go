@@ -44,17 +44,20 @@ type QueryStoreFunc func(ctx context.Context, queries []*pbm.QueryStatWrite) err
 // SegmentStoreFunc is the function signature for storing a batch of segment metrics.
 type SegmentStoreFunc func(ctx context.Context, metrics []*pbm.SegmentMetricsWrite) error
 
-// RunSessionBatchProcessor starts the batch processor for sessions.
+// RunSessionBatchProcessor starts the batch processor for sessions. target names
+// the writer destination and is used as a Prometheus label so multiple targets
+// can be distinguished.
 func RunSessionBatchProcessor(
 	ctx context.Context,
 	logger *zap.SugaredLogger,
 	config BatchProcessorConfig,
+	target string,
 	sourceCh <-chan *gp.SessionDataWrite,
 	store SessionStoreFunc,
 ) {
 	pipeCh := make(chan []*gp.SessionDataWrite, config.BatchQueueSize)
-	go collectSessionBatches(ctx, logger, config, sourceCh, pipeCh)
-	go processSessionBatches(ctx, logger, config, pipeCh, store)
+	go collectSessionBatches(ctx, logger, config, target, sourceCh, pipeCh)
+	go processSessionBatches(ctx, logger, config, target, pipeCh, store)
 	<-ctx.Done()
 	logger.Info("done session batch processor")
 }
@@ -64,12 +67,13 @@ func RunQueryBatchProcessor(
 	ctx context.Context,
 	logger *zap.SugaredLogger,
 	config BatchProcessorConfig,
+	target string,
 	sourceCh <-chan *pbm.QueryStatWrite,
 	store QueryStoreFunc,
 ) {
 	pipeCh := make(chan []*pbm.QueryStatWrite, config.BatchQueueSize)
-	go collectQueryBatches(ctx, logger, config, sourceCh, pipeCh)
-	go processQueryBatches(ctx, logger, config, pipeCh, store)
+	go collectQueryBatches(ctx, logger, config, target, sourceCh, pipeCh)
+	go processQueryBatches(ctx, logger, config, target, pipeCh, store)
 	<-ctx.Done()
 	logger.Info("done query batch processor")
 }
@@ -79,12 +83,13 @@ func RunSegmentBatchProcessor(
 	ctx context.Context,
 	logger *zap.SugaredLogger,
 	config BatchProcessorConfig,
+	target string,
 	sourceCh <-chan *pbm.SegmentMetricsWrite,
 	store SegmentStoreFunc,
 ) {
 	pipeCh := make(chan []*pbm.SegmentMetricsWrite, config.BatchQueueSize)
-	go collectSegmentBatches(ctx, logger, config, sourceCh, pipeCh)
-	go processSegmentBatches(ctx, logger, config, pipeCh, store)
+	go collectSegmentBatches(ctx, logger, config, target, sourceCh, pipeCh)
+	go processSegmentBatches(ctx, logger, config, target, pipeCh, store)
 	<-ctx.Done()
 	logger.Info("done segment batch processor")
 }
@@ -94,6 +99,7 @@ func collectSessionBatches(
 	ctx context.Context,
 	logger *zap.SugaredLogger,
 	config BatchProcessorConfig,
+	target string,
 	sourceCh <-chan *gp.SessionDataWrite,
 	pipeCh chan<- []*gp.SessionDataWrite,
 ) {
@@ -113,18 +119,18 @@ func collectSessionBatches(
 			select {
 			case pipeCh <- batch:
 				if metrics.YagpccMetrics != nil {
-					metrics.YagpccMetrics.WriterBatchSize.WithLabelValues(stream).Observe(float64(len(batch)))
+					metrics.YagpccMetrics.WriterBatchSize.WithLabelValues(stream, target).Observe(float64(len(batch)))
 				}
 			case <-ctx.Done():
 				if metrics.YagpccMetrics != nil {
-					metrics.YagpccMetrics.WriterDroppedMessages.WithLabelValues(stream).Add(float64(len(batch)))
+					metrics.YagpccMetrics.WriterDroppedMessages.WithLabelValues(stream, target).Add(float64(len(batch)))
 				}
 				return
 			default:
 				if metrics.YagpccMetrics != nil {
-					metrics.YagpccMetrics.WriterDroppedMessages.WithLabelValues(stream).Add(float64(len(batch)))
+					metrics.YagpccMetrics.WriterDroppedMessages.WithLabelValues(stream, target).Add(float64(len(batch)))
 				}
-				logger.Warnf("pipe full for stream %s, dropping batch of %d messages", stream, len(batch))
+				logger.Warnf("pipe full for stream %s target %s, dropping batch of %d messages", stream, target, len(batch))
 			}
 		}
 
@@ -160,6 +166,7 @@ func processSessionBatches(
 	ctx context.Context,
 	logger *zap.SugaredLogger,
 	config BatchProcessorConfig,
+	target string,
 	pipeCh <-chan []*gp.SessionDataWrite,
 	store SessionStoreFunc,
 ) {
@@ -170,7 +177,7 @@ func processSessionBatches(
 		case <-ctx.Done():
 			return
 		case batch := <-pipeCh:
-			processBatch(ctx, logger, config, stream, batch, func(ctx context.Context, b []*gp.SessionDataWrite) error {
+			processBatch(ctx, logger, config, stream, target, batch, func(ctx context.Context, b []*gp.SessionDataWrite) error {
 				return store(ctx, b)
 			})
 		}
@@ -182,6 +189,7 @@ func collectQueryBatches(
 	ctx context.Context,
 	logger *zap.SugaredLogger,
 	config BatchProcessorConfig,
+	target string,
 	sourceCh <-chan *pbm.QueryStatWrite,
 	pipeCh chan<- []*pbm.QueryStatWrite,
 ) {
@@ -201,18 +209,18 @@ func collectQueryBatches(
 			select {
 			case pipeCh <- batch:
 				if metrics.YagpccMetrics != nil {
-					metrics.YagpccMetrics.WriterBatchSize.WithLabelValues(stream).Observe(float64(len(batch)))
+					metrics.YagpccMetrics.WriterBatchSize.WithLabelValues(stream, target).Observe(float64(len(batch)))
 				}
 			case <-ctx.Done():
 				if metrics.YagpccMetrics != nil {
-					metrics.YagpccMetrics.WriterDroppedMessages.WithLabelValues(stream).Add(float64(len(batch)))
+					metrics.YagpccMetrics.WriterDroppedMessages.WithLabelValues(stream, target).Add(float64(len(batch)))
 				}
 				return
 			default:
 				if metrics.YagpccMetrics != nil {
-					metrics.YagpccMetrics.WriterDroppedMessages.WithLabelValues(stream).Add(float64(len(batch)))
+					metrics.YagpccMetrics.WriterDroppedMessages.WithLabelValues(stream, target).Add(float64(len(batch)))
 				}
-				logger.Warnf("pipe full for stream %s, dropping batch of %d messages", stream, len(batch))
+				logger.Warnf("pipe full for stream %s target %s, dropping batch of %d messages", stream, target, len(batch))
 			}
 		}
 
@@ -248,6 +256,7 @@ func processQueryBatches(
 	ctx context.Context,
 	logger *zap.SugaredLogger,
 	config BatchProcessorConfig,
+	target string,
 	pipeCh <-chan []*pbm.QueryStatWrite,
 	store QueryStoreFunc,
 ) {
@@ -258,7 +267,7 @@ func processQueryBatches(
 		case <-ctx.Done():
 			return
 		case batch := <-pipeCh:
-			processBatch(ctx, logger, config, stream, batch, func(ctx context.Context, b []*pbm.QueryStatWrite) error {
+			processBatch(ctx, logger, config, stream, target, batch, func(ctx context.Context, b []*pbm.QueryStatWrite) error {
 				return store(ctx, b)
 			})
 		}
@@ -270,6 +279,7 @@ func collectSegmentBatches(
 	ctx context.Context,
 	logger *zap.SugaredLogger,
 	config BatchProcessorConfig,
+	target string,
 	sourceCh <-chan *pbm.SegmentMetricsWrite,
 	pipeCh chan<- []*pbm.SegmentMetricsWrite,
 ) {
@@ -289,18 +299,18 @@ func collectSegmentBatches(
 			select {
 			case pipeCh <- batch:
 				if metrics.YagpccMetrics != nil {
-					metrics.YagpccMetrics.WriterBatchSize.WithLabelValues(stream).Observe(float64(len(batch)))
+					metrics.YagpccMetrics.WriterBatchSize.WithLabelValues(stream, target).Observe(float64(len(batch)))
 				}
 			case <-ctx.Done():
 				if metrics.YagpccMetrics != nil {
-					metrics.YagpccMetrics.WriterDroppedMessages.WithLabelValues(stream).Add(float64(len(batch)))
+					metrics.YagpccMetrics.WriterDroppedMessages.WithLabelValues(stream, target).Add(float64(len(batch)))
 				}
 				return
 			default:
 				if metrics.YagpccMetrics != nil {
-					metrics.YagpccMetrics.WriterDroppedMessages.WithLabelValues(stream).Add(float64(len(batch)))
+					metrics.YagpccMetrics.WriterDroppedMessages.WithLabelValues(stream, target).Add(float64(len(batch)))
 				}
-				logger.Warnf("pipe full for stream %s, dropping batch of %d messages", stream, len(batch))
+				logger.Warnf("pipe full for stream %s target %s, dropping batch of %d messages", stream, target, len(batch))
 			}
 		}
 
@@ -336,6 +346,7 @@ func processSegmentBatches(
 	ctx context.Context,
 	logger *zap.SugaredLogger,
 	config BatchProcessorConfig,
+	target string,
 	pipeCh <-chan []*pbm.SegmentMetricsWrite,
 	store SegmentStoreFunc,
 ) {
@@ -346,7 +357,7 @@ func processSegmentBatches(
 		case <-ctx.Done():
 			return
 		case batch := <-pipeCh:
-			processBatch(ctx, logger, config, stream, batch, func(ctx context.Context, b []*pbm.SegmentMetricsWrite) error {
+			processBatch(ctx, logger, config, stream, target, batch, func(ctx context.Context, b []*pbm.SegmentMetricsWrite) error {
 				return store(ctx, b)
 			})
 		}
@@ -359,6 +370,7 @@ func processBatch[T any](
 	logger *zap.SugaredLogger,
 	config BatchProcessorConfig,
 	stream string,
+	target string,
 	batch []T,
 	store func(ctx context.Context, batch []T) error,
 ) {
@@ -373,14 +385,14 @@ func processBatch[T any](
 
 	if err != nil {
 		if metrics.YagpccMetrics != nil {
-			metrics.YagpccMetrics.WriterDroppedMessages.WithLabelValues(stream).Add(float64(len(batch)))
+			metrics.YagpccMetrics.WriterDroppedMessages.WithLabelValues(stream, target).Add(float64(len(batch)))
 		}
-		logger.Warnf("write failed for stream %s, dropping batch of %d messages: %v", stream, len(batch), err)
+		logger.Warnf("write failed for stream %s target %s, dropping batch of %d messages: %v", stream, target, len(batch), err)
 	} else if metrics.YagpccMetrics != nil {
-		metrics.YagpccMetrics.WriterProcessedMessages.WithLabelValues(stream).Add(float64(len(batch)))
+		metrics.YagpccMetrics.WriterProcessedMessages.WithLabelValues(stream, target).Add(float64(len(batch)))
 	}
 
 	if metrics.YagpccMetrics != nil {
-		metrics.YagpccMetrics.WriterDuration.WithLabelValues(stream).Observe(duration)
+		metrics.YagpccMetrics.WriterDuration.WithLabelValues(stream, target).Observe(duration)
 	}
 }

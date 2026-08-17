@@ -34,6 +34,7 @@ import (
 	"github.com/open-gpdb/yagpcc/internal/gp"
 	"github.com/open-gpdb/yagpcc/internal/gp/workfile_usage"
 	"github.com/open-gpdb/yagpcc/internal/metrics"
+	"github.com/open-gpdb/yagpcc/internal/sink/clickhouse"
 	"github.com/open-gpdb/yagpcc/internal/storage"
 	"github.com/open-gpdb/yagpcc/internal/utils"
 	"go.uber.org/zap"
@@ -278,32 +279,149 @@ func (bs *BackgroundStorage) launchSegmentPullers(ctx context.Context, nPullers 
 	}
 }
 
+// namedWriter pairs an ArchiveWriter with the target name used to label its
+// pipeline metrics.
+type namedWriter struct {
+	name   string
+	writer ArchiveWriter
+}
+
 func (bs *BackgroundStorage) launchArchiveWriters(ctx context.Context,
 	writerConfig *config.WriterConfig,
 	queryChan chan *pbm.QueryStatWrite,
 	sessChan chan *gp.SessionDataWrite,
 	segChan chan *pbm.SegmentMetricsWrite,
 ) error {
-	fileTarget := writerConfig.Targets[0]
 	batchConfig := BatchProcessorConfig{
 		BatchInterval:  writerConfig.BatchInterval,
 		WriteTimeout:   writerConfig.WriteTimeout,
 		BatchQueueSize: writerConfig.BatchQueueSize,
 	}
 
-	// Create file writers
-	fileWriters, err := NewFileWriters(bs.l, fileTarget.SessionsFile, fileTarget.QueriesFile, fileTarget.SegmentsFile, fileTarget.MaxFileSize)
+	writers, err := bs.buildArchiveWriters(writerConfig.Targets)
 	if err != nil {
-		bs.l.Errorf("could not create file writers with error %v", err)
+		bs.l.Errorf("could not create archive writers with error %v", err)
 		return err
 	}
 
-	// Start batch processors for each stream
-	go RunSessionBatchProcessor(ctx, bs.l, batchConfig, sessChan, fileWriters.StoreSessions)
-	go RunQueryBatchProcessor(ctx, bs.l, batchConfig, queryChan, fileWriters.StoreQuery)
-	go RunSegmentBatchProcessor(ctx, bs.l, batchConfig, segChan, fileWriters.StoreSegmensMetrics)
+	// Every source stream is teed onto independent per-target channels, each
+	// drained by its own batch-processor pipeline (independent bounded queue /
+	// write timeout / drops). The fan-out stamps the discovered TmID once, before
+	// distribution, so the writers stay read-only and a teed pointer is never
+	// mutated by two pipelines at once. With a single enabled target the fan-out
+	// send blocks, preserving the source backpressure of the file-only path; with
+	// several, sends are non-blocking and a full target channel drops the message
+	// for that target alone (accounted as WriterDroppedMessages).
+	names := make([]string, len(writers))
+	sessTargets := make([]chan *gp.SessionDataWrite, len(writers))
+	queryTargets := make([]chan *pbm.QueryStatWrite, len(writers))
+	segTargets := make([]chan *pbm.SegmentMetricsWrite, len(writers))
+	for i, w := range writers {
+		names[i] = w.name
+		sessTargets[i] = make(chan *gp.SessionDataWrite, fanoutBufferSize(cap(sessChan)))
+		queryTargets[i] = make(chan *pbm.QueryStatWrite, fanoutBufferSize(cap(queryChan)))
+		segTargets[i] = make(chan *pbm.SegmentMetricsWrite, fanoutBufferSize(cap(segChan)))
+		bs.startBatchProcessors(ctx, batchConfig, w, queryTargets[i], sessTargets[i], segTargets[i])
+	}
+	go fanOut(ctx, sessChan, sessTargets, "sessions", names, stampSessionTmID)
+	go fanOut(ctx, queryChan, queryTargets, "queries", names, stampQueryTmID)
+	go fanOut(ctx, segChan, segTargets, "segments", names, stampSegmentTmID)
+
+	// Release writer-held resources (ClickHouse connection pools, file handles)
+	// when the master context is cancelled so a restart or leadership change does
+	// not orphan them.
+	go func() {
+		<-ctx.Done()
+		for _, w := range writers {
+			if err := w.writer.Close(); err != nil {
+				bs.l.Warnf("archive writer %q close error: %v", w.name, err)
+			}
+		}
+	}()
 
 	return nil
+}
+
+// fanoutBufferSize keeps a per-target channel at least as large as the shared
+// source channel, falling back to a small buffer when the source is unbuffered.
+func fanoutBufferSize(sourceCap int) int {
+	if sourceCap <= 0 {
+		return segChanSize
+	}
+	return sourceCap
+}
+
+// startBatchProcessors launches the three per-stream batch processors for one
+// writer, reading from the given channels.
+func (bs *BackgroundStorage) startBatchProcessors(ctx context.Context,
+	batchConfig BatchProcessorConfig,
+	w namedWriter,
+	queryChan <-chan *pbm.QueryStatWrite,
+	sessChan <-chan *gp.SessionDataWrite,
+	segChan <-chan *pbm.SegmentMetricsWrite,
+) {
+	go RunSessionBatchProcessor(ctx, bs.l, batchConfig, w.name, sessChan, w.writer.StoreSessions)
+	go RunQueryBatchProcessor(ctx, bs.l, batchConfig, w.name, queryChan, w.writer.StoreQuery)
+	go RunSegmentBatchProcessor(ctx, bs.l, batchConfig, w.name, segChan, w.writer.StoreSegmensMetrics)
+}
+
+// buildArchiveWriters instantiates an ArchiveWriter for every enabled target.
+// Target names double as metric labels; duplicate types get a numeric suffix so
+// the labels stay unique.
+func (bs *BackgroundStorage) buildArchiveWriters(targets []config.WriterTarget) ([]namedWriter, error) {
+	writers := make([]namedWriter, 0, len(targets))
+	typeCount := make(map[string]int)
+	for i := range targets {
+		target := targets[i]
+		if !target.Enabled {
+			continue
+		}
+		w, err := bs.newArchiveWriter(target)
+		if err != nil {
+			// Close writers already built so a later target's failure does not
+			// orphan the connections/handles opened for earlier targets.
+			for _, nw := range writers {
+				if cerr := nw.writer.Close(); cerr != nil {
+					bs.l.Warnf("archive writer %q close error during cleanup: %v", nw.name, cerr)
+				}
+			}
+			return nil, err
+		}
+		typ := target.Type
+		if typ == "" {
+			typ = "file"
+		}
+		name := typ
+		if n := typeCount[typ]; n > 0 {
+			name = fmt.Sprintf("%s_%d", typ, n)
+		}
+		typeCount[typ]++
+		writers = append(writers, namedWriter{name: name, writer: w})
+	}
+	if len(writers) == 0 {
+		return nil, fmt.Errorf("no enabled archive writer targets")
+	}
+	return writers, nil
+}
+
+// newArchiveWriter builds the ArchiveWriter for a single target. A ClickHouse
+// connection is opened lazily by the driver, so an unreachable server does not
+// fail here — connection errors surface per batch and are dropped by the
+// pipeline.
+func (bs *BackgroundStorage) newArchiveWriter(target config.WriterTarget) (ArchiveWriter, error) {
+	switch target.Type {
+	case "", "file":
+		return NewFileWriters(bs.l, target.SessionsFile, target.QueriesFile, target.SegmentsFile, target.MaxFileSize)
+	case "clickhouse":
+		chCfg := target.ClickhouseConfig()
+		conn, err := clickhouse.NewClient(context.Background(), &chCfg)
+		if err != nil {
+			return nil, fmt.Errorf("clickhouse writer: %w", err)
+		}
+		return NewClickHouseWriters(bs.l, conn, chCfg.Database, clickHouseMetrics()), nil
+	default:
+		return nil, fmt.Errorf("unknown writer target type %q", target.Type)
+	}
 }
 
 func (bs *BackgroundStorage) launchArchivers(ctx context.Context,

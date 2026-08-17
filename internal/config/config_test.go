@@ -107,6 +107,104 @@ func TestValidate_WriterConfigWithValues(t *testing.T) {
 	require.NoError(t, cfg.Validate())
 }
 
+func TestValidate_ClickhouseTarget_Enabled(t *testing.T) {
+	cfg := defaultValidConfig()
+	cfg.Writers.Targets = append(cfg.Writers.Targets, WriterTarget{
+		Type:    "clickhouse",
+		Enabled: true,
+		Addrs:   []string{"ch-1:9000"},
+	})
+	require.NoError(t, cfg.Validate())
+}
+
+func TestValidate_ClickhouseTarget_MissingAddrs(t *testing.T) {
+	cfg := defaultValidConfig()
+	cfg.Writers.Targets = append(cfg.Writers.Targets, WriterTarget{
+		Type:    "clickhouse",
+		Enabled: true,
+	})
+	err := cfg.Validate()
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "clickhouse target requires addrs")
+}
+
+func TestValidate_ClickhouseTarget_DisabledNoAddrsOK(t *testing.T) {
+	cfg := defaultValidConfig()
+	cfg.Writers.Targets = append(cfg.Writers.Targets, WriterTarget{
+		Type:    "clickhouse",
+		Enabled: false,
+	})
+	require.NoError(t, cfg.Validate())
+}
+
+func TestValidate_ClickhouseTarget_UnsupportedDatabase(t *testing.T) {
+	cfg := defaultValidConfig()
+	cfg.Writers.Targets = append(cfg.Writers.Targets, WriterTarget{
+		Type:     "clickhouse",
+		Enabled:  true,
+		Addrs:    []string{"ch-1:9000"},
+		Database: "otherdb",
+	})
+	err := cfg.Validate()
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "database must be")
+}
+
+func TestValidate_UnknownTargetType(t *testing.T) {
+	cfg := defaultValidConfig()
+	cfg.Writers.Targets = append(cfg.Writers.Targets, WriterTarget{
+		Type:    "kafka",
+		Enabled: true,
+	})
+	err := cfg.Validate()
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "unknown target type")
+}
+
+func TestClickhouseConfig_FromTarget(t *testing.T) {
+	target := WriterTarget{
+		Type:     "clickhouse",
+		Enabled:  true,
+		Addrs:    []string{"ch-1:9000", "ch-2:9000"},
+		Database: "customdb",
+		User:     "writer",
+		Password: "secret",
+	}
+	chCfg := target.ClickhouseConfig()
+	assert.True(t, chCfg.Enabled)
+	assert.Equal(t, []string{"ch-1:9000", "ch-2:9000"}, chCfg.Addrs)
+	assert.Equal(t, "customdb", chCfg.Database)
+	assert.Equal(t, "writer", chCfg.User)
+	assert.Equal(t, "secret", chCfg.Password)
+	assert.False(t, chCfg.AsyncInsert)
+}
+
+func TestClickhouseConfig_FromTarget_Defaults(t *testing.T) {
+	target := WriterTarget{Type: "clickhouse", Enabled: true, Addrs: []string{"ch:9000"}}
+	chCfg := target.ClickhouseConfig()
+	// Falls back to the ClickHouse defaults when the target omits them.
+	assert.Equal(t, DefaultClickhouseConfig().Database, chCfg.Database)
+	assert.Equal(t, DefaultClickhouseConfig().User, chCfg.User)
+}
+
+func TestClickhouseConfig_FromTarget_PasswordEnvOverride(t *testing.T) {
+	t.Setenv(ClickhousePasswordEnv, "from-env")
+	target := WriterTarget{Type: "clickhouse", Enabled: true, Addrs: []string{"ch:9000"}}
+	chCfg := target.ClickhouseConfig()
+	assert.Equal(t, "from-env", chCfg.Password)
+}
+
+func TestValidate_MultipleEnabledTargets(t *testing.T) {
+	cfg := defaultValidConfig()
+	cfg.Writers.Targets = append(cfg.Writers.Targets, WriterTarget{
+		Type:    "clickhouse",
+		Enabled: true,
+		Addrs:   []string{"ch:9000"},
+	})
+	// file (targets[0]) + clickhouse both enabled is a valid configuration.
+	require.NoError(t, cfg.Validate())
+}
+
 func TestValidate_ProcfsDisabled_ZeroIntervalOK(t *testing.T) {
 	cfg := defaultValidConfig()
 	cfg.ProcfsEnabled = false

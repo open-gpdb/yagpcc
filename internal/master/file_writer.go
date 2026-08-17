@@ -61,6 +61,20 @@ func NewFileWriters(logger *zap.SugaredLogger, sessionsFile, queriesFile, segmen
 	}, nil
 }
 
+// Close closes any underlying file handles. The rotating writers satisfy
+// io.Closer; the first close error is returned after attempting all three.
+func (fw *FileWriters) Close() error {
+	var firstErr error
+	for _, wr := range []io.Writer{fw.sessionWriter, fw.queryWriter, fw.segmentWriter} {
+		if c, ok := wr.(io.Closer); ok {
+			if err := c.Close(); err != nil && firstErr == nil {
+				firstErr = err
+			}
+		}
+	}
+	return firstErr
+}
+
 // StoreSessions writes a batch of session data to the archive file.
 func (fw *FileWriters) StoreSessions(ctx context.Context, sessions []*gp.SessionDataWrite) error {
 	if len(sessions) == 0 {
@@ -69,9 +83,6 @@ func (fw *FileWriters) StoreSessions(ctx context.Context, sessions []*gp.Session
 
 	writeJS := make([]byte, 0)
 	for _, val := range sessions {
-		val.GpStatInfo.TmID = int(gp.DiscoveredTmID)
-		val.RunningQuery.Tmid = int32(gp.DiscoveredTmID)
-
 		myJS, err := val.ToJSON()
 		if err != nil {
 			fw.logger.Errorf("fail to convert sessions data %v with error %v", val, err)
@@ -96,8 +107,6 @@ func (fw *FileWriters) StoreQuery(ctx context.Context, queries []*pbm.QueryStatW
 
 	writeJS := make([]byte, 0)
 	for _, val := range queries {
-		val.QueryKey.Tmid = int32(gp.DiscoveredTmID)
-
 		serializable := &QueryStatWriteSerializable{v: val}
 		myJS, err := serializable.ToJSON()
 		if err != nil {
@@ -124,8 +133,6 @@ func (fw *FileWriters) StoreSegmensMetrics(ctx context.Context, metrics []*pbm.S
 
 	writeJS := make([]byte, 0)
 	for _, val := range metrics {
-		val.QueryKey.Tmid = int32(gp.DiscoveredTmID)
-
 		serializable := &SegmentMetricsWriteSerializable{v: val}
 		myJS, err := serializable.ToJSON()
 		if err != nil {
@@ -210,6 +217,19 @@ func (w *RotateWriter) Write(output []byte) (int, error) {
 		err = w.fp.Sync()
 	}
 	return cnt, err
+}
+
+// Close closes the underlying file handle so a master restart does not leak
+// descriptors. Safe to call when the file is already closed.
+func (w *RotateWriter) Close() error {
+	w.lock.Lock()
+	defer w.lock.Unlock()
+	if w.fp == nil {
+		return nil
+	}
+	err := w.fp.Close()
+	w.fp = nil
+	return err
 }
 
 // Rotate performs the actual act of rotating and reopening file.

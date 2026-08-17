@@ -83,6 +83,36 @@ type WriterTarget struct {
 	QueriesFile  string `config:"queries_file" yaml:"queries_file"`
 	SegmentsFile string `config:"segments_file" yaml:"segments_file"`
 	MaxFileSize  int64  `config:"max_file_size" yaml:"max_file_size"`
+
+	// ClickHouse-based writer settings (Type == "clickhouse"). Password may be
+	// left empty here and supplied through the YAGPCC_CH_PASSWORD env var.
+	Addrs    []string            `config:"addrs" yaml:"addrs"`
+	Database string              `config:"database" yaml:"database"`
+	User     string              `config:"user" yaml:"user"`
+	Password string              `config:"password" yaml:"password"`
+	TLS      ClickhouseTLSConfig `config:"tls" yaml:"tls"`
+}
+
+// ClickhouseConfig builds a ClickhouseConfig for a Type=="clickhouse" target,
+// filling connection defaults and applying the password env override. Direct
+// batch inserts run synchronously, so async_insert is disabled.
+func (t *WriterTarget) ClickhouseConfig() ClickhouseConfig {
+	cfg := DefaultClickhouseConfig()
+	cfg.Enabled = true
+	cfg.Addrs = t.Addrs
+	if t.Database != "" {
+		cfg.Database = t.Database
+	}
+	if t.User != "" {
+		cfg.User = t.User
+	}
+	if t.Password != "" {
+		cfg.Password = t.Password
+	}
+	cfg.TLS = t.TLS
+	cfg.AsyncInsert = false
+	cfg.ApplyEnvOverrides()
+	return cfg
 }
 
 // Config contains all yagpcc configuration
@@ -130,6 +160,7 @@ type Config struct {
 	MaxMessageSize             int64              `config:"max_message_size" yaml:"max_message_size"`
 	MaxOuterMessageSize        int64              `config:"max_outer_message_size" yaml:"max_outer_message_size"`
 	MaximumStoredQueries       uint32             `config:"maximum_stored_queries" yaml:"maximum_stored_queries"`
+	Clickhouse                 ClickhouseConfig   `json:"clickhouse" yaml:"clickhouse"`
 }
 
 var _ AppConfig = &Config{}
@@ -271,6 +302,7 @@ func DefaultConfig() (*Config, error) {
 		MaxMessageSize:             12 * 1024 * 1024,
 		MaxOuterMessageSize:        4 * 1024 * 1024,
 		MaximumStoredQueries:       50 * 1000,
+		Clickhouse:                 DefaultClickhouseConfig(),
 	}
 	config.normalizeWriters()
 	return &config, nil
@@ -297,6 +329,10 @@ func ReadFromFile(configFile string) (*Config, error) {
 		return nil, err
 	}
 	config.normalizeWriters()
+	// Apply the password env override before validating so a deployment that
+	// keeps the ClickHouse secret out of the YAML (YAGPCC_CH_PASSWORD) does not
+	// trip the "password is required when enabled" check at startup.
+	config.Clickhouse.ApplyEnvOverrides()
 	err = config.Validate()
 	if err != nil {
 		return nil, err
@@ -347,6 +383,26 @@ func (cfg *Config) Validate() error {
 	}
 	if fileTarget.MaxFileSize <= 0 {
 		return fmt.Errorf("writers.targets[0].max_file_size must be > 0, got %v", fileTarget.MaxFileSize)
+	}
+	for i := range cfg.Writers.Targets {
+		target := &cfg.Writers.Targets[i]
+		switch target.Type {
+		case "file":
+		case "clickhouse":
+			if target.Enabled && len(target.Addrs) == 0 {
+				return fmt.Errorf("writers.targets[%d]: clickhouse target requires addrs when enabled", i)
+			}
+			if target.Database != "" && target.Database != SupportedClickhouseDatabase {
+				return fmt.Errorf("writers.targets[%d]: clickhouse target database must be %q, got %q (the embedded schema only creates tables in that database)", i, SupportedClickhouseDatabase, target.Database)
+			}
+		default:
+			return fmt.Errorf("writers.targets[%d]: unknown target type %q", i, target.Type)
+		}
+	}
+	if cfg.Role == "master" {
+		if err := cfg.Clickhouse.Validate(); err != nil {
+			return err
+		}
 	}
 	return nil
 }

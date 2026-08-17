@@ -35,4 +35,9 @@ type ArchiveWriter interface {
 	// StoreSegmensMetrics writes a batch of segment metrics to the archive.
 	// Note: the misspelled name is preserved for backward compatibility.
 	StoreSegmensMetrics(ctx context.Context, metrics []*pbm.SegmentMetricsWrite) error
+
+	// Close releases any resources held by the writer (open files, network
+	// connections). It is called once when the owning context is cancelled so a
+	// master restart or leadership change does not orphan connections.
+	Close() error
 }

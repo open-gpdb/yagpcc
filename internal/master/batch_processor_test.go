@@ -55,7 +55,7 @@ func TestRunSessionBatchProcessorProcessesMessages(t *testing.T) {
 	cfg := master.DefaultBatchProcessorConfig()
 	cfg.BatchInterval = 200 * time.Millisecond // Faster batching for tests
 
-	go master.RunSessionBatchProcessor(ctx, zap.NewNop().Sugar(), cfg, sourceCh, storeFunc)
+	go master.RunSessionBatchProcessor(ctx, zap.NewNop().Sugar(), cfg, "file", sourceCh, storeFunc)
 
 	// Send some messages
 	for i := 0; i < 5; i++ {
@@ -85,7 +85,7 @@ func TestRunQueryBatchProcessorProcessesMessages(t *testing.T) {
 	cfg := master.DefaultBatchProcessorConfig()
 	cfg.BatchInterval = 200 * time.Millisecond
 
-	go master.RunQueryBatchProcessor(ctx, zap.NewNop().Sugar(), cfg, sourceCh, storeFunc)
+	go master.RunQueryBatchProcessor(ctx, zap.NewNop().Sugar(), cfg, "file", sourceCh, storeFunc)
 
 	// Send some messages
 	for i := 0; i < 5; i++ {
@@ -115,7 +115,7 @@ func TestRunSegmentBatchProcessorProcessesMessages(t *testing.T) {
 	cfg := master.DefaultBatchProcessorConfig()
 	cfg.BatchInterval = 200 * time.Millisecond
 
-	go master.RunSegmentBatchProcessor(ctx, zap.NewNop().Sugar(), cfg, sourceCh, storeFunc)
+	go master.RunSegmentBatchProcessor(ctx, zap.NewNop().Sugar(), cfg, "file", sourceCh, storeFunc)
 
 	// Send some messages
 	for i := 0; i < 5; i++ {
@@ -149,7 +149,7 @@ func TestBatchProcessorDropsOnFullPipe(t *testing.T) {
 	cfg.BatchInterval = 100 * time.Millisecond
 	cfg.BatchQueueSize = 2 // Very small pipe
 
-	go master.RunSessionBatchProcessor(ctx, zap.NewNop().Sugar(), cfg, sourceCh, storeFunc)
+	go master.RunSessionBatchProcessor(ctx, zap.NewNop().Sugar(), cfg, "file", sourceCh, storeFunc)
 
 	// Send many messages quickly to fill the pipe
 	for i := 0; i < 20; i++ {
