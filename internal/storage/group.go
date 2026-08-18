@@ -267,6 +267,8 @@ func MergeQueryInfo(dest *pbc.QueryInfo, source *pbc.QueryInfo) error {
 	dest.DatabaseName = max(dest.DatabaseName, source.DatabaseName)
 	dest.Rsgname = max(dest.Rsgname, source.Rsgname)
 	dest.AnalyzeText = max(dest.AnalyzeText, source.AnalyzeText)
+	dest.TemplateQueryText = max(dest.TemplateQueryText, source.TemplateQueryText) //nolint:staticcheck
+	dest.TemplatePlanText = max(dest.TemplatePlanText, source.TemplatePlanText)    //nolint:staticcheck
 	dest.SubmitTime = chooseTimestampMin(dest.SubmitTime, source.SubmitTime)
 	dest.StartTime = chooseTimestampMin(dest.StartTime, source.StartTime)
 	dest.EndTime = chooseTimestampMax(dest.EndTime, source.EndTime)
