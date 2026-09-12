@@ -79,6 +79,12 @@ message QueryInfo {
 
    // end time: time when query finished
     google.protobuf.Timestamp end_time              =  14;
+
+    // plan_json: EXPLAIN (FORMAT JSON) plan; field number must match gpsc_metrics.proto.
+    string plan_json = 15;
+
+    // analyze_json: EXPLAIN (ANALYZE, FORMAT JSON) plan; field number must match gpsc_metrics.proto.
+    string analyze_json = 16;
 }
 
 message AdditionalQueryInfo {

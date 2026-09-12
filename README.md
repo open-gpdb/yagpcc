@@ -135,6 +135,17 @@ The binary exposes schema-management subcommands (they exit after running, and a
 
 Exit codes: `0` on success, `2` on failure. The `--migrate-only`/`--verify-schema` commands always render the standalone (non-clustered) DDL; the clustered variant is bootstrapped out of band.
 
+The current schema version is **2**. It adds the `plan_json` / `analyze_json` columns to
+`statements_part` and `segments_part` (empty string when the extension sends no payload,
+`NULL` only for rows written before the upgrade).
+
+Upgrading to schema v2: run the migration before starting the new binary. The service start
+path does not migrate, and `--verify-schema` reports an upgrade requirement until it is applied.
+
+```sh
+yagpcc --config-path /etc/yagpcc --migrate-only
+```
+
 ## Running
 
 1. Use a config file for the correct role (master or segment) and save it as **`yagpcc.yaml`** in the directory where you will run the binary.

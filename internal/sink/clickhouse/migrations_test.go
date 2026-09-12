@@ -46,10 +46,151 @@ func TestParseMigrationsEmbedded(t *testing.T) {
 		t.Error("up file should contain the {{if .Replicated}} variant switch")
 	}
 
+	// Versions are dense and start at 1: 0001..ExpectedSchemaVersion, one pair each.
+	if len(migs) != ExpectedSchemaVersion {
+		t.Fatalf("got %d embedded migrations, want %d (one per version)",
+			len(migs), ExpectedSchemaVersion)
+	}
+	for i, m := range migs {
+		if m.Version != i+1 {
+			t.Errorf("migs[%d].Version = %d, want %d", i, m.Version, i+1)
+		}
+	}
+
 	// Highest applied version equals ExpectedSchemaVersion.
 	if migs[len(migs)-1].Version != ExpectedSchemaVersion {
 		t.Errorf("last embedded migration = %d, ExpectedSchemaVersion = %d",
 			migs[len(migs)-1].Version, ExpectedSchemaVersion)
+	}
+
+	// Migration 2 adds the FORMAT JSON plan columns.
+	planJSON := migs[1]
+	if planJSON.Name != "plan_json" {
+		t.Errorf("second migration name = %q, want plan_json", planJSON.Name)
+	}
+	if !strings.Contains(planJSON.Up, "ADD COLUMN IF NOT EXISTS `plan_json`") {
+		t.Error("0002 up should add the plan_json column")
+	}
+	if !strings.Contains(planJSON.Down, "DROP COLUMN IF EXISTS `analyze_json`") {
+		t.Error("0002 down should drop the analyze_json column")
+	}
+}
+
+// renderMigration renders one embedded migration body in both variants.
+func renderMigration(t *testing.T, version int, direction string, replicated bool) string {
+	t.Helper()
+	migs, err := ParseMigrations()
+	if err != nil {
+		t.Fatalf("ParseMigrations: %v", err)
+	}
+	for _, m := range migs {
+		if m.Version != version {
+			continue
+		}
+		body := m.Up
+		if direction == "down" {
+			body = m.Down
+		}
+		rendered, err := RenderTemplate(body, map[string]any{
+			"RetentionDays": 30,
+			"Replicated":    replicated,
+		})
+		if err != nil {
+			t.Fatalf("RenderTemplate migration %d %s: %v", version, direction, err)
+		}
+		return rendered
+	}
+	t.Fatalf("migration %d not found", version)
+	return ""
+}
+
+func TestRenderEmbeddedPlanJSONMigration_Standalone(t *testing.T) {
+	up := renderMigration(t, 2, "up", false)
+	for _, want := range []string{
+		"ALTER TABLE yagpcc.statements_part\n    ADD COLUMN IF NOT EXISTS `plan_json` Nullable(String) CODEC(ZSTD(3)) AFTER `plan_text`",
+		"ALTER TABLE yagpcc.statements_part\n    ADD COLUMN IF NOT EXISTS `analyze_json` Nullable(String) CODEC(ZSTD(3)) AFTER `plan_json`",
+		"ALTER TABLE yagpcc.segments_part\n    ADD COLUMN IF NOT EXISTS `plan_json` Nullable(String) CODEC(ZSTD(3)) AFTER `plan_text`",
+		"ALTER TABLE yagpcc.segments_part\n    ADD COLUMN IF NOT EXISTS `analyze_json` Nullable(String) CODEC(ZSTD(3)) AFTER `plan_json`",
+	} {
+		if !strings.Contains(up, want) {
+			t.Errorf("standalone 0002 up missing:\n%s\ngot:\n%s", want, up)
+		}
+	}
+	// No clustered constructs, and the Distributed wrappers stay untouched.
+	for _, absent := range []string{"ON CLUSTER", "yagpcc.statements ", "yagpcc.segments ", "{{"} {
+		if strings.Contains(up, absent) {
+			t.Errorf("standalone 0002 up should not contain %q", absent)
+		}
+	}
+	if got := len(SplitStatements(up)); got != 4 {
+		t.Errorf("standalone 0002 up has %d statements, want 4", got)
+	}
+
+	down := renderMigration(t, 2, "down", false)
+	for _, want := range []string{
+		"ALTER TABLE yagpcc.segments_part\n    DROP COLUMN IF EXISTS `analyze_json`",
+		"ALTER TABLE yagpcc.statements_part\n    DROP COLUMN IF EXISTS `plan_json`",
+	} {
+		if !strings.Contains(down, want) {
+			t.Errorf("standalone 0002 down missing:\n%s\ngot:\n%s", want, down)
+		}
+	}
+	for _, absent := range []string{"ON CLUSTER", "yagpcc.statements ", "yagpcc.segments ", "{{"} {
+		if strings.Contains(down, absent) {
+			t.Errorf("standalone 0002 down should not contain %q", absent)
+		}
+	}
+	if got := len(SplitStatements(down)); got != 4 {
+		t.Errorf("standalone 0002 down has %d statements, want 4", got)
+	}
+	// analyze_json is dropped before plan_json (reverse of the up order).
+	if strings.Index(down, "DROP COLUMN IF EXISTS `analyze_json`") >
+		strings.LastIndex(down, "DROP COLUMN IF EXISTS `plan_json`") {
+		t.Error("0002 down should drop analyze_json before plan_json")
+	}
+}
+
+func TestRenderEmbeddedPlanJSONMigration_Replicated(t *testing.T) {
+	up := renderMigration(t, 2, "up", true)
+	for _, want := range []string{
+		"ALTER TABLE yagpcc.statements_part ON CLUSTER '{cluster}'",
+		"ALTER TABLE yagpcc.segments_part ON CLUSTER '{cluster}'",
+		"ALTER TABLE yagpcc.statements ON CLUSTER '{cluster}'",
+		"ALTER TABLE yagpcc.segments ON CLUSTER '{cluster}'",
+	} {
+		if !strings.Contains(up, want) {
+			t.Errorf("replicated 0002 up missing %q", want)
+		}
+	}
+	// Local + Distributed tables, two columns each.
+	if got := len(SplitStatements(up)); got != 8 {
+		t.Errorf("replicated 0002 up has %d statements, want 8", got)
+	}
+	if strings.Contains(up, "{{") {
+		t.Error("replicated 0002 up still contains template syntax")
+	}
+
+	down := renderMigration(t, 2, "down", true)
+	for _, want := range []string{
+		"ALTER TABLE yagpcc.segments ON CLUSTER '{cluster}'\n    DROP COLUMN IF EXISTS `analyze_json`",
+		"ALTER TABLE yagpcc.statements ON CLUSTER '{cluster}'\n    DROP COLUMN IF EXISTS `plan_json`",
+		"ALTER TABLE yagpcc.segments_part ON CLUSTER '{cluster}'",
+		"ALTER TABLE yagpcc.statements_part ON CLUSTER '{cluster}'",
+	} {
+		if !strings.Contains(down, want) {
+			t.Errorf("replicated 0002 down missing %q", want)
+		}
+	}
+	if got := len(SplitStatements(down)); got != 8 {
+		t.Errorf("replicated 0002 down has %d statements, want 8", got)
+	}
+	if strings.Contains(down, "{{") {
+		t.Error("replicated 0002 down still contains template syntax")
+	}
+	// The Distributed drops come first, before the local-table drops.
+	if strings.LastIndex(down, "ALTER TABLE yagpcc.segments ON CLUSTER") >
+		strings.Index(down, "ALTER TABLE yagpcc.segments_part ON CLUSTER") {
+		t.Error("replicated 0002 down should drop Distributed columns first")
 	}
 }
 

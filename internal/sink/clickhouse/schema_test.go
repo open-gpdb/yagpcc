@@ -121,6 +121,9 @@ func TestDumpSchema_RendersAllUpFiles(t *testing.T) {
 		"ENGINE = ReplacingMergeTree",
 		"toIntervalDay(60)",
 		"-- migration 1 (init) up",
+		"-- migration 2 (plan_json) up",
+		"ADD COLUMN IF NOT EXISTS `plan_json`",
+		"ADD COLUMN IF NOT EXISTS `analyze_json`",
 	} {
 		if !strings.Contains(out, want) {
 			t.Errorf("DumpSchema output missing %q", want)
@@ -258,6 +261,42 @@ func TestDumpMigration_Down(t *testing.T) {
 	}
 	if strings.Contains(out, "CREATE TABLE") {
 		t.Error("down dump should not contain CREATE TABLE")
+	}
+}
+
+func TestDumpMigration_SingleStepUpgrade(t *testing.T) {
+	// The v1 -> v2 step must carry only the plan_json ALTERs, no 0001 DDL.
+	out, err := DumpMigration(1, 2, DumpOptions{RetentionDays: 30})
+	if err != nil {
+		t.Fatalf("DumpMigration: %v", err)
+	}
+	if !strings.Contains(out, "-- migration 2 (plan_json) up") {
+		t.Error("expected the migration 2 header")
+	}
+	if strings.Contains(out, "-- migration 1") {
+		t.Error("v1 -> v2 dump should not replay migration 1")
+	}
+	if strings.Contains(out, "CREATE TABLE") {
+		t.Error("v1 -> v2 dump should not contain CREATE TABLE")
+	}
+	for _, table := range []string{"yagpcc.statements_part", "yagpcc.segments_part"} {
+		if !strings.Contains(out, "ALTER TABLE "+table) {
+			t.Errorf("missing ALTER TABLE for %s", table)
+		}
+	}
+
+	down, err := DumpMigration(2, 1, DumpOptions{RetentionDays: 30})
+	if err != nil {
+		t.Fatalf("DumpMigration down: %v", err)
+	}
+	if !strings.Contains(down, "-- migration 2 (plan_json) down") {
+		t.Error("expected the migration 2 down header")
+	}
+	if strings.Contains(down, "DROP TABLE") {
+		t.Error("v2 -> v1 dump must only drop columns, not tables")
+	}
+	if strings.Contains(down, "-- migration 1") {
+		t.Error("v2 -> v1 dump should not include migration 1")
 	}
 }
 

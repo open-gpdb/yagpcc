@@ -409,6 +409,8 @@ Cluster-wide unique query identifier.
 | `submit_time` | `Timestamp` | Submit time. |
 | `start_time` | `Timestamp` | Start time. |
 | `end_time` | `Timestamp` | End time. |
+| `plan_json` | `string` | `EXPLAIN (FORMAT JSON)` plan; empty when the extension does not provide it. |
+| `analyze_json` | `string` | `EXPLAIN (ANALYZE, FORMAT JSON)` plan; empty when the extension does not provide it. |
 
 **PlanGenerator**: `PLAN_GENERATOR_UNSPECIFIED`, `PLAN_GENERATOR_PLANNER` (legacy), `PLAN_GENERATOR_OPTIMIZER` (GPORCA).
 

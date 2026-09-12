@@ -109,6 +109,16 @@ func findExec(log []execCall, contains string) int {
 	return -1
 }
 
+func findAllExec(log []execCall, contains string) []int {
+	var out []int
+	for i, c := range log {
+		if strings.Contains(c.query, contains) {
+			out = append(out, i)
+		}
+	}
+	return out
+}
+
 func countExec(log []execCall, contains string) int {
 	n := 0
 	for _, c := range log {
@@ -239,12 +249,19 @@ func TestApplyMigrations_FreshDatabase(t *testing.T) {
 		t.Error("rendered DDL still contains template syntax")
 	}
 
-	// Final INSERT into _yagpcc_meta records the applied version.
-	insertIdx := findExec(conn.execLog, "INSERT INTO yagpcc._yagpcc_meta")
-	if insertIdx < 0 {
-		t.Fatal("missing INSERT INTO yagpcc._yagpcc_meta")
+	// One meta INSERT per migration, in version order; the last records ExpectedSchemaVersion.
+	inserts := findAllExec(conn.execLog, "INSERT INTO yagpcc._yagpcc_meta")
+	if len(inserts) != ExpectedSchemaVersion {
+		t.Fatalf("got %d meta INSERTs, want %d (one per migration)",
+			len(inserts), ExpectedSchemaVersion)
 	}
-	args := conn.execLog[insertIdx].args
+	for i, idx := range inserts {
+		if v, ok := conn.execLog[idx].args[0].(int32); !ok || v != int32(i+1) {
+			t.Errorf("meta INSERT #%d version arg = %v, want %d",
+				i, conn.execLog[idx].args[0], i+1)
+		}
+	}
+	args := conn.execLog[inserts[len(inserts)-1]].args
 	if len(args) != 3 {
 		t.Fatalf("insert args = %v, want 3", args)
 	}
@@ -361,4 +378,56 @@ func execQueries(log []execCall) []string {
 		out[i] = c.query
 	}
 	return out
+}
+
+func TestApplyMigrations_UpgradeFromV1AppliesOnly0002(t *testing.T) {
+	// A v1 database gets only the 0002 ALTERs and one new meta row with version 2.
+	conn := &fakeConn{
+		selectResponses: []selectResponse{
+			metaExistsResp(true),
+			maxVersionResp(1),
+		},
+	}
+	err := ApplyMigrations(context.Background(), conn, MigrateOptions{
+		RetentionDays: 30,
+		YagpccVersion: "1.2.3",
+	})
+	if err != nil {
+		t.Fatalf("ApplyMigrations: %v", err)
+	}
+
+	// 0001 DDL must not be replayed.
+	if findExec(conn.execLog, "CREATE TABLE IF NOT EXISTS yagpcc.statements_part") >= 0 {
+		t.Error("migration 1 must not be re-applied on a v1 database")
+	}
+	// 0002 ALTERs must run for both fact tables and both columns.
+	for _, want := range []string{
+		"ALTER TABLE yagpcc.statements_part",
+		"ALTER TABLE yagpcc.segments_part",
+		"ADD COLUMN IF NOT EXISTS `plan_json`",
+		"ADD COLUMN IF NOT EXISTS `analyze_json`",
+	} {
+		if findExec(conn.execLog, want) < 0 {
+			t.Errorf("missing 0002 statement containing %q", want)
+		}
+	}
+	if countExec(conn.execLog, "ADD COLUMN IF NOT EXISTS") != 4 {
+		t.Errorf("got %d ADD COLUMN statements, want 4",
+			countExec(conn.execLog, "ADD COLUMN IF NOT EXISTS"))
+	}
+	// ApplyMigrations renders the standalone variant: no clustered DDL.
+	if findExec(conn.execLog, "ON CLUSTER") >= 0 {
+		t.Error("standalone ApplyMigrations must not emit ON CLUSTER")
+	}
+	if findExec(conn.execLog, "yagpcc.statements ") >= 0 {
+		t.Error("standalone ApplyMigrations must not touch the Distributed table")
+	}
+
+	inserts := findAllExec(conn.execLog, "INSERT INTO yagpcc._yagpcc_meta")
+	if len(inserts) != 1 {
+		t.Fatalf("got %d meta INSERTs, want 1", len(inserts))
+	}
+	if v, ok := conn.execLog[inserts[0]].args[0].(int32); !ok || v != 2 {
+		t.Errorf("meta INSERT version arg = %v, want 2", conn.execLog[inserts[0]].args[0])
+	}
 }

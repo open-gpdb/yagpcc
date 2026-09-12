@@ -28,6 +28,7 @@ import (
 	"go.uber.org/zap"
 
 	pbm "github.com/open-gpdb/yagpcc/api/proto/agent_master"
+	pbc "github.com/open-gpdb/yagpcc/api/proto/common"
 )
 
 // newTestServer creates a Server with nil gRPC backends (for guard tests).
@@ -614,4 +615,24 @@ func TestJSONResponseContentType(t *testing.T) {
 	rec := httptest.NewRecorder()
 	mux.ServeHTTP(rec, req)
 	assert.Equal(t, "application/json; charset=utf-8", rec.Header().Get("Content-Type"))
+}
+
+// TestConvertQueryInfoCarriesPlanJSON: proto fields 15/16 must survive the field-by-field map.
+func TestConvertQueryInfoCarriesPlanJSON(t *testing.T) {
+	assert.Nil(t, convertQueryInfo(nil))
+
+	m := convertQueryInfo(&pbc.QueryInfo{
+		PlanText:    "plan",
+		AnalyzeText: "analyze",
+		PlanJson:    `[{"Plan": {}}]`,
+		AnalyzeJson: `[{"Plan": {"Actual Rows": 1}}]`,
+	})
+	assert.Equal(t, "plan", m["planText"])
+	assert.Equal(t, "analyze", m["analyzeText"])
+	assert.Equal(t, `[{"Plan": {}}]`, m["planJson"])
+	assert.Equal(t, `[{"Plan": {"Actual Rows": 1}}]`, m["analyzeJson"])
+
+	empty := convertQueryInfo(&pbc.QueryInfo{})
+	assert.Equal(t, "", empty["planJson"])
+	assert.Equal(t, "", empty["analyzeJson"])
 }

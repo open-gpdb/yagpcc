@@ -100,6 +100,35 @@ writers:
 
 An enabled `clickhouse` target requires a non-empty `addrs`; the password is read from the `YAGPCC_CH_PASSWORD` env var when omitted from the file. Connections are opened lazily, so an unreachable server at startup does not crash the process or affect the file target — its batches are dropped per-batch until it recovers. Apply the schema out of band with `yagpcc --dump-schema` / `--migrate-only` (add `--replicated` for the clustered `ReplicatedReplacingMergeTree` + `Distributed` variant). Greenplum (`type: greenplum`) is a follow-up that reuses the same fan-out and `ArchiveWriter` interface.
 
+#### Schema versions
+
+The embedded migrations carry a schema version. It is stored in `yagpcc._yagpcc_meta`
+and checked by `--verify-schema`. The current expected version is **2**.
+
+| Version | Migration | Change |
+|---------|-----------|--------|
+| 1 | `0001_init` | Initial schema: `sessions_part`, `statements_part`, `segments_part` (plus the `Distributed` wrappers in the replicated variant). |
+| 2 | `0002_plan_json` | `plan_json` and `analyze_json` columns in `statements_part` and `segments_part`. |
+
+Schema v2 adds `plan_json` and `analyze_json` (`Nullable(String) CODEC(ZSTD(3))`) right
+after `plan_text`. They carry the `EXPLAIN (FORMAT JSON)` and `EXPLAIN (ANALYZE, FORMAT JSON)`
+payloads from `QueryInfo`.
+
+Values to expect in the new columns:
+
+- `''` (empty string) - the row was written by the service, but the extension sent no
+  payload (JSON plans disabled or an older extension). The writer serializes with
+  `EmitUnpopulated`, so the empty field is still present in the JSONL.
+- `NULL` - the row was written before the upgrade to v2.
+- `segments_part` always holds `''`: `ArchiveQuery` trims `QueryInfo` for segment rows
+  (they do not carry `plan_text` either).
+
+Operator note for the upgrade: run `yagpcc --migrate-only` with the new binary **before**
+starting the service. The service start path never migrates and never verifies the schema.
+Against a v1 database `--verify-schema` returns `ErrSchemaUpgradeRequired`, and a running
+ClickHouse target drops every `statements`/`segments` batch, because the columns it inserts
+do not exist. The file target is not affected.
+
 ## Metrics
 
 Writer pipeline metrics are defined in [`YagpccMetricsType`](../internal/metrics/metrics.go:23) and initialized by [`InitMetrics`](../internal/app/app.go:226):

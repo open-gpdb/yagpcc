@@ -18,6 +18,7 @@ package clickhouse
 
 import (
 	"encoding/json"
+	"fmt"
 	"testing"
 	"time"
 
@@ -231,6 +232,10 @@ func TestStatementsMapping_Golden(t *testing.T) {
 	assert.Equal(t, float64(6), row["total_time"])
 	assert.Equal(t, uint64(10), row["query_slices"])
 
+	// Docs without planJson/analyzeJson keys (pre-v2 archives) yield NULL columns.
+	assert.Nil(t, row["plan_json"])
+	assert.Nil(t, row["analyze_json"])
+
 	// message + analyzeText are unmapped and land in _rest.
 	rest := restMap(t, row)
 	assert.Equal(t, "hello", rest["message"])
@@ -278,6 +283,9 @@ func TestSegmentsMapping_Golden(t *testing.T) {
 	assert.Equal(t, uint64(64), row["total_rss"])
 	assert.Equal(t, uint64(11), row["total_ntuples"])
 	assert.Equal(t, 0.25, row["total_startup"])
+
+	assert.Nil(t, row["plan_json"])
+	assert.Nil(t, row["analyze_json"])
 
 	// segments_part has no *_startup_time column.
 	names := SegmentsMapping().ColumnNames()
@@ -362,4 +370,134 @@ func TestMapping_TemplateTextsPreserved(t *testing.T) {
 	assert.Equal(t, "TPLAN", stmt["template_plan_text"])
 	seg := rowMap(t, SegmentsMapping(), []byte(segmentGolden))
 	assert.Equal(t, "SELECT $1", seg["template_query_text"])
+}
+
+// planJSONSample: a small but real EXPLAIN (FORMAT JSON) plan with a Gather Motion child.
+const planJSONSample = `[{"Plan":{"Node Type":"Limit","Startup Cost":0.00,` +
+	`"Total Cost":2745.19,"Plan Rows":14,"Plans":[{"Node Type":"Gather Motion",` +
+	`"Senders":2,"Receivers":1,"Slice":2,"Segments":2}]}}]`
+
+const analyzeJSONSample = `[{"Plan":{"Node Type":"Limit","Actual Total Time":1631.148,` +
+	`"Actual Rows":5,"Actual Loops":1},"Execution Time":1631.9}]`
+
+// planJSONDoc renders tmpl with the payloads embedded as JSON string values, protojson-style.
+func planJSONDoc(t *testing.T, tmpl, planJSON, analyzeJSON string) []byte {
+	t.Helper()
+	plan, err := json.Marshal(planJSON)
+	require.NoError(t, err)
+	analyze, err := json.Marshal(analyzeJSON)
+	require.NoError(t, err)
+	return []byte(fmt.Sprintf(tmpl, plan, analyze))
+}
+
+// statementPlanJSONTemplate carries only mapped keys, so _rest must be NULL.
+const statementPlanJSONTemplate = `{
+  "clusterId": "c1",
+  "hostname": "h1",
+  "collectTime": "2025-02-21T16:07:02+00:00",
+  "queryKey": {"ssid": 1, "tmid": 123, "ccnt": 2},
+  "queryInfo": {
+    "queryId": "12", "planId": "321",
+    "queryText": "select 1", "planText": "plan",
+    "planJson": %s,
+    "analyzeJson": %s,
+    "userName": "bob", "databaseName": "db"
+  }
+}`
+
+func TestStatementsMapping_PlanJSONColumns(t *testing.T) {
+	doc := planJSONDoc(t, statementPlanJSONTemplate, planJSONSample, analyzeJSONSample)
+	row := rowMap(t, StatementsMapping(), doc)
+
+	assert.Equal(t, "plan", row["plan_text"])
+	assert.Equal(t, planJSONSample, row["plan_json"])
+	assert.Equal(t, analyzeJSONSample, row["analyze_json"])
+	// All keys are mapped, so the payloads must not leak into _rest.
+	assert.Nil(t, row[colRest])
+
+	// The JSON payload survives verbatim and stays parseable.
+	var plan []map[string]any
+	require.NoError(t, json.Unmarshal([]byte(row["plan_json"].(string)), &plan))
+	require.Len(t, plan, 1)
+	node, ok := plan[0]["Plan"].(map[string]any)
+	require.True(t, ok)
+	assert.Equal(t, "Limit", node["Node Type"])
+	children, ok := node["Plans"].([]any)
+	require.True(t, ok)
+	require.Len(t, children, 1)
+	child, ok := children[0].(map[string]any)
+	require.True(t, ok)
+	assert.Equal(t, "Gather Motion", child["Node Type"])
+}
+
+// segmentPlanJSONTemplate mirrors the statements case for segments_part.
+const segmentPlanJSONTemplate = `{
+  "clusterId": "c1",
+  "hostname": "h1",
+  "collectTime": "2025-02-21T16:07:02+00:00",
+  "queryKey": {"ssid": 1, "tmid": 123, "ccnt": 0},
+  "segmentKey": {"dbid": 2, "segindex": 4},
+  "queryInfo": {
+    "queryId": "77", "planId": "88", "planText": "plan",
+    "planJson": %s,
+    "analyzeJson": %s
+  }
+}`
+
+func TestSegmentsMapping_PlanJSONColumns(t *testing.T) {
+	doc := planJSONDoc(t, segmentPlanJSONTemplate, planJSONSample, analyzeJSONSample)
+	row := rowMap(t, SegmentsMapping(), doc)
+
+	assert.Equal(t, planJSONSample, row["plan_json"])
+	assert.Equal(t, analyzeJSONSample, row["analyze_json"])
+	assert.Nil(t, row[colRest])
+}
+
+func TestMapping_PlanJSONSnakeCaseAlias(t *testing.T) {
+	// The snake_case spelling (encoding/json tags) must map to the same columns as camelCase.
+	const tmpl = `{"query_info":{"plan_json":%s,"analyze_json":%s}}`
+	doc := planJSONDoc(t, tmpl, planJSONSample, analyzeJSONSample)
+	for _, tm := range []*tableMapping{StatementsMapping(), SegmentsMapping()} {
+		row := rowMap(t, tm, doc)
+		assert.Equal(t, planJSONSample, row["plan_json"], tm.Table())
+		assert.Equal(t, analyzeJSONSample, row["analyze_json"], tm.Table())
+		assert.Nil(t, row[colRest], tm.Table())
+	}
+}
+
+func TestMapping_PlanJSONColumnPosition(t *testing.T) {
+	// Insert order follows the 0002 DDL: plan_text, plan_json, analyze_json, template_query_text.
+	for _, tm := range []*tableMapping{StatementsMapping(), SegmentsMapping()} {
+		names := tm.ColumnNames()
+		idx := map[string]int{}
+		for i, n := range names {
+			idx[n] = i
+		}
+		for _, want := range []string{"plan_text", "plan_json", "analyze_json", "template_query_text"} {
+			require.Contains(t, idx, want, tm.Table())
+		}
+		assert.Equal(t, idx["plan_text"]+1, idx["plan_json"], tm.Table())
+		assert.Equal(t, idx["plan_json"]+1, idx["analyze_json"], tm.Table())
+		assert.Equal(t, idx["analyze_json"]+1, idx["template_query_text"], tm.Table())
+	}
+}
+
+// TestStatementsMapping_EmptyPlanJSONIsEmptyString: the live writer (EmitUnpopulated)
+// sends "planJson": "", stored as an empty string; NULL is reserved for pre-v2 rows.
+func TestStatementsMapping_EmptyPlanJSONIsEmptyString(t *testing.T) {
+	for _, tc := range []struct {
+		name string
+		m    *Mapping
+		doc  string
+	}{
+		{"statements", StatementsMapping(), `{"queryInfo": {"planJson": "", "analyzeJson": ""}}`},
+		{"segments", SegmentsMapping(), `{"queryInfo": {"planJson": "", "analyzeJson": ""}}`},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			row := rowMap(t, tc.m, []byte(tc.doc))
+			assert.Equal(t, "", row["plan_json"])
+			assert.Equal(t, "", row["analyze_json"])
+			assert.Nil(t, row["_rest"])
+		})
+	}
 }
