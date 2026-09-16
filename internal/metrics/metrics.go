@@ -64,6 +64,9 @@ type YagpccMetricsType struct {
 	QueriesArchivedTimeout       prometheus.Counter
 	QueriesArchivedSessionFailed prometheus.Counter
 
+	// Oversized file archive records, labelled by stream and outcome.
+	FileOversizedRecords *prometheus.CounterVec
+
 	// Writer pipeline metrics
 	WriterProcessedMessages *prometheus.CounterVec
 	WriterDroppedMessages   *prometheus.CounterVec

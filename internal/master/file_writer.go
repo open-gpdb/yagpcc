@@ -88,6 +88,10 @@ func (fw *FileWriters) StoreSessions(ctx context.Context, sessions []*gp.Session
 			fw.logger.Errorf("fail to convert sessions data %v with error %v", val, err)
 			continue
 		}
+		myJS, err = fw.limitRecord(myJS, "sessions")
+		if err != nil {
+			continue
+		}
 		writeJS = append(writeJS, myJS...)
 		writeJS = append(writeJS, '\n')
 	}
@@ -111,6 +115,10 @@ func (fw *FileWriters) StoreQuery(ctx context.Context, queries []*pbm.QueryStatW
 		myJS, err := serializable.ToJSON()
 		if err != nil {
 			fw.logger.Errorf("fail to convert query data %v with error %v", val, err)
+			continue
+		}
+		myJS, err = fw.limitRecord(myJS, "queries")
+		if err != nil {
 			continue
 		}
 		writeJS = append(writeJS, myJS...)
@@ -137,6 +145,10 @@ func (fw *FileWriters) StoreSegmensMetrics(ctx context.Context, metrics []*pbm.S
 		myJS, err := serializable.ToJSON()
 		if err != nil {
 			fw.logger.Errorf("fail to convert segment metrics data %v with error %v", val, err)
+			continue
+		}
+		myJS, err = fw.limitRecord(myJS, "segments")
+		if err != nil {
 			continue
 		}
 		writeJS = append(writeJS, myJS...)

@@ -100,6 +100,35 @@ writers:
 
 An enabled `clickhouse` target requires a non-empty `addrs`; the password is read from the `YAGPCC_CH_PASSWORD` env var when omitted from the file. Connections are opened lazily, so an unreachable server at startup does not crash the process or affect the file target — its batches are dropped per-batch until it recovers. Apply the schema out of band with `yagpcc --dump-schema` / `--migrate-only` (add `--replicated` for the clustered `ReplicatedReplacingMergeTree` + `Distributed` variant). Greenplum (`type: greenplum`) is a follow-up that reuses the same fan-out and `ArchiveWriter` interface.
 
+## File archive record size
+
+Each file archive event remains one JSON line. The file writer enforces a
+1 MiB (1,048,576 bytes) limit including the trailing newline, matching the
+Unified Agent `file_input.max_bytes_in_line: 1024kb` transport configuration.
+`max_file_size` controls file rotation and does not change this record limit.
+
+Records that fit are emitted unchanged. For oversized records, only the
+following text fields may be shortened:
+
+- Sessions: `GpStatInfo.Query`, `RunningQueryInfo.QueryText`, and
+  `RunningQueryInfo.PlanText`.
+- Queries and segments: `queryInfo.queryText`, `queryInfo.planText`, and the
+  deprecated `queryInfo.templateQueryText` / `queryInfo.templatePlanText` fields
+  when populated.
+
+Shortened values retain a UTF-8 prefix and end with `...[truncated]`. The writer
+checks the actual serialized size, accounting for JSON escaping. IDs and
+metrics retain their values, including integers above 2^53. Only the serialized
+file copy is modified; in-memory data and other archive targets are unaffected.
+A record that still cannot fit after shortening the allowed fields is skipped,
+with a warning containing its stream and size (not its contents). Later records
+in the batch are still processed.
+
+`file_oversized_records_total{stream="sessions|queries|segments", outcome="truncated|dropped"}`
+counts records shortened or rejected by the file size guard. A `truncated`
+outcome describes preparation of the record, not confirmation of delivery.
+Already truncated historical records cannot be recovered by this change.
+
 ## Metrics
 
 Writer pipeline metrics are defined in [`YagpccMetricsType`](../internal/metrics/metrics.go:23) and initialized by [`InitMetrics`](../internal/app/app.go:226):
