@@ -411,7 +411,7 @@ func (bs *BackgroundStorage) buildArchiveWriters(targets []config.WriterTarget) 
 func (bs *BackgroundStorage) newArchiveWriter(target config.WriterTarget) (ArchiveWriter, error) {
 	switch target.Type {
 	case "", "file":
-		return NewFileWriters(bs.l, target.SessionsFile, target.QueriesFile, target.SegmentsFile, target.MaxFileSize)
+		return NewFileWriters(bs.l, target.SessionsFile, target.QueriesFile, target.SegmentsFile, target.MaxFileSize, target.FileRecordLimit)
 	case "clickhouse":
 		chCfg := target.ClickhouseConfig()
 		conn, err := clickhouse.NewClient(context.Background(), &chCfg)

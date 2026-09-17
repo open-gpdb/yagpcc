@@ -176,6 +176,7 @@ func TestFileWritersCreatesWritersSuccessfully(t *testing.T) {
 		tmpDir+"/queries.json",
 		tmpDir+"/segments.json",
 		1024*1024,
+		0,
 	)
 	require.NoError(t, err)
 	require.NotNil(t, writers)
@@ -191,6 +192,7 @@ func TestFileWritersStoreSessions(t *testing.T) {
 		tmpDir+"/queries.json",
 		tmpDir+"/segments.json",
 		1024*1024,
+		0,
 	)
 	require.NoError(t, err)
 
@@ -220,6 +222,7 @@ func TestFileWritersStoreQuery(t *testing.T) {
 		tmpDir+"/queries.json",
 		tmpDir+"/segments.json",
 		1024*1024,
+		0,
 	)
 	require.NoError(t, err)
 
@@ -243,6 +246,7 @@ func TestFileWritersStoreSegmensMetrics(t *testing.T) {
 		tmpDir+"/queries.json",
 		tmpDir+"/segments.json",
 		1024*1024,
+		0,
 	)
 	require.NoError(t, err)
 

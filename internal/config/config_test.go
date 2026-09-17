@@ -259,3 +259,35 @@ func TestValidate_ZeroSessionSendMetricInterval(t *testing.T) {
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "session_send_metric_interval")
 }
+
+func TestReadFromFile_FileRecordLimit(t *testing.T) {
+	for _, tc := range []struct {
+		name    string
+		yaml    string
+		want    int64
+		invalid bool
+	}{
+		{name: "omitted", yaml: "{}", want: 1 << 20},
+		{name: "large limit", yaml: "arch_config:\n  file_record_limit: 4294967296\n", want: 4294967296},
+		{name: "legacy", yaml: "arch_config:\n  file_record_limit: 2048\n", want: 2048},
+		{name: "zero", yaml: "arch_config:\n  file_record_limit: 0\n", want: 1 << 20},
+		{name: "target", yaml: "writers:\n  targets:\n    - type: file\n      file_record_limit: 4096\n", want: 4096},
+		{name: "override", yaml: "arch_config:\n  file_record_limit: 2048\nwriters:\n  targets:\n    - type: file\n      file_record_limit: 4096\n", want: 4096},
+		{name: "inherit", yaml: "arch_config:\n  file_record_limit: 2048\nwriters:\n  targets:\n    - type: file\n      file_record_limit: 0\n", want: 2048},
+		{name: "insert file target", yaml: "arch_config:\n  file_record_limit: 2048\nwriters:\n  targets:\n    - type: clickhouse\n      enabled: false\n", want: 2048},
+		{name: "negative legacy", yaml: "arch_config:\n  file_record_limit: -1\n", invalid: true},
+		{name: "negative target", yaml: "writers:\n  targets:\n    - type: file\n      file_record_limit: -1\n", invalid: true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			path := filepath.Join(t.TempDir(), "config.yaml")
+			require.NoError(t, os.WriteFile(path, []byte(tc.yaml), 0600))
+			cfg, err := ReadFromFile(path)
+			if tc.invalid {
+				require.ErrorContains(t, err, "file_record_limit")
+				return
+			}
+			require.NoError(t, err)
+			require.Equal(t, tc.want, cfg.Writers.Targets[0].FileRecordLimit)
+		})
+	}
+}

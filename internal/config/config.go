@@ -48,6 +48,7 @@ type ArchiverConfigType struct {
 	PlanDetailFile     string `config:"plan_detail_file" yaml:"plan_detail_file"`
 	PlanDetaiQueueSize uint32 `config:"plan_detail_queue_size" yaml:"plan_detail_queue_size"`
 	MaxFileSize        int64  `config:"max_file_size" yaml:"max_file_size"`
+	FileRecordLimit    int64  `config:"file_record_limit" yaml:"file_record_limit"`
 }
 
 // BatchProcessorConfig holds configuration for archive writer batching.
@@ -79,10 +80,11 @@ type WriterTarget struct {
 	Enabled bool `config:"enabled" yaml:"enabled"`
 
 	// File-based writer settings
-	SessionsFile string `config:"sessions_file" yaml:"sessions_file"`
-	QueriesFile  string `config:"queries_file" yaml:"queries_file"`
-	SegmentsFile string `config:"segments_file" yaml:"segments_file"`
-	MaxFileSize  int64  `config:"max_file_size" yaml:"max_file_size"`
+	SessionsFile    string `config:"sessions_file" yaml:"sessions_file"`
+	QueriesFile     string `config:"queries_file" yaml:"queries_file"`
+	SegmentsFile    string `config:"segments_file" yaml:"segments_file"`
+	MaxFileSize     int64  `config:"max_file_size" yaml:"max_file_size"`
+	FileRecordLimit int64  `config:"file_record_limit" yaml:"file_record_limit"`
 
 	// ClickHouse-based writer settings (Type == "clickhouse"). Password may be
 	// left empty here and supplied through the YAGPCC_CH_PASSWORD env var.
@@ -178,6 +180,7 @@ func DefaultArchiverConfig() ArchiverConfigType {
 		PlanDetailFile:     "plan_details.json",
 		PlanDetaiQueueSize: 4000,
 		MaxFileSize:        400 * 1024 * 1024,
+		FileRecordLimit:    1 << 20, // 1 MiB, including the trailing newline
 	}
 }
 
@@ -202,6 +205,9 @@ func DefaultWriterConfig() *WriterConfig {
 }
 
 func (cfg *Config) normalizeWriters() {
+	if cfg.ArchiverConfig.FileRecordLimit == 0 {
+		cfg.ArchiverConfig.FileRecordLimit = DefaultArchiverConfig().FileRecordLimit
+	}
 	if cfg.Writers == nil {
 		cfg.Writers = DefaultWriterConfig()
 	}
@@ -230,6 +236,9 @@ func (cfg *Config) normalizeWriters() {
 		if target.SegmentsFile == "" {
 			target.SegmentsFile = cfg.ArchiverConfig.SegmentsFile
 		}
+		if target.FileRecordLimit == 0 {
+			target.FileRecordLimit = cfg.ArchiverConfig.FileRecordLimit
+		}
 		if target.MaxFileSize == 0 {
 			target.MaxFileSize = cfg.ArchiverConfig.MaxFileSize
 		}
@@ -240,12 +249,13 @@ func (cfg *Config) normalizeWriters() {
 
 	if fileTargetIndex == -1 {
 		cfg.Writers.Targets = append([]WriterTarget{{
-			Type:         "file",
-			Enabled:      true,
-			SessionsFile: cfg.ArchiverConfig.SessionsFile,
-			QueriesFile:  cfg.ArchiverConfig.QueriesFile,
-			SegmentsFile: cfg.ArchiverConfig.SegmentsFile,
-			MaxFileSize:  cfg.ArchiverConfig.MaxFileSize,
+			Type:            "file",
+			Enabled:         true,
+			SessionsFile:    cfg.ArchiverConfig.SessionsFile,
+			QueriesFile:     cfg.ArchiverConfig.QueriesFile,
+			SegmentsFile:    cfg.ArchiverConfig.SegmentsFile,
+			MaxFileSize:     cfg.ArchiverConfig.MaxFileSize,
+			FileRecordLimit: cfg.ArchiverConfig.FileRecordLimit,
 		}}, cfg.Writers.Targets...)
 		return
 	}
@@ -341,6 +351,9 @@ func ReadFromFile(configFile string) (*Config, error) {
 }
 
 func (cfg *Config) Validate() error {
+	if cfg.ArchiverConfig.FileRecordLimit < 0 {
+		return fmt.Errorf("arch_config.file_record_limit must be >= 0")
+	}
 	if cfg.SessionRefreshInterval <= 0 {
 		return fmt.Errorf("session_refresh_interval must be > 0, got %v", cfg.SessionRefreshInterval)
 	}
@@ -388,6 +401,9 @@ func (cfg *Config) Validate() error {
 		target := &cfg.Writers.Targets[i]
 		switch target.Type {
 		case "file":
+			if target.FileRecordLimit < 0 {
+				return fmt.Errorf("writers.targets[%d].file_record_limit must be >= 0", i)
+			}
 		case "clickhouse":
 			if target.Enabled && len(target.Addrs) == 0 {
 				return fmt.Errorf("writers.targets[%d]: clickhouse target requires addrs when enabled", i)
