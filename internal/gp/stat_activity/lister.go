@@ -148,6 +148,8 @@ from
 				pg_locks l,
 				pg_locks w
 			WHERE l.transactionid = w.transactionid
+				AND l.gp_segment_id = w.gp_segment_id
+				AND l.mppsessionid <> w.mppsessionid
 				AND l.granted = true
 				AND w.granted = false
 				AND l.transactionid is not NULL
@@ -167,6 +169,7 @@ from
 				AND w.granted = false
 				AND l.locktype = 'relation'
 				AND l.gp_segment_id = w.gp_segment_id
+				AND l.mppsessionid <> w.mppsessionid
 		`
 )
 
