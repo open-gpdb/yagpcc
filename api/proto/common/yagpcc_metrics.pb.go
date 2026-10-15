@@ -193,7 +193,11 @@ type QueryInfo struct {
 	// start time: time when query started execution
 	StartTime *timestamppb.Timestamp `protobuf:"bytes,13,opt,name=start_time,json=startTime,proto3" json:"start_time,omitempty"`
 	// end time: time when query finished
-	EndTime       *timestamppb.Timestamp `protobuf:"bytes,14,opt,name=end_time,json=endTime,proto3" json:"end_time,omitempty"`
+	EndTime *timestamppb.Timestamp `protobuf:"bytes,14,opt,name=end_time,json=endTime,proto3" json:"end_time,omitempty"`
+	// plan_json: EXPLAIN (FORMAT JSON) plan; field number must match gpsc_metrics.proto.
+	PlanJson string `protobuf:"bytes,15,opt,name=plan_json,json=planJson,proto3" json:"plan_json,omitempty"`
+	// analyze_json: EXPLAIN (ANALYZE, FORMAT JSON) plan; field number must match gpsc_metrics.proto.
+	AnalyzeJson   string `protobuf:"bytes,16,opt,name=analyze_json,json=analyzeJson,proto3" json:"analyze_json,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -326,6 +330,20 @@ func (x *QueryInfo) GetEndTime() *timestamppb.Timestamp {
 		return x.EndTime
 	}
 	return nil
+}
+
+func (x *QueryInfo) GetPlanJson() string {
+	if x != nil {
+		return x.PlanJson
+	}
+	return ""
+}
+
+func (x *QueryInfo) GetAnalyzeJson() string {
+	if x != nil {
+		return x.AnalyzeJson
+	}
+	return ""
 }
 
 type AdditionalQueryInfo struct {
@@ -2872,7 +2890,7 @@ var File_api_proto_common_yagpcc_metrics_proto protoreflect.FileDescriptor
 
 const file_api_proto_common_yagpcc_metrics_proto_rawDesc = "" +
 	"\n" +
-	"%api/proto/common/yagpcc_metrics.proto\x12\x06yagpcc\x1a\x1fgoogle/protobuf/timestamp.proto\"\xc2\x04\n" +
+	"%api/proto/common/yagpcc_metrics.proto\x12\x06yagpcc\x1a\x1fgoogle/protobuf/timestamp.proto\"\x82\x05\n" +
 	"\tQueryInfo\x123\n" +
 	"\tgenerator\x18\x01 \x01(\x0e2\x15.yagpcc.PlanGeneratorR\tgenerator\x12\x19\n" +
 	"\bquery_id\x18\x02 \x01(\x04R\aqueryId\x12\x17\n" +
@@ -2891,7 +2909,9 @@ const file_api_proto_common_yagpcc_metrics_proto_rawDesc = "" +
 	"submitTime\x129\n" +
 	"\n" +
 	"start_time\x18\r \x01(\v2\x1a.google.protobuf.TimestampR\tstartTime\x125\n" +
-	"\bend_time\x18\x0e \x01(\v2\x1a.google.protobuf.TimestampR\aendTime\"x\n" +
+	"\bend_time\x18\x0e \x01(\v2\x1a.google.protobuf.TimestampR\aendTime\x12\x1b\n" +
+	"\tplan_json\x18\x0f \x01(\tR\bplanJson\x12!\n" +
+	"\fanalyze_json\x18\x10 \x01(\tR\vanalyzeJson\"x\n" +
 	"\x13AdditionalQueryInfo\x12!\n" +
 	"\fnested_level\x18\x01 \x01(\x03R\vnestedLevel\x12#\n" +
 	"\rerror_message\x18\x02 \x01(\tR\ferrorMessage\x12\x19\n" +

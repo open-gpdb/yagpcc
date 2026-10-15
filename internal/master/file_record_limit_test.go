@@ -82,6 +82,45 @@ func TestArchiveJSONBoundary(t *testing.T) {
 	}
 }
 
+func TestArchiveJSONDropsPlansBeforeText(t *testing.T) {
+	record := func() []byte {
+		in, err := json.Marshal(map[string]interface{}{
+			"queryInfo": map[string]interface{}{
+				"queryText":   "select 1",
+				"planText":    strings.Repeat("p", 100),
+				"planJson":    `[{"Plan":"` + strings.Repeat("j", 2000) + `"}]`,
+				"analyzeJson": `[{"Plan":"` + strings.Repeat("a", 3000) + `"}]`,
+			},
+		})
+		require.NoError(t, err)
+		return in
+	}
+	decode := func(out []byte) map[string]interface{} {
+		require.True(t, json.Valid(out))
+		var rec map[string]interface{}
+		require.NoError(t, json.Unmarshal(out, &rec))
+		return rec["queryInfo"].(map[string]interface{})
+	}
+
+	out, changed, err := limitArchiveJSON(record(), 2500)
+	require.NoError(t, err)
+	require.True(t, changed)
+	require.LessOrEqual(t, len(out)+1, 2500)
+	qi := decode(out)
+	require.Equal(t, "", qi["analyzeJson"])
+	require.Len(t, qi["planJson"], 2000+len(`[{"Plan":""}]`))
+	require.Equal(t, strings.Repeat("p", 100), qi["planText"])
+
+	out, _, err = limitArchiveJSON(record(), 150)
+	require.NoError(t, err)
+	require.LessOrEqual(t, len(out)+1, 150)
+	qi = decode(out)
+	require.Equal(t, "", qi["analyzeJson"])
+	require.Equal(t, "", qi["planJson"])
+	require.Equal(t, "select 1", qi["queryText"])
+	require.Contains(t, qi["planText"], truncationMarker)
+}
+
 func TestArchiveJSONDoesNotTruncateOtherFields(t *testing.T) {
 	in := []byte(`{"message":"` + strings.Repeat("x", 2000) + `","queryInfo":{"queryText":"select 1"}}`)
 	out, _, err := limitArchiveJSON(in, 512)

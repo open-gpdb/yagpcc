@@ -38,7 +38,7 @@ var migrationsFS embed.FS
 
 // ExpectedSchemaVersion is the schema version this binary expects after all
 // embedded migrations have been applied. Bump when adding a new migration.
-const ExpectedSchemaVersion = 1
+const ExpectedSchemaVersion = 2
 
 // Migration is one parsed up/down pair from the embedded migrations FS.
 type Migration struct {

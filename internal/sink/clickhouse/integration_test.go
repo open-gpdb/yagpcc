@@ -32,6 +32,7 @@ package clickhouse
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"os"
 	"strings"
@@ -148,10 +149,15 @@ func TestClickHouseIntegration(t *testing.T) {
 	statements := []string{
 		statementDoc(ts, 2001, ""),
 		statementDoc(ts, 2002, "hello"), // extra top-level field -> _rest
+		// Live-writer shape: EmitUnpopulated emits the keys as "" instead of omitting them.
+		emptyPlanJSONStatementDoc(ts, 2004),
+		// Schema v2: FORMAT JSON payloads land in their own columns.
+		planJSONStatementDoc(t, ts, 2003),
 	}
 	segments := []string{
 		segmentDoc(ts, 3001),
 		segmentDoc(ts, 3002),
+		planJSONSegmentDoc(t, ts, 3003),
 	}
 
 	insertJSON(ctx, t, conn, SessionsMapping(), sessions)
@@ -159,14 +165,15 @@ func TestClickHouseIntegration(t *testing.T) {
 	insertJSON(ctx, t, conn, SegmentsMapping(), segments)
 
 	t.Run("row counts and CDC columns", func(t *testing.T) {
-		if got := countRows(ctx, t, conn, "SELECT count() FROM yagpcc.sessions_part"); got != 3 {
-			t.Errorf("sessions count = %d, want 3", got)
+		// Distinct sess_ids: nothing collapses under ReplacingMergeTree, count == fixture size.
+		if got := countRows(ctx, t, conn, "SELECT count() FROM yagpcc.sessions_part"); got != uint64(len(sessions)) {
+			t.Errorf("sessions count = %d, want %d", got, len(sessions))
 		}
-		if got := countRows(ctx, t, conn, "SELECT count() FROM yagpcc.statements_part"); got != 2 {
-			t.Errorf("statements count = %d, want 2", got)
+		if got := countRows(ctx, t, conn, "SELECT count() FROM yagpcc.statements_part"); got != uint64(len(statements)) {
+			t.Errorf("statements count = %d, want %d", got, len(statements))
 		}
-		if got := countRows(ctx, t, conn, "SELECT count() FROM yagpcc.segments_part"); got != 2 {
-			t.Errorf("segments count = %d, want 2", got)
+		if got := countRows(ctx, t, conn, "SELECT count() FROM yagpcc.segments_part"); got != uint64(len(segments)) {
+			t.Errorf("segments count = %d, want %d", got, len(segments))
 		}
 		if got := countRows(ctx, t, conn,
 			"SELECT count() FROM yagpcc.sessions_part WHERE _partition = 'direct' AND _offset = 0"); got != 3 {
@@ -221,6 +228,66 @@ func TestClickHouseIntegration(t *testing.T) {
 		}
 		if tq != "SELECT $1" || tp != "TPLAN" {
 			t.Errorf("template texts = (%q, %q), want (SELECT $1, TPLAN)", tq, tp)
+		}
+	})
+
+	t.Run("schema version is recorded in _yagpcc_meta", func(t *testing.T) {
+		var version int32
+		if err := conn.QueryRow(ctx,
+			"SELECT max(version) FROM yagpcc._yagpcc_meta WHERE direction = 'up'",
+		).Scan(&version); err != nil {
+			t.Fatalf("scan meta version: %v", err)
+		}
+		if version != 2 {
+			t.Errorf("_yagpcc_meta version = %d, want 2", version)
+		}
+	})
+
+	t.Run("plan_json/analyze_json round trip", func(t *testing.T) {
+		for _, tc := range []struct {
+			table string
+			ssid  uint64
+		}{
+			{"statements_part", 2003},
+			{"segments_part", 3003},
+		} {
+			var planJSON, analyzeJSON string
+			var rest *string
+			if err := conn.QueryRow(ctx, fmt.Sprintf(
+				"SELECT plan_json, analyze_json, _rest FROM yagpcc.%s WHERE sess_id = %d", tc.table, tc.ssid,
+			)).Scan(&planJSON, &analyzeJSON, &rest); err != nil {
+				t.Fatalf("scan %s plan json: %v", tc.table, err)
+			}
+			if planJSON != planJSONSample {
+				t.Errorf("%s plan_json = %q, want %q", tc.table, planJSON, planJSONSample)
+			}
+			if analyzeJSON != analyzeJSONSample {
+				t.Errorf("%s analyze_json = %q, want %q", tc.table, analyzeJSON, analyzeJSONSample)
+			}
+			// Both payloads are mapped to columns, so nothing leaks into _rest.
+			if rest != nil {
+				t.Errorf("%s _rest = %q, want NULL", tc.table, *rest)
+			}
+		}
+	})
+
+	t.Run("documents without FORMAT JSON payload keys leave NULLs", func(t *testing.T) {
+		// Docs that omit the keys (pre-v2 archives) read back as NULL, not "".
+		if got := countRows(ctx, t, conn,
+			"SELECT count() FROM yagpcc.statements_part WHERE plan_json IS NULL AND analyze_json IS NULL"); got != 2 {
+			t.Errorf("statements without plan json = %d, want 2", got)
+		}
+		if got := countRows(ctx, t, conn,
+			"SELECT count() FROM yagpcc.segments_part WHERE plan_json IS NULL AND analyze_json IS NULL"); got != 2 {
+			t.Errorf("segments without plan json = %d, want 2", got)
+		}
+	})
+
+	t.Run("empty FORMAT JSON payload strings are stored as empty, not NULL", func(t *testing.T) {
+		// EmitUnpopulated yields "planJson": "", stored as '' (distinct from pre-upgrade NULL).
+		if got := countRows(ctx, t, conn,
+			"SELECT count() FROM yagpcc.statements_part WHERE plan_json = '' AND analyze_json = ''"); got != 1 {
+			t.Errorf("statements with empty plan json = %d, want 1", got)
 		}
 	})
 
@@ -284,6 +351,26 @@ func statementDoc(ts string, ssid uint64, extra string) string {
 }`, ts, ssid, tail)
 }
 
+// emptyPlanJSONStatementDoc: statement doc as the live writer emits it, planJson/analyzeJson = "".
+func emptyPlanJSONStatementDoc(ts string, ssid uint64) string {
+	return fmt.Sprintf(`{
+  "clusterId": "itest",
+  "hostname": "h1",
+  "collectTime": %q,
+  "queryKey": {"ssid": %d, "tmid": 0, "ccnt": 2},
+  "queryInfo": {
+    "generator": "PLAN_GENERATOR_OPTIMIZER",
+    "queryId": "12", "planId": "321",
+    "queryText": "select 1", "planText": "plan",
+    "planJson": "", "analyzeJson": "",
+    "templateQueryText": "SELECT $1", "templatePlanText": "TPLAN",
+    "userName": "bob", "databaseName": "db", "rsgname": "rg"
+  },
+  "queryStatus": "QUERY_STATUS_DONE",
+  "completed": true
+}`, ts, ssid)
+}
+
 // segmentDoc builds a segment JSON document in the protojson (camelCase) shape
 // the segment stream emits.
 func segmentDoc(ts string, ssid uint64) string {
@@ -295,4 +382,222 @@ func segmentDoc(ts string, ssid uint64) string {
   "segmentKey": {"dbid": 2, "segindex": 4},
   "queryInfo": {"queryId": "12", "planId": "321"}
 }`, ts, ssid)
+}
+
+// planJSONStatementDoc: statement doc with JSON payloads embedded protojson-style;
+// only mapped keys, so _rest stays NULL.
+func planJSONStatementDoc(t *testing.T, ts string, ssid uint64) string {
+	t.Helper()
+	plan, err := json.Marshal(planJSONSample)
+	if err != nil {
+		t.Fatalf("marshal plan sample: %v", err)
+	}
+	analyze, err := json.Marshal(analyzeJSONSample)
+	if err != nil {
+		t.Fatalf("marshal analyze sample: %v", err)
+	}
+	return fmt.Sprintf(`{
+  "clusterId": "itest",
+  "hostname": "h1",
+  "collectTime": %q,
+  "queryKey": {"ssid": %d, "tmid": 0, "ccnt": 2},
+  "queryInfo": {
+    "queryId": "12", "planId": "321",
+    "queryText": "select 1", "planText": "plan",
+    "planJson": %s,
+    "analyzeJson": %s,
+    "userName": "bob", "databaseName": "db"
+  },
+  "queryStatus": "QUERY_STATUS_DONE",
+  "completed": true
+}`, ts, ssid, plan, analyze)
+}
+
+// planJSONSegmentDoc mirrors planJSONStatementDoc for the segments stream.
+func planJSONSegmentDoc(t *testing.T, ts string, ssid uint64) string {
+	t.Helper()
+	plan, err := json.Marshal(planJSONSample)
+	if err != nil {
+		t.Fatalf("marshal plan sample: %v", err)
+	}
+	analyze, err := json.Marshal(analyzeJSONSample)
+	if err != nil {
+		t.Fatalf("marshal analyze sample: %v", err)
+	}
+	return fmt.Sprintf(`{
+  "clusterId": "itest",
+  "hostname": "h1",
+  "collectTime": %q,
+  "queryKey": {"ssid": %d, "tmid": 0, "ccnt": 2},
+  "segmentKey": {"dbid": 2, "segindex": 4},
+  "queryInfo": {
+    "queryId": "12", "planId": "321", "planText": "plan",
+    "planJson": %s,
+    "analyzeJson": %s
+  }
+}`, ts, ssid, plan, analyze)
+}
+
+// legacyStatementInsert writes a row through the v1 column list (pre-v2 data).
+const legacyStatementInsert = `INSERT INTO yagpcc.statements_part
+    (_timestamp, _partition, _offset, _idx, cluster_id, collect_time, hostname,
+     sess_id, tm_id, ccnt, query_id, plan_id, query_text, plan_text, user_name, database_name)
+VALUES (now(), 'v1', 0, 0, 'itest', now(), 'h1', 9001, 0, 1, 12, 321, 'select 1', 'plan', 'bob', 'db')`
+
+const legacySegmentInsert = `INSERT INTO yagpcc.segments_part
+    (_timestamp, _partition, _offset, _idx, cluster_id, collect_time, hostname,
+     sess_id, tm_id, ccnt, dbid, segindex, query_id, plan_id, plan_text)
+VALUES (now(), 'v1', 0, 0, 'itest', now(), 'h1', 9002, 0, 1, 2, 4, 12, 321, 'plan')`
+
+// countPlanJSONColumns counts the v2 plan_json/analyze_json columns across both fact tables.
+func countPlanJSONColumns(ctx context.Context, t *testing.T, conn driver.Conn) uint64 {
+	t.Helper()
+	return countRows(ctx, t, conn,
+		"SELECT count() FROM system.columns WHERE database = 'yagpcc' "+
+			"AND table IN ('statements_part', 'segments_part') "+
+			"AND name IN ('plan_json', 'analyze_json')")
+}
+
+// TestClickHouseIntegrationSchemaUpgrade upgrades a v1 database to v2 via ApplyMigrations
+// (the --migrate-only path); shares yagpcc with TestClickHouseIntegration, so no t.Parallel.
+func TestClickHouseIntegrationSchemaUpgrade(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Minute)
+	defer cancel()
+
+	conn := openIntegrationConn(ctx, t)
+	defer conn.Close()
+
+	if err := conn.Exec(ctx, "DROP DATABASE IF EXISTS yagpcc"); err != nil {
+		t.Fatalf("drop database: %v", err)
+	}
+
+	// ApplyMigrations has no partial target: build the v1 baseline by hand and record it in meta.
+	initDDL, err := DumpMigration(0, 1, DumpOptions{RetentionDays: 60})
+	if err != nil {
+		t.Fatalf("render migration 0001: %v", err)
+	}
+	for _, stmt := range SplitStatements(initDDL) {
+		if err := conn.Exec(ctx, stmt); err != nil {
+			t.Fatalf("exec 0001 statement %q: %v", stmt, err)
+		}
+	}
+	if err := conn.Exec(ctx, insertMetaSQL, int32(1), "integration-v1", "up"); err != nil {
+		t.Fatalf("record version 1: %v", err)
+	}
+	if v, err := GetCurrentVersion(ctx, conn); err != nil || v != 1 {
+		t.Fatalf("baseline version = %d, err = %v, want 1", v, err)
+	}
+	if got := countPlanJSONColumns(ctx, t, conn); got != 0 {
+		t.Fatalf("plan json columns before upgrade = %d, want 0", got)
+	}
+
+	if err := conn.Exec(ctx, legacyStatementInsert); err != nil {
+		t.Fatalf("insert legacy statement: %v", err)
+	}
+	if err := conn.Exec(ctx, legacySegmentInsert); err != nil {
+		t.Fatalf("insert legacy segment: %v", err)
+	}
+
+	if err := ApplyMigrations(ctx, conn, MigrateOptions{RetentionDays: 60, YagpccVersion: "integration"}); err != nil {
+		t.Fatalf("upgrade to v2: %v", err)
+	}
+
+	t.Run("version advances to 2", func(t *testing.T) {
+		if v, err := GetCurrentVersion(ctx, conn); err != nil || v != ExpectedSchemaVersion {
+			t.Fatalf("version after upgrade = %d, err = %v, want %d", v, err, ExpectedSchemaVersion)
+		}
+		if err := VerifySchema(ctx, conn); err != nil {
+			t.Errorf("VerifySchema after upgrade: %v", err)
+		}
+	})
+
+	t.Run("columns are added after plan_text", func(t *testing.T) {
+		if got := countPlanJSONColumns(ctx, t, conn); got != 4 {
+			t.Errorf("plan json columns after upgrade = %d, want 4", got)
+		}
+		for _, table := range []string{"statements_part", "segments_part"} {
+			var planTextPos, planJSONPos, analyzeJSONPos uint64
+			if err := conn.QueryRow(ctx, fmt.Sprintf(
+				"SELECT "+
+					"maxIf(position, name = 'plan_text'), "+
+					"maxIf(position, name = 'plan_json'), "+
+					"maxIf(position, name = 'analyze_json') "+
+					"FROM system.columns WHERE database = 'yagpcc' AND table = '%s'", table,
+			)).Scan(&planTextPos, &planJSONPos, &analyzeJSONPos); err != nil {
+				t.Fatalf("scan %s column positions: %v", table, err)
+			}
+			if planJSONPos != planTextPos+1 || analyzeJSONPos != planJSONPos+1 {
+				t.Errorf("%s column positions: plan_text=%d plan_json=%d analyze_json=%d",
+					table, planTextPos, planJSONPos, analyzeJSONPos)
+			}
+		}
+	})
+
+	t.Run("pre-upgrade rows read back as NULL", func(t *testing.T) {
+		for _, tc := range []struct {
+			table string
+			ssid  uint64
+		}{
+			{"statements_part", 9001},
+			{"segments_part", 9002},
+		} {
+			var planText string
+			var planJSON, analyzeJSON *string
+			if err := conn.QueryRow(ctx, fmt.Sprintf(
+				"SELECT plan_text, plan_json, analyze_json FROM yagpcc.%s WHERE sess_id = %d", tc.table, tc.ssid,
+			)).Scan(&planText, &planJSON, &analyzeJSON); err != nil {
+				t.Fatalf("scan legacy %s row: %v", tc.table, err)
+			}
+			if planText != "plan" {
+				t.Errorf("%s plan_text = %q, want plan", tc.table, planText)
+			}
+			if planJSON != nil || analyzeJSON != nil {
+				t.Errorf("%s legacy row json columns = (%v, %v), want NULL", tc.table, planJSON, analyzeJSON)
+			}
+		}
+	})
+
+	t.Run("post-upgrade rows carry the payloads", func(t *testing.T) {
+		ts := time.Now().UTC().Truncate(time.Second).Format(time.RFC3339)
+		insertJSON(ctx, t, conn, StatementsMapping(), []string{planJSONStatementDoc(t, ts, 9101)})
+		insertJSON(ctx, t, conn, SegmentsMapping(), []string{planJSONSegmentDoc(t, ts, 9102)})
+		for _, tc := range []struct {
+			table string
+			ssid  uint64
+		}{
+			{"statements_part", 9101},
+			{"segments_part", 9102},
+		} {
+			var planJSON, analyzeJSON string
+			if err := conn.QueryRow(ctx, fmt.Sprintf(
+				"SELECT plan_json, analyze_json FROM yagpcc.%s WHERE sess_id = %d", tc.table, tc.ssid,
+			)).Scan(&planJSON, &analyzeJSON); err != nil {
+				t.Fatalf("scan upgraded %s row: %v", tc.table, err)
+			}
+			if planJSON != planJSONSample || analyzeJSON != analyzeJSONSample {
+				t.Errorf("%s payloads = (%q, %q), want the samples", tc.table, planJSON, analyzeJSON)
+			}
+		}
+	})
+
+	// Runs last: it reverts the schema this test built up.
+	t.Run("down migration drops the columns", func(t *testing.T) {
+		downDDL, err := DumpMigration(ExpectedSchemaVersion, 1, DumpOptions{RetentionDays: 60})
+		if err != nil {
+			t.Fatalf("render down migration: %v", err)
+		}
+		for _, stmt := range SplitStatements(downDDL) {
+			if err := conn.Exec(ctx, stmt); err != nil {
+				t.Fatalf("exec 0002 down statement %q: %v", stmt, err)
+			}
+		}
+		if got := countPlanJSONColumns(ctx, t, conn); got != 0 {
+			t.Errorf("plan json columns after downgrade = %d, want 0", got)
+		}
+		// The legacy rows and their plan_text are untouched by the rollback.
+		if got := countRows(ctx, t, conn,
+			"SELECT count() FROM yagpcc.statements_part WHERE sess_id = 9001 AND plan_text = 'plan'"); got != 1 {
+			t.Errorf("legacy statement after downgrade = %d, want 1", got)
+		}
+	})
 }

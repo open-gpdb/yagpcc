@@ -53,6 +53,8 @@ type (
 		PlanText          string
 		TemplateQueryText string
 		TemplatePlanText  string
+		PlanJson          string
+		AnalyzeJson       string
 		TotalMetrics      *pbc.GPMetrics
 		QueryKey          *pbc.QueryKey
 		AggTimes          *pbc.AggregatedMetrics
@@ -152,6 +154,8 @@ func (a *AggregatedStorage) ArchiveAggQuery(ctx context.Context, queryChan chan 
 							PlanText:          val.PlanText,
 							TemplateQueryText: val.TemplateQueryText,
 							TemplatePlanText:  val.TemplatePlanText,
+							PlanJson:          val.PlanJson,
+							AnalyzeJson:       val.AnalyzeJson,
 							Rsgname:           key.Rsgname,
 						},
 						StartTime:         utils.GetTimeAsString(key.StartTime),
@@ -226,6 +230,8 @@ func (a *AggregatedStorage) AggQuery(qT *pbm.TotalQueryData) error {
 		aValNew := &AggVal{
 			QueryText:    qT.QueryStat.QueryInfo.QueryText,
 			PlanText:     qT.QueryStat.QueryInfo.PlanText,
+			PlanJson:     qT.QueryStat.QueryInfo.PlanJson,
+			AnalyzeJson:  qT.QueryStat.QueryInfo.AnalyzeJson,
 			TotalMetrics: &pbc.GPMetrics{},
 			AggTimes:     &pbc.AggregatedMetrics{},
 			QueryKey:     qT.QueryStat.QueryKey,
@@ -265,6 +271,13 @@ func (a *AggregatedStorage) AggQuery(qT *pbm.TotalQueryData) error {
 	}
 	aVal.QueryLock.Lock()
 	defer aVal.QueryLock.Unlock()
+	// the first event of a bucket may arrive without JSON plans (analyze below min_analyze_time), keep the first non-empty ones
+	if aVal.PlanJson == "" {
+		aVal.PlanJson = qT.QueryStat.QueryInfo.PlanJson
+	}
+	if aVal.AnalyzeJson == "" {
+		aVal.AnalyzeJson = qT.QueryStat.QueryInfo.AnalyzeJson
+	}
 	intermediateResults := make(map[MapAggregateKey]uint64, 0)
 	err := GroupGPMetrics(aVal.TotalMetrics, qT.QueryStat.TotalQueryMetrics, AggMax, "hostname", intermediateResults)
 	if err != nil {

@@ -17,6 +17,7 @@
 package storage
 
 import (
+	"context"
 	"math/rand"
 	"os"
 	"testing"
@@ -271,5 +272,63 @@ func TestParallelAgg(t *testing.T) {
 				time.Sleep(time.Duration(tcTest.sleep) * time.Second)
 			}
 		})
+	}
+}
+
+// TestAggregateKeepsJsonPlans: the aggregated row carries the first non-empty JSON plans of the bucket.
+func TestAggregateKeepsJsonPlans(t *testing.T) {
+	file, err := os.Create("trace.log")
+	require.NoError(t, err)
+	zLogger := utils.DualLog(true, file)
+	aggStorage := NewAggregatedStorage(zLogger, WithTruncInterval(time.Minute))
+
+	startQ, endQ := setTime()
+	event := func(planJSON, analyzeJSON string) *pbm.TotalQueryData {
+		return &pbm.TotalQueryData{
+			QueryStat: &pbm.QueryStat{
+				StatKind:    pbm.StatKind_SK_PRECISE,
+				Completed:   true,
+				StartTime:   timestamppb.New(startQ),
+				EndTime:     timestamppb.New(endQ),
+				QueryStatus: pbc.QueryStatus_QUERY_STATUS_DONE,
+				QueryInfo: &pbc.QueryInfo{
+					QueryId:     321,
+					QueryText:   "Select 1",
+					PlanText:    "Result",
+					PlanJson:    planJSON,
+					AnalyzeJson: analyzeJSON,
+				},
+				QueryKey:          &pbc.QueryKey{Ssid: 1},
+				TotalQueryMetrics: &pbc.GPMetrics{SystemStat: &pbc.SystemStat{UserTimeSeconds: 1}},
+			},
+		}
+	}
+
+	require.NoError(t, aggStorage.AggQuery(event("", "")))
+	require.NoError(t, aggStorage.AggQuery(event(`[{"Plan":{"Node Type":"Result"}}]`, "")))
+	require.NoError(t, aggStorage.AggQuery(event(`[{"Plan":{"Node Type":"Other"}}]`, `[{"Plan":{"Actual Rows":1}}]`)))
+
+	startI, endI := aggStorage.GetCurrentInterval()
+	valA, okA := aggStorage.aggQueries[AggKey{QueryID: 321, StartTime: startI, EndTime: endI}]
+	require.True(t, okA)
+	assert.Equal(t, `[{"Plan":{"Node Type":"Result"}}]`, valA.PlanJson)
+	assert.Equal(t, `[{"Plan":{"Actual Rows":1}}]`, valA.AnalyzeJson)
+	assert.Equal(t, int64(3), valA.AggTimes.Calls)
+
+	// move the clock past the bucket so ArchiveAggQuery flushes it
+	CurrentTime = func() time.Time { return endQ.Add(3 * time.Minute) }
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	queryChan := make(chan *pbm.QueryStatWrite, 1)
+	go func() { _ = aggStorage.ArchiveAggQuery(ctx, queryChan, "cluster", "host") }()
+
+	select {
+	case stat := <-queryChan:
+		assert.Equal(t, pbm.StatKind_SK_AGGREGATED, stat.StatKind)
+		assert.Equal(t, "Result", stat.QueryInfo.PlanText)
+		assert.Equal(t, `[{"Plan":{"Node Type":"Result"}}]`, stat.QueryInfo.PlanJson)
+		assert.Equal(t, `[{"Plan":{"Actual Rows":1}}]`, stat.QueryInfo.AnalyzeJson)
+	case <-time.After(5 * time.Second):
+		t.Fatal("aggregated query was not archived")
 	}
 }

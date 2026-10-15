@@ -62,12 +62,36 @@ func limitArchiveJSON(data []byte, limit int64) ([]byte, bool, error) {
 		return nil, false, err
 	}
 
+	if err := dropJSONPlansUntilFits(record, limit); err != nil {
+		return nil, false, err
+	}
 	fields := collectTruncatableTextFields(record)
 	result, err := fitArchiveRecord(record, fields, limit)
 	if err != nil {
 		return nil, false, err
 	}
 	return result, true, nil
+}
+
+func dropJSONPlansUntilFits(record map[string]interface{}, limit int64) error {
+	object, ok := record["queryInfo"].(map[string]interface{})
+	if !ok {
+		return nil
+	}
+	for _, name := range []string{"analyzeJson", "planJson"} {
+		if text, ok := object[name].(string); !ok || text == "" {
+			continue
+		}
+		result, err := json.Marshal(record)
+		if err != nil {
+			return err
+		}
+		if int64(len(result))+1 <= limit {
+			return nil
+		}
+		object[name] = ""
+	}
+	return nil
 }
 
 func collectTruncatableTextFields(record map[string]interface{}) []truncatableTextField {

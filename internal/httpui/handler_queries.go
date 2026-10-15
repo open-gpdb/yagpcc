@@ -289,6 +289,8 @@ func convertQueryInfo(qi *pbc.QueryInfo) map[string]interface{} {
 		"databaseName": qi.GetDatabaseName(),
 		"rsgname":      qi.GetRsgname(),
 		"analyzeText":  qi.GetAnalyzeText(),
+		"planJson":     qi.GetPlanJson(),
+		"analyzeJson":  qi.GetAnalyzeJson(),
 		"submitTime":   formatTimestamp(qi.GetSubmitTime()),
 		"startTime":    formatTimestamp(qi.GetStartTime()),
 		"endTime":      formatTimestamp(qi.GetEndTime()),
